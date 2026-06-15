@@ -1,0 +1,1046 @@
+{
+  "generated_at": "2026-04-24T14:47:30.988806+00:00",
+  "profile": "ability",
+  "checked_files": [
+    "src/client/Controllers/AbilityController.luau",
+    "src/client/Controllers/BossWorldController.luau",
+    "src/client/Controllers/NotificationController.luau",
+    "src/client/Controllers/UIManager.luau",
+    "src/client/Controllers/WeatherController.luau",
+    "src/client/init.client.luau",
+    "src/client/UI/Components/ActionBar.luau",
+    "src/client/UI/Components/AuraCard.luau",
+    "src/client/UI/Components/FusionAuraCard.luau",
+    "src/client/UI/Components/SkillHUD.luau",
+    "src/client/UI/Components/TopBar.luau",
+    "src/client/UI/DesignSystem.luau",
+    "src/client/UI/InventoryUI.luau",
+    "src/client/UI/RollUI.luau",
+    "src/client/UI/StatsUI.luau",
+    "src/client/UI/StoreUI.luau",
+    "src/client/Utils/CameraUtils.luau",
+    "src/client/Utils/SoundUtils.luau",
+    "src/server/init.server.luau",
+    "src/server/Services/AbilityService.luau",
+    "src/server/Services/BossWorldService.luau",
+    "src/server/Services/DataManager.luau",
+    "src/server/Services/PlayerService.luau",
+    "src/server/Services/RollService.luau",
+    "src/server/Services/StatsService.luau",
+    "src/server/Services/WeatherService.luau",
+    "src/shared/Abilities/AbilityBase.luau",
+    "src/shared/Abilities/AmogusSus.luau",
+    "src/shared/Abilities/BasicDoge.luau",
+    "src/shared/Abilities/BigChungus.luau",
+    "src/shared/Abilities/BingChilling.luau",
+    "src/shared/Abilities/BombasticSideEye.luau",
+    "src/shared/Abilities/Boowomp.luau",
+    "src/shared/Abilities/Cameraman.luau",
+    "src/shared/Abilities/Capybara.luau",
+    "src/shared/Abilities/ChillGuy.luau",
+    "src/shared/Abilities/CryingCat.luau",
+    "src/shared/Abilities/DaVinky.luau",
+    "src/shared/Abilities/ElGato.luau",
+    "src/shared/Abilities/FanumTax.luau",
+    "src/shared/Abilities/FlappyBird.luau",
+    "src/shared/Abilities/Floppa.luau",
+    "src/shared/Abilities/Gigachad.luau",
+    "src/shared/Abilities/Gojo.luau",
+    "src/shared/Abilities/GoofyAhhUncle.luau",
+    "src/shared/Abilities/GrimaceShake.luau",
+    "src/shared/Abilities/JohnPork.luau",
+    "src/shared/Abilities/LightskinStare.luau",
+    "src/shared/Abilities/LoreReason.luau",
+    "src/shared/Abilities/MaxwellCat.luau",
+    "src/shared/Abilities/MewingStreak.luau",
+    "src/shared/Abilities/MondayLeftMeBroken.luau",
+    "src/shared/Abilities/MrBeast.luau",
+    "src/shared/Abilities/NerdEmoji.luau",
+    "src/shared/Abilities/OhioFinalBoss.luau",
+    "src/shared/Abilities/PedroRaccoon.luau",
+    "src/shared/Abilities/Plink.luau",
+    "src/shared/Abilities/Rizzler.luau",
+    "src/shared/Abilities/SigmaMale.luau",
+    "src/shared/Abilities/SkibidiToilet.luau",
+    "src/shared/Abilities/SmurfCat.luau",
+    "src/shared/Abilities/SpinningRoach.luau",
+    "src/shared/Abilities/StandardAbility.luau",
+    "src/shared/AuraData.luau",
+    "src/shared/Constants.luau",
+    "src/shared/Network.luau",
+    "src/shared/Utilities/NumberUtility.luau",
+    "src/shared/Utilities/TableUtility.luau",
+    "src/startercharacter/.gitkeep.luau",
+    "src/startercharacter/Dash.client.luau",
+    "src/startercharacter/Geppo.client.luau",
+    "src/startergui/.gitkeep.luau"
+  ],
+  "baseline_size": 160,
+  "known_findings": [
+    {
+      "level": "fail",
+      "file": "src/client/Controllers/AbilityController.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/AbilityController.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/BossWorldController.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/BossWorldController.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/BossWorldController.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/NotificationController.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/NotificationController.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/NotificationController.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/UIManager.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/UIManager.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/UIManager.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/WeatherController.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/WeatherController.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Controllers/WeatherController.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/init.client.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/init.client.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/init.client.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/ActionBar.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/ActionBar.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/ActionBar.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/AuraCard.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/AuraCard.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/AuraCard.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/FusionAuraCard.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/FusionAuraCard.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/FusionAuraCard.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/SkillHUD.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/SkillHUD.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/SkillHUD.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/TopBar.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/TopBar.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/Components/TopBar.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/client/UI/DesignSystem.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/DesignSystem.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/InventoryUI.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/InventoryUI.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/InventoryUI.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/client/UI/RollUI.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/RollUI.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/StatsUI.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/StatsUI.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/StatsUI.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/StoreUI.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/StoreUI.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/UI/StoreUI.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Utils/CameraUtils.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Utils/CameraUtils.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Utils/CameraUtils.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Utils/SoundUtils.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Utils/SoundUtils.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/client/Utils/SoundUtils.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/init.server.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/init.server.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/init.server.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/server/Services/AbilityService.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/AbilityService.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "fail",
+      "file": "src/server/Services/BossWorldService.luau",
+      "rule": "forbidden_1",
+      "detail": "Matched forbidden pattern: BodyVelocity"
+    },
+    {
+      "level": "fail",
+      "file": "src/server/Services/BossWorldService.luau",
+      "rule": "forbidden_2",
+      "detail": "Matched forbidden pattern: BodyPosition"
+    },
+    {
+      "level": "fail",
+      "file": "src/server/Services/BossWorldService.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/DataManager.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/DataManager.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/PlayerService.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/PlayerService.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/PlayerService.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/RollService.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/RollService.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/RollService.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/StatsService.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/StatsService.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/StatsService.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/WeatherService.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/WeatherService.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/server/Services/WeatherService.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/AbilityBase.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/AbilityBase.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/AmogusSus.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/AmogusSus.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/BasicDoge.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/BasicDoge.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/BigChungus.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/BingChilling.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/BombasticSideEye.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/Boowomp.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/Boowomp.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/Cameraman.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/Capybara.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/ChillGuy.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/ChillGuy.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/CryingCat.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/CryingCat.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/CryingCat.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/DaVinky.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/ElGato.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/ElGato.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/FanumTax.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/FlappyBird.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/Floppa.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/Gigachad.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/Gigachad.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/Gigachad.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/Gojo.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/Gojo.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/GoofyAhhUncle.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/GrimaceShake.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/GrimaceShake.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/JohnPork.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/LightskinStare.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/LightskinStare.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/LoreReason.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/LoreReason.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/MaxwellCat.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/MewingStreak.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/MewingStreak.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/MondayLeftMeBroken.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/MrBeast.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/MrBeast.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/NerdEmoji.luau",
+      "rule": "forbidden_1",
+      "detail": "Matched forbidden pattern: BodyVelocity"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/NerdEmoji.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/OhioFinalBoss.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/PedroRaccoon.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/PedroRaccoon.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/Plink.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/Rizzler.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/SigmaMale.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/SigmaMale.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/SkibidiToilet.luau",
+      "rule": "forbidden_1",
+      "detail": "Matched forbidden pattern: BodyVelocity"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/SkibidiToilet.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/SkibidiToilet.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/SmurfCat.luau",
+      "rule": "forbidden_1",
+      "detail": "Matched forbidden pattern: BodyVelocity"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/SmurfCat.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/SmurfCat.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/shared/Abilities/SpinningRoach.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/StandardAbility.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/StandardAbility.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Abilities/StandardAbility.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/AuraData.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/AuraData.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/AuraData.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Constants.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Constants.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Constants.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Network.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Network.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Utilities/NumberUtility.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Utilities/NumberUtility.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Utilities/NumberUtility.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Utilities/TableUtility.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Utilities/TableUtility.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/shared/Utilities/TableUtility.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/startercharacter/.gitkeep.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/startercharacter/.gitkeep.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/startercharacter/.gitkeep.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/startercharacter/Dash.client.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/startercharacter/Dash.client.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/startercharacter/Dash.client.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "fail",
+      "file": "src/startercharacter/Geppo.client.luau",
+      "rule": "forbidden_4",
+      "detail": "Matched forbidden pattern: wait\\("
+    },
+    {
+      "level": "warn",
+      "file": "src/startercharacter/Geppo.client.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    },
+    {
+      "level": "warn",
+      "file": "src/startergui/.gitkeep.luau",
+      "rule": "required_hint_1",
+      "detail": "Missing expected hint: Debris"
+    },
+    {
+      "level": "warn",
+      "file": "src/startergui/.gitkeep.luau",
+      "rule": "required_hint_2",
+      "detail": "Missing expected hint: task\\.wait"
+    },
+    {
+      "level": "warn",
+      "file": "src/startergui/.gitkeep.luau",
+      "rule": "required_hint_3",
+      "detail": "Missing expected hint: task\\.spawn"
+    }
+  ],
+  "known_count": 160,
+  "status": "pass",
+  "fail_count": 0,
+  "warn_count": 0,
+  "findings": []
+}

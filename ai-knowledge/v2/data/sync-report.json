@@ -1,0 +1,73 @@
+{
+  "synced_at": "2026-04-24T14:40:58.110403+00:00",
+  "total_sources": 6,
+  "changed_sources": 6,
+  "results": [
+    {
+      "id": "creator_hub_engine",
+      "tier": "A",
+      "url": "https://create.roblox.com/docs/en-us/reference/engine",
+      "description": "Roblox Engine API reference",
+      "synced_at": "2026-04-24T14:40:58.110403+00:00",
+      "status": "ok",
+      "hash": "78556b129bb25f9ae23b4826040a5706f15d1ea6ff3e903ca1d93ddbe8b2bede",
+      "changed": true,
+      "char_count": 120000
+    },
+    {
+      "id": "creator_hub_luau",
+      "tier": "A",
+      "url": "https://create.roblox.com/docs/luau",
+      "description": "Official Luau docs",
+      "synced_at": "2026-04-24T14:40:58.110403+00:00",
+      "status": "ok",
+      "hash": "8e611e4ff5e9913786d39bd34088af67cb68013c40fa19a203f35f51be07a56f",
+      "changed": true,
+      "char_count": 120000
+    },
+    {
+      "id": "robloxapi_mirror",
+      "tier": "C",
+      "url": "https://robloxapi.github.io/ref/index.html",
+      "description": "Roblox API mirror and update feed",
+      "synced_at": "2026-04-24T14:40:58.110403+00:00",
+      "status": "ok",
+      "hash": "c48d9e5d23b3b6f87f5d5c3bd04678aaedf5fbf719aac9e960d74a164427cbc8",
+      "changed": true,
+      "char_count": 58028
+    },
+    {
+      "id": "lua_51_manual",
+      "tier": "B",
+      "url": "https://www.lua.org/manual/5.1/manual.html",
+      "description": "Lua 5.1 reference baseline",
+      "synced_at": "2026-04-24T14:40:58.110403+00:00",
+      "status": "ok",
+      "hash": "c155199fdd4f13342ec5cd8493cad6af6b08e8d0cbf907716edc6935de37b122",
+      "changed": true,
+      "char_count": 120000
+    },
+    {
+      "id": "creator_docs_repo",
+      "tier": "B",
+      "url": "https://github.com/Roblox/creator-docs/tree/main",
+      "description": "Roblox open source creator docs",
+      "synced_at": "2026-04-24T14:40:58.110403+00:00",
+      "status": "ok",
+      "hash": "c398d4a50087e5e63828db9b2c9e2df5a6de504345c7b1e3d3629ec75a08e1fb",
+      "changed": true,
+      "char_count": 83136
+    },
+    {
+      "id": "devforum",
+      "tier": "D",
+      "url": "https://devforum.roblox.com/",
+      "description": "Roblox community forum",
+      "synced_at": "2026-04-24T14:40:58.110403+00:00",
+      "status": "ok",
+      "hash": "1d22a306d6ddf54827a1857fc56a36d982ad11e80c3a834180b3e6e0d5521154",
+      "changed": true,
+      "char_count": 4189
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "luau-lsp.completion.imports.suggestServices": true,
+  "luau-lsp.completion.imports.suggestImports": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "JohnnyMorganz.stylua-vscode",
+  "[luau]": {
+    "editor.defaultFormatter": "JohnnyMorganz.stylua-vscode",
+    "editor.formatOnSave": true
+  },
+  "rojo.projectFile": "default.project.json"
+}

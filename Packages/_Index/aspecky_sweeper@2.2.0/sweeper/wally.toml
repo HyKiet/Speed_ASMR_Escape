@@ -1,0 +1,8 @@
+[package]
+name = "aspecky/sweeper"
+version = "2.2.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+description = "It's like Maid/Janitor, but a lot more lightweight with no promises"
+
+[dependencies]

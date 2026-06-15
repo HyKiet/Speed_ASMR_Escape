@@ -1,0 +1,14 @@
+| Level | Rebirths | Pad | Treadmill | Trail | Aura | Gamepass Mult | Gain/Sec | Time to Level (Mins) | Mo ta phan khuc |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0 | Pad 1 | TM 1 | None | None | x1.0 | 2.9 | 0.36 | Newbie (Khai cuoc) |
+| 10 | 0 | Pad 2 | TM 1 | None | Sparkle | x1.0 | 6.9 | 0.56 | Early-game (Dat Pad 2, Sparkle Aura) |
+| 20 | 0 | Pad 3 | TM 2 | Green | Sparkle | x1.0 | 77.1 | 0.22 | Obby 1 done (Pad 3, TM 2, Trail Luc) |
+| 35 | 0 | Pad 4 | TM 3 | Blue | Fire | x1.0 | 2,314.3 | 0.07 | Mid-game (Pad 4, TM 3, Trail Lam, Aura Lua) |
+| 50 | 0 | Pad 4 | TM 3 | Purple | Lightning | x1.0 | 4,821.4 | 0.29 | Chuan bi Rebirth 1 (Pad 4, Trail Tim, Aura Set) |
+| 50 | 1 | Pad 5 | TM 4 | Red | Void | x1.0 | 96,428.6 | 0.01 | Mid-game R1 (Pad 5, TM 4, Trail Do, Aura Hu Khong) |
+| 67 | 2 | Pad 6 | TM 4 | Rainbow | Void | x1.0 | 321,428.6 | 0.05 | High-level R2 (Pad 6, Trail Cau Vong, Aura Hu Khong) |
+| 80 | 4 | Pad 7 | TM 5 | Galaxy | Cosmic | x1.0 | 17,142,857.1 | 0.01 | Late-game R4 (Pad 7, TM 5, Trail Thien Ha, Aura Vu Tru) |
+| 100 | 5 | Pad 8 | TM 5 | Galaxy | Cosmic | x1.0 | 40,000,000.0 | 0.05 | Max Level 100 R5 (Pad 8, TM 5, Trail Thien Ha, Aura Vu Tru) |
+| 100 | 5 | Pad 8 | TM 5 | Galaxy | Cosmic | x96.0 | 3,840,000,000.0 | 0.00 | Whale Stacked x96 + VIP (Max Level 100) |
+| 120 | 12 | Pad 10 | TM 6 | Cosmic_trail | Nebula | x1.0 | 25,000,000,000.0 | 0.00 | Future W2 (Level 120, Rebirth 12, Pad 10, TM 6) |
+| 180 | 30 | Pad 12 | TM 8 | Void_trail | Singularity | x1.0 | 457,142,857,142,857.1 | 0.00 | Future W3 (Level 180, Rebirth 30, Pad 12, TM 8) |

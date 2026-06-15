@@ -1,0 +1,40 @@
+{
+  "sources": [
+    {
+      "id": "creator_hub_engine",
+      "tier": "A",
+      "url": "https://create.roblox.com/docs/en-us/reference/engine",
+      "description": "Roblox Engine API reference"
+    },
+    {
+      "id": "creator_hub_luau",
+      "tier": "A",
+      "url": "https://create.roblox.com/docs/luau",
+      "description": "Official Luau docs"
+    },
+    {
+      "id": "robloxapi_mirror",
+      "tier": "C",
+      "url": "https://robloxapi.github.io/ref/index.html",
+      "description": "Roblox API mirror and update feed"
+    },
+    {
+      "id": "lua_51_manual",
+      "tier": "B",
+      "url": "https://www.lua.org/manual/5.1/manual.html",
+      "description": "Lua 5.1 reference baseline"
+    },
+    {
+      "id": "creator_docs_repo",
+      "tier": "B",
+      "url": "https://github.com/Roblox/creator-docs/tree/main",
+      "description": "Roblox open source creator docs"
+    },
+    {
+      "id": "devforum",
+      "tier": "D",
+      "url": "https://devforum.roblox.com/",
+      "description": "Roblox community forum"
+    }
+  ]
+}
