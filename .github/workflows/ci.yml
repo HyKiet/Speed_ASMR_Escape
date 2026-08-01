@@ -42,7 +42,7 @@ jobs:
       - name: Tải luau-lsp
         run: |
           curl -sL -o luau-lsp.zip \
-            "https://github.com/JohnnyMorganz/luau-lsp/releases/download/${LUAU_LSP_VERSION}/luau-lsp-linux.zip"
+            "https://github.com/JohnnyMorganz/luau-lsp/releases/download/${LUAU_LSP_VERSION}/luau-lsp-linux-x86_64.zip"
           unzip -q luau-lsp.zip
           chmod +x luau-lsp
           curl -sL -o globalTypes.d.luau \
