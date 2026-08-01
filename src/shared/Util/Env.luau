@@ -9,6 +9,11 @@
 -- Quy tắc an toàn: chỉ đúng LIVE_PLACE_ID mới được coi là Live. Bất kỳ place nào
 -- khác — kể cả place mới tạo sau này — đều rơi về QA. Đoán sai theo hướng này
 -- chỉ làm bẩn dữ liệu QA; đoán sai theo hướng ngược lại thì mất dữ liệu thật.
+--
+-- ⚠️ KHI RA WORLD 2 (hoặc bất kỳ place Live thứ hai nào): phải đổi chỗ này thành
+-- một DANH SÁCH place Live. Nếu quên, World 2 sẽ bị xếp vào QA và người chơi
+-- teleport sang đó thấy tài khoản trắng — đúng, dữ liệu thật vẫn còn nguyên
+-- trong bể Live, nhưng người chơi sẽ tưởng là mất sạch.
 
 local RunService = game:GetService("RunService")
 
