@@ -2944,7 +2944,7 @@ local function springCoefficients(time: number, damping: number, speed: number):
 	if damping > 1 then
 		-- overdamped spring
 		-- solution to the characteristic equation:
-		-- z = -ζω ± Sqrt[ζ^2 - 1] ω
+		-- z = -Î¶Ï‰ Â± Sqrt[Î¶^2 - 1] Ï‰
 		-- x[t] -> x0(e^(t z2) z1 - e^(t z1) z2)/(z1 - z2)
 		--		 + v0(e^(t z1) - e^(t z2))/(z1 - z2)
 		-- v[t] -> x0(z1 z2(-e^(t z1) + e^(t z2)))/(z1 - z2)
@@ -2965,8 +2965,8 @@ local function springCoefficients(time: number, damping: number, speed: number):
 
 	elseif damping == 1 then
 		-- critically damped spring
-		-- x[t] -> x0(e^-tω)(1+tω) + v0(e^-tω)t
-		-- v[t] -> x0(t ω^2)(-e^-tω) + v0(1 - tω)(e^-tω)
+		-- x[t] -> x0(e^-tÏ‰)(1+tÏ‰) + v0(e^-tÏ‰)t
+		-- v[t] -> x0(t Ï‰^2)(-e^-tÏ‰) + v0(1 - tÏ‰)(e^-tÏ‰)
 
 		local scaledTime = time * speed
 		local expTerm = math.exp(-scaledTime)
@@ -2979,11 +2979,11 @@ local function springCoefficients(time: number, damping: number, speed: number):
 	else
 		-- underdamped spring
 		-- factored out of the solutions to the characteristic equation:
-		-- α = Sqrt[1 - ζ^2]
-		-- x[t] -> x0(e^-tζω)(α Cos[tα] + ζω Sin[tα])/α
-		--       + v0(e^-tζω)(Sin[tα])/α
-		-- v[t] -> x0(-e^-tζω)(α^2 + ζ^2 ω^2)(Sin[tα])/α
-		--       + v0(e^-tζω)(α Cos[tα] - ζω Sin[tα])/α
+		-- Î± = Sqrt[1 - Î¶^2]
+		-- x[t] -> x0(e^-tÎ¶Ï‰)(Î± Cos[tÎ±] + Î¶Ï‰ Sin[tÎ±])/Î±
+		--       + v0(e^-tÎ¶Ï‰)(Sin[tÎ±])/Î±
+		-- v[t] -> x0(-e^-tÎ¶Ï‰)(Î±^2 + Î¶^2 Ï‰^2)(Sin[tÎ±])/Î±
+		--       + v0(e^-tÎ¶Ï‰)(Î± Cos[tÎ±] - Î¶Ï‰ Sin[tÎ±])/Î±
 
 		local scaledTime = time * speed
 		local alpha = math.sqrt(1 - damping^2)
@@ -8427,52 +8427,52 @@ return ZonePlusReference</string>
           <string name="Source"><![CDATA[--!strict
 --[[
 	Constants.luau
-	Chứa toàn bộ hằng số cấu hình Game Balancing của SpeedEscape.
-	Tất cả các thông số như Tốc độ, Wins, Rebirth, Trails, Auras, Gamepass, Level
-	đều được định nghĩa tập trung tại đây để dễ dàng cân chỉnh.
+	Chá»©a toÃ n bá»™ háº±ng sá»‘ cáº¥u hÃ¬nh Game Balancing cá»§a SpeedEscape.
+	Táº¥t cáº£ cÃ¡c thÃ´ng sá»‘ nhÆ° Tá»‘c Ä‘á»™, Wins, Rebirth, Trails, Auras, Gamepass, Level
+	Ä‘á»u Ä‘Æ°á»£c Ä‘á»‹nh nghÄ©a táº­p trung táº¡i Ä‘Ã¢y Ä‘á»ƒ dá»… dÃ ng cÃ¢n chá»‰nh.
 ]]
 
 local Constants = {}
 
 -- ============================================================================
--- 1. BẢN MẪU DỮ LIỆU NGƯỜI CHƠI (DATA TEMPLATE)
--- Định nghĩa các thuộc tính lưu trữ cho mỗi tài khoản người chơi.
+-- 1. Báº¢N MáºªU Dá»® LIá»†U NGÆ¯á»œI CHÆ I (DATA TEMPLATE)
+-- Äá»‹nh nghÄ©a cÃ¡c thuá»™c tÃ­nh lÆ°u trá»¯ cho má»—i tÃ i khoáº£n ngÆ°á»i chÆ¡i.
 -- ============================================================================
 Constants.DATA_TEMPLATE = {
-	Speed = 0,                             -- Điểm Speed tích lũy (số lớn, tăng khi chạy/đi trên máy chạy bộ)
-	TotalWins = 0,                         -- Tổng số Wins (Cúp) người chơi đã tích lũy (dùng mua Trails/Auras)
-	CurrentRunWins = 0,                    -- Số Wins tích lũy trong vòng chạy hiện tại của Stage 5
-	Streak = 0,                            -- Chuỗi thắng liên tục khi tiếp đất thành công ở Stage 5
-	PersonalBestDistance = 0,              -- Khoảng cách bay xa nhất từ trước đến nay (Studs)
-	PersonalBestRunWins = 0,               -- Kỷ lục số Wins nhận được nhiều nhất trong 1 lần nhảy
-	TotalRuns = 0,                         -- Tổng số lần thực hiện cú nhảy ở Stage 5
-	TotalDonatedRobux = 0,                 -- Tổng số Robux người chơi đã quyên góp (nếu có tính năng Donate)
-	Rebirths = 0,                          -- Số lần Trùng Sinh (Rebirth). Mỗi lần Trùng Sinh sẽ reset Speed/Level về 1 nhưng tăng hệ số nhân vĩnh viễn.
-	Level = 1,                             -- Cấp độ hiện tại của người chơi (Level càng cao chạy càng nhanh)
-	XP = 0,                                -- Điểm kinh nghiệm hiện tại (1 Speed nhận được = 1 XP)
-	EquippedTreadmill = "treadmill_1",     -- ID Máy chạy bộ đang trang bị (Mặc định là Máy Gỗ)
-	EquippedTrail = "none",                -- ID Vệt sáng chân đang trang bị ("none" là không trang bị)
-	EquippedAura = "none",                 -- ID Hào quang đang trang bị ("none" là không trang bị)
-	CustomSpeedLimit = 6,                  -- Tốc độ chạy thực tế mà người chơi tự cài đặt (không vượt quá giới hạn Level)
-	UnlockedTreadmills = {                 -- Danh sách các máy chạy bộ đã mở khóa (dưới dạng bảng tra cứu nhanh key-value)
+	Speed = 0,                             -- Äiá»ƒm Speed tÃ­ch lÅ©y (sá»‘ lá»›n, tÄƒng khi cháº¡y/Ä‘i trÃªn mÃ¡y cháº¡y bá»™)
+	TotalWins = 0,                         -- Tá»•ng sá»‘ Wins (CÃºp) ngÆ°á»i chÆ¡i Ä‘Ã£ tÃ­ch lÅ©y (dÃ¹ng mua Trails/Auras)
+	CurrentRunWins = 0,                    -- Sá»‘ Wins tÃ­ch lÅ©y trong vÃ²ng cháº¡y hiá»‡n táº¡i cá»§a Stage 5
+	Streak = 0,                            -- Chuá»—i tháº¯ng liÃªn tá»¥c khi tiáº¿p Ä‘áº¥t thÃ nh cÃ´ng á»Ÿ Stage 5
+	PersonalBestDistance = 0,              -- Khoáº£ng cÃ¡ch bay xa nháº¥t tá»« trÆ°á»›c Ä‘áº¿n nay (Studs)
+	PersonalBestRunWins = 0,               -- Ká»· lá»¥c sá»‘ Wins nháº­n Ä‘Æ°á»£c nhiá»u nháº¥t trong 1 láº§n nháº£y
+	TotalRuns = 0,                         -- Tá»•ng sá»‘ láº§n thá»±c hiá»‡n cÃº nháº£y á»Ÿ Stage 5
+	TotalDonatedRobux = 0,                 -- Tá»•ng sá»‘ Robux ngÆ°á»i chÆ¡i Ä‘Ã£ quyÃªn gÃ³p (náº¿u cÃ³ tÃ­nh nÄƒng Donate)
+	Rebirths = 0,                          -- Sá»‘ láº§n TrÃ¹ng Sinh (Rebirth). Má»—i láº§n TrÃ¹ng Sinh sáº½ reset Speed/Level vá» 1 nhÆ°ng tÄƒng há»‡ sá»‘ nhÃ¢n vÄ©nh viá»…n.
+	Level = 1,                             -- Cáº¥p Ä‘á»™ hiá»‡n táº¡i cá»§a ngÆ°á»i chÆ¡i (Level cÃ ng cao cháº¡y cÃ ng nhanh)
+	XP = 0,                                -- Äiá»ƒm kinh nghiá»‡m hiá»‡n táº¡i (1 Speed nháº­n Ä‘Æ°á»£c = 1 XP)
+	EquippedTreadmill = "treadmill_1",     -- ID MÃ¡y cháº¡y bá»™ Ä‘ang trang bá»‹ (Máº·c Ä‘á»‹nh lÃ  MÃ¡y Gá»—)
+	EquippedTrail = "none",                -- ID Vá»‡t sÃ¡ng chÃ¢n Ä‘ang trang bá»‹ ("none" lÃ  khÃ´ng trang bá»‹)
+	EquippedAura = "none",                 -- ID HÃ o quang Ä‘ang trang bá»‹ ("none" lÃ  khÃ´ng trang bá»‹)
+	CustomSpeedLimit = 6,                  -- Tá»‘c Ä‘á»™ cháº¡y thá»±c táº¿ mÃ  ngÆ°á»i chÆ¡i tá»± cÃ i Ä‘áº·t (khÃ´ng vÆ°á»£t quÃ¡ giá»›i háº¡n Level)
+	UnlockedTreadmills = {                 -- Danh sÃ¡ch cÃ¡c mÃ¡y cháº¡y bá»™ Ä‘Ã£ má»Ÿ khÃ³a (dÆ°á»›i dáº¡ng báº£ng tra cá»©u nhanh key-value)
 		["treadmill_1"] = true
 	} :: { [string]: boolean },
-	UnlockedTrails = {                     -- Danh sách Trails đã mở khóa
+	UnlockedTrails = {                     -- Danh sÃ¡ch Trails Ä‘Ã£ má»Ÿ khÃ³a
 		["none"] = true
 	} :: { [string]: boolean },
-	UnlockedAuras = {                      -- Danh sách Auras đã mở khóa
+	UnlockedAuras = {                      -- Danh sÃ¡ch Auras Ä‘Ã£ má»Ÿ khÃ³a
 		["none"] = true
 	} :: { [string]: boolean },
 }
 
 -- ============================================================================
--- 2. CẤU HÌNH MÁY CHẠY BỘ (TREADMILLS / MULTIPLIER PADS)
+-- 2. Cáº¤U HÃŒNH MÃY CHáº Y Bá»˜ (TREADMILLS / MULTIPLIER PADS)
 -- ============================================================================
 export type TreadmillConfig = {
 	id: string,
 	name: string,
-	multiplier: number,      -- Hệ số nhân tốc độ của máy chạy bộ (Ví dụ: x3 nghĩa là đi 1 bước nhận 3 Speed)
-	priceRobux: number,      -- Giá mua nhanh bằng Robux (0 nghĩa là miễn phí)
+	multiplier: number,      -- Há»‡ sá»‘ nhÃ¢n tá»‘c Ä‘á»™ cá»§a mÃ¡y cháº¡y bá»™ (VÃ­ dá»¥: x3 nghÄ©a lÃ  Ä‘i 1 bÆ°á»›c nháº­n 3 Speed)
+	priceRobux: number,      -- GiÃ¡ mua nhanh báº±ng Robux (0 nghÄ©a lÃ  miá»…n phÃ­)
 }
 
 Constants.TREADMILLS = {
@@ -8483,12 +8483,12 @@ Constants.TREADMILLS = {
 	{ id = "treadmill_5", name = "Red Admin Treadmill", multiplier = 100.0,  priceRobux = 499 },
 } :: { TreadmillConfig }
 
--- Các hằng số tốc độ di chuyển và thời gian
-Constants.BASE_SPEED_GAIN = 1              -- Lượng Speed cơ bản nhận được mỗi bước chạy trên đất thường
-Constants.DEFAULT_WALK_SPEED = 6           -- Tốc độ chạy mặc định của người chơi mới (Roblox mặc định là 16, chúng ta để 6 để tạo cảm giác chậm)
-Constants.WALK_SPEED_PER_LEVEL = 2         -- Lượng WalkSpeed tăng thêm sau mỗi Level
-Constants.SPEED_GAIN_INTERVAL = 0.35       -- Cứ mỗi 0.35 giây sẽ cộng Speed một lần (Loop Interval)
-Constants.MIN_MOVEMENT_FOR_SPEED_GAIN = 1.5 -- Khoảng cách tối thiểu nhân vật phải di chuyển để được tính là đang chạy bộ
+-- CÃ¡c háº±ng sá»‘ tá»‘c Ä‘á»™ di chuyá»ƒn vÃ  thá»i gian
+Constants.BASE_SPEED_GAIN = 1              -- LÆ°á»£ng Speed cÆ¡ báº£n nháº­n Ä‘Æ°á»£c má»—i bÆ°á»›c cháº¡y trÃªn Ä‘áº¥t thÆ°á»ng
+Constants.DEFAULT_WALK_SPEED = 6           -- Tá»‘c Ä‘á»™ cháº¡y máº·c Ä‘á»‹nh cá»§a ngÆ°á»i chÆ¡i má»›i (Roblox máº·c Ä‘á»‹nh lÃ  16, chÃºng ta Ä‘á»ƒ 6 Ä‘á»ƒ táº¡o cáº£m giÃ¡c cháº­m)
+Constants.WALK_SPEED_PER_LEVEL = 2         -- LÆ°á»£ng WalkSpeed tÄƒng thÃªm sau má»—i Level
+Constants.SPEED_GAIN_INTERVAL = 0.35       -- Cá»© má»—i 0.35 giÃ¢y sáº½ cá»™ng Speed má»™t láº§n (Loop Interval)
+Constants.MIN_MOVEMENT_FOR_SPEED_GAIN = 1.5 -- Khoáº£ng cÃ¡ch tá»‘i thiá»ƒu nhÃ¢n váº­t pháº£i di chuyá»ƒn Ä‘á»ƒ Ä‘Æ°á»£c tÃ­nh lÃ  Ä‘ang cháº¡y bá»™
 Constants.TREADMILL_GAIN_RADIUS = 13
 Constants.STAGE_WINS = {
 	[1] = 1,
@@ -8668,14 +8668,14 @@ Constants.STREAK_BONUSES = {
 } :: { StreakBonusConfig }
 
 -- ============================================================================
--- 3. CẤU HÌNH TRAILS (VỆT SÁNG)
+-- 3. Cáº¤U HÃŒNH TRAILS (Vá»†T SÃNG)
 -- ============================================================================
 export type TrailConfig = {
 	id: string,
 	name: string,
-	multiplier: number,      -- Hệ số nhân tốc độ (Trail Boost)
-	priceWins: number,       -- Giá mua bằng Wins
-	priceRobux: number,      -- Giá mua nhanh bằng Robux (0 là không bán bằng Robux)
+	multiplier: number,      -- Há»‡ sá»‘ nhÃ¢n tá»‘c Ä‘á»™ (Trail Boost)
+	priceWins: number,       -- GiÃ¡ mua báº±ng Wins
+	priceRobux: number,      -- GiÃ¡ mua nhanh báº±ng Robux (0 lÃ  khÃ´ng bÃ¡n báº±ng Robux)
 }
 
 Constants.TRAILS = {
@@ -8688,13 +8688,13 @@ Constants.TRAILS = {
 } :: { TrailConfig }
 
 -- ============================================================================
--- 4. CẤU HÌNH AURAS (HÀO QUANG)
+-- 4. Cáº¤U HÃŒNH AURAS (HÃ€O QUANG)
 -- ============================================================================
 export type AuraConfig = {
 	id: string,
 	name: string,
-	multiplier: number,      -- Hệ số nhân tốc độ (Aura Boost)
-	priceWins: number,       -- Giá mua bằng Wins
+	multiplier: number,      -- Há»‡ sá»‘ nhÃ¢n tá»‘c Ä‘á»™ (Aura Boost)
+	priceWins: number,       -- GiÃ¡ mua báº±ng Wins
 }
 
 Constants.AURAS = {
@@ -8706,28 +8706,28 @@ Constants.AURAS = {
 } :: { AuraConfig }
 
 -- ============================================================================
--- 5. CẤU HÌNH GAMEPASS (NHÂN HỆ SỐ BẰNG ROBUX - GIÁ SIÊU RẺ CHO VN)
+-- 5. Cáº¤U HÃŒNH GAMEPASS (NHÃ‚N Há»† Sá» Báº°NG ROBUX - GIÃ SIÃŠU Ráºº CHO VN)
 -- ============================================================================
--- Thay thế các ID dưới đây bằng ID Gamepass thật của game trên Roblox Creator Dashboard
+-- Thay tháº¿ cÃ¡c ID dÆ°á»›i Ä‘Ã¢y báº±ng ID Gamepass tháº­t cá»§a game trÃªn Roblox Creator Dashboard
 Constants.GAMEPASS_IDS = {
-	DoubleSpeed = 0,         -- Gamepass x2 Speed (Giá: 3 Robux) - Nhân vĩnh viễn x2 Speed nhận được
-	QuadSpeed = 0,           -- Gamepass x4 Speed (Giá: 9 Robux) - Nhân vĩnh viễn x4 Speed nhận được
-	OctaSpeed = 0,           -- Gamepass x8 Speed (Giá: 19 Robux) - Nhân vĩnh viễn x8 Speed nhận được
+	DoubleSpeed = 0,         -- Gamepass x2 Speed (GiÃ¡: 3 Robux) - NhÃ¢n vÄ©nh viá»…n x2 Speed nháº­n Ä‘Æ°á»£c
+	QuadSpeed = 0,           -- Gamepass x4 Speed (GiÃ¡: 9 Robux) - NhÃ¢n vÄ©nh viá»…n x4 Speed nháº­n Ä‘Æ°á»£c
+	OctaSpeed = 0,           -- Gamepass x8 Speed (GiÃ¡: 19 Robux) - NhÃ¢n vÄ©nh viá»…n x8 Speed nháº­n Ä‘Æ°á»£c
 }
 
 -- ============================================================================
--- 6. CÁC HÀM CÔNG THỨC TOÁN HỌC CÂN BẰNG TIẾN TRÌNH (FORMULAS)
+-- 6. CÃC HÃ€M CÃ”NG THá»¨C TOÃN Há»ŒC CÃ‚N Báº°NG TIáº¾N TRÃŒNH (FORMULAS)
 -- ============================================================================
 
--- Tỉ lệ quy đổi từ lượng Speed nhận được sang lượng XP tương ứng
+-- Tá»‰ lá»‡ quy Ä‘á»•i tá»« lÆ°á»£ng Speed nháº­n Ä‘Æ°á»£c sang lÆ°á»£ng XP tÆ°Æ¡ng á»©ng
 Constants.XP_CONVERSION_RATE = 1 -- 1 Speed = 1 XP
 Constants.XP_CURVE_ANCHOR_LEVEL = 67
 Constants.XP_CURVE_ANCHOR_REQUIRED_SPEED = 1010000
 Constants.XP_CURVE_NEXT_REQUIRED_SPEED = 1170000
 Constants.XP_CURVE_GROWTH_RATE = Constants.XP_CURVE_NEXT_REQUIRED_SPEED / Constants.XP_CURVE_ANCHOR_REQUIRED_SPEED
 
--- Tính số XP cần thiết để thăng lên cấp độ tiếp theo (Required XP)
--- Neo theo game mẫu: Level 67 cần 1.01M và Level 68 cần 1.17M.
+-- TÃ­nh sá»‘ XP cáº§n thiáº¿t Ä‘á»ƒ thÄƒng lÃªn cáº¥p Ä‘á»™ tiáº¿p theo (Required XP)
+-- Neo theo game máº«u: Level 67 cáº§n 1.01M vÃ  Level 68 cáº§n 1.17M.
 function Constants.GetRequiredXP(level: number): number
 	if level <= 0 then return 0 end
 	return math.floor(
@@ -8737,26 +8737,26 @@ function Constants.GetRequiredXP(level: number): number
 	)
 end
 
--- Tính tốc độ di chuyển tối đa thực tế (Max WalkSpeed) dựa trên Level hiện tại
--- Công thức: Max WalkSpeed = 6 + ((Level - 1) * 2)
+-- TÃ­nh tá»‘c Ä‘á»™ di chuyá»ƒn tá»‘i Ä‘a thá»±c táº¿ (Max WalkSpeed) dá»±a trÃªn Level hiá»‡n táº¡i
+-- CÃ´ng thá»©c: Max WalkSpeed = 6 + ((Level - 1) * 2)
 function Constants.GetMaxWalkSpeed(level: number): number
 	return Constants.DEFAULT_WALK_SPEED + (math.max(level - 1, 0) * Constants.WALK_SPEED_PER_LEVEL)
 end
 
--- Tính lượng XP thưởng khi người chơi thăng cấp
+-- TÃ­nh lÆ°á»£ng XP thÆ°á»Ÿng khi ngÆ°á»i chÆ¡i thÄƒng cáº¥p
 function Constants.GetLevelUpWinsReward(level: number): number
 	return level * 10
 end
 
--- Tính số Level tối thiểu cần thiết để thực hiện Rebirth lần tiếp theo
--- Neo theo UI mẫu: Rebirths = 5, multiplier x3.5 -> x4.0, cần Level 100.
--- Công thức: Yêu cầu Level = 50 + Rebirths * 10
+-- TÃ­nh sá»‘ Level tá»‘i thiá»ƒu cáº§n thiáº¿t Ä‘á»ƒ thá»±c hiá»‡n Rebirth láº§n tiáº¿p theo
+-- Neo theo UI máº«u: Rebirths = 5, multiplier x3.5 -> x4.0, cáº§n Level 100.
+-- CÃ´ng thá»©c: YÃªu cáº§u Level = 50 + Rebirths * 10
 function Constants.GetRequiredLevelForRebirth(currentRebirths: number): number
 	return 50 + (currentRebirths * 10)
 end
 
--- Tính hệ số nhân Rebirth vĩnh viễn (Rebirth Multiplier)
--- Công thức: Rebirth Multiplier = 1 + Rebirths * 0.5
+-- TÃ­nh há»‡ sá»‘ nhÃ¢n Rebirth vÄ©nh viá»…n (Rebirth Multiplier)
+-- CÃ´ng thá»©c: Rebirth Multiplier = 1 + Rebirths * 0.5
 function Constants.GetRebirthMultiplier(rebirths: number): number
 	return 1 + (rebirths * 0.5)
 end
@@ -8811,9 +8811,9 @@ function Constants.GetStreakBonus(streak: number): StreakBonusConfig?
 end
 
 -- ============================================================================
--- 7. HÀM ĐỊNH DẠNG SỐ LỚN ĐỂ RENDER UI (FORMAT NUMBER)
+-- 7. HÃ€M Äá»ŠNH Dáº NG Sá» Lá»šN Äá»‚ RENDER UI (FORMAT NUMBER)
 -- ============================================================================
--- Hàm chuyển đổi số nguyên thô (ví dụ: 1254300) thành chuỗi rút gọn gọn gàng (ví dụ: 1.25M)
+-- HÃ m chuyá»ƒn Ä‘á»•i sá»‘ nguyÃªn thÃ´ (vÃ­ dá»¥: 1254300) thÃ nh chuá»—i rÃºt gá»n gá»n gÃ ng (vÃ­ dá»¥: 1.25M)
 function Constants.FormatNumber(value: number): string
 	if value < 1000 then
 		return tostring(math.floor(value))
@@ -8940,76 +8940,76 @@ end)
       <Properties>
         <string name="Name">Server</string>
         <token name="RunContext">0</token>
-        <string name="Source"><![CDATA[--!strict -- Bật chế độ Type Checking nghiêm ngặt của Luau (ngôn ngữ lập trình của Roblox). Giúp phát hiện lỗi sớm trước khi chạy game!
+        <string name="Source"><![CDATA[--!strict -- Báº­t cháº¿ Ä‘á»™ Type Checking nghiÃªm ngáº·t cá»§a Luau (ngÃ´n ngá»¯ láº­p trÃ¬nh cá»§a Roblox). GiÃºp phÃ¡t hiá»‡n lá»—i sá»›m trÆ°á»›c khi cháº¡y game!
 
--- Bộ khởi chạy Server Modular (Custom Bootstrapper)
--- Đây là "trái tim" của Server. Thay vì chạy nhiều script riêng lẻ, file này tự động tìm và chạy tất cả Services (dịch vụ).
+-- Bá»™ khá»Ÿi cháº¡y Server Modular (Custom Bootstrapper)
+-- ÄÃ¢y lÃ  "trÃ¡i tim" cá»§a Server. Thay vÃ¬ cháº¡y nhiá»u script riÃªng láº», file nÃ y tá»± Ä‘á»™ng tÃ¬m vÃ  cháº¡y táº¥t cáº£ Services (dá»‹ch vá»¥).
 
--- script:WaitForChild("Services") dùng để tìm thư mục có tên "Services" nằm bên trong script này.
--- WaitForChild là một cách an toàn để lấy Instance vì nó sẽ đợi cho đến khi Instance đó được tải xong hoàn toàn.
+-- script:WaitForChild("Services") dÃ¹ng Ä‘á»ƒ tÃ¬m thÆ° má»¥c cÃ³ tÃªn "Services" náº±m bÃªn trong script nÃ y.
+-- WaitForChild lÃ  má»™t cÃ¡ch an toÃ n Ä‘á»ƒ láº¥y Instance vÃ¬ nÃ³ sáº½ Ä‘á»£i cho Ä‘áº¿n khi Instance Ä‘Ã³ Ä‘Æ°á»£c táº£i xong hoÃ n toÃ n.
 local ServicesFolder = script:WaitForChild("Services")
 
-print("--- [SERVER LOADING] Bắt đầu nạp các dịch vụ trên Server... ---")
+print("--- [SERVER LOADING] Báº¯t Ä‘áº§u náº¡p cÃ¡c dá»‹ch vá»¥ trÃªn Server... ---")
 
--- Khởi tạo bảng (table) trống để lưu trữ các dịch vụ đã tải thành công.
+-- Khá»Ÿi táº¡o báº£ng (table) trá»‘ng Ä‘á»ƒ lÆ°u trá»¯ cÃ¡c dá»‹ch vá»¥ Ä‘Ã£ táº£i thÃ nh cÃ´ng.
 local Services = {}
 
 -- ============================================================================
--- GIAI ĐOẠN 1: QUÉT VÀ NẠP TẤT CẢ MODULESCRIPT TRONG THƯ MỤC SERVICES
+-- GIAI ÄOáº N 1: QUÃ‰T VÃ€ Náº P Táº¤T Cáº¢ MODULESCRIPT TRONG THÆ¯ Má»¤C SERVICES
 -- ============================================================================
--- GetChildren() lấy ra danh sách tất cả các đối tượng con nằm trực tiếp trong thư mục ServicesFolder.
+-- GetChildren() láº¥y ra danh sÃ¡ch táº¥t cáº£ cÃ¡c Ä‘á»‘i tÆ°á»£ng con náº±m trá»±c tiáº¿p trong thÆ° má»¥c ServicesFolder.
 for _, module in ServicesFolder:GetChildren() do
-	-- Kiểm tra xem đối tượng con đó có đúng là kiểu "ModuleScript" hay không.
+	-- Kiá»ƒm tra xem Ä‘á»‘i tÆ°á»£ng con Ä‘Ã³ cÃ³ Ä‘Ãºng lÃ  kiá»ƒu "ModuleScript" hay khÃ´ng.
 	if module:IsA("ModuleScript") then
-		-- pcall (Protected Call) chạy hàm require(module) trong một chế độ an toàn.
-		-- Nếu ModuleScript có lỗi cú pháp hoặc bị crash, pcall sẽ bắt lỗi đó và trả về success = false mà không làm crash toàn bộ Server.
-		-- require() là hàm dùng để nạp nội dung của một ModuleScript và trả về giá trị (thường là một table).
+		-- pcall (Protected Call) cháº¡y hÃ m require(module) trong má»™t cháº¿ Ä‘á»™ an toÃ n.
+		-- Náº¿u ModuleScript cÃ³ lá»—i cÃº phÃ¡p hoáº·c bá»‹ crash, pcall sáº½ báº¯t lá»—i Ä‘Ã³ vÃ  tráº£ vá» success = false mÃ  khÃ´ng lÃ m crash toÃ n bá»™ Server.
+		-- require() lÃ  hÃ m dÃ¹ng Ä‘á»ƒ náº¡p ná»™i dung cá»§a má»™t ModuleScript vÃ  tráº£ vá» giÃ¡ trá»‹ (thÆ°á»ng lÃ  má»™t table).
 		local success, service = pcall(require, module)
 		if success then
-			-- Lưu dịch vụ vào bảng Services với tên của file làm khóa (Key).
+			-- LÆ°u dá»‹ch vá»¥ vÃ o báº£ng Services vá»›i tÃªn cá»§a file lÃ m khÃ³a (Key).
 			Services[module.Name] = service
 		else
-			-- Nếu có lỗi, cảnh báo (warn) sẽ in ra màn hình Output màu cam nhưng không làm gián đoạn game.
-			warn("[SERVER ERROR] Lỗi nạp dịch vụ: " .. module.Name .. " | Chi tiết lỗi: " .. tostring(service))
+			-- Náº¿u cÃ³ lá»—i, cáº£nh bÃ¡o (warn) sáº½ in ra mÃ n hÃ¬nh Output mÃ u cam nhÆ°ng khÃ´ng lÃ m giÃ¡n Ä‘oáº¡n game.
+			warn("[SERVER ERROR] Lá»—i náº¡p dá»‹ch vá»¥: " .. module.Name .. " | Chi tiáº¿t lá»—i: " .. tostring(service))
 		end
 	end
 end
 
 -- ============================================================================
--- GIAI ĐOẠN 2: KHỞI TẠO (INIT)
+-- GIAI ÄOáº N 2: KHá»žI Táº O (INIT)
 -- ============================================================================
--- Vòng lặp này chạy qua tất cả các dịch vụ đã nạp thành công ở Giai đoạn 1.
+-- VÃ²ng láº·p nÃ y cháº¡y qua táº¥t cáº£ cÃ¡c dá»‹ch vá»¥ Ä‘Ã£ náº¡p thÃ nh cÃ´ng á»Ÿ Giai Ä‘oáº¡n 1.
 for name, service in Services do
-	-- Kiểm tra xem trong dịch vụ đó có định nghĩa hàm tên là "Init" hay không.
+	-- Kiá»ƒm tra xem trong dá»‹ch vá»¥ Ä‘Ã³ cÃ³ Ä‘á»‹nh nghÄ©a hÃ m tÃªn lÃ  "Init" hay khÃ´ng.
 	if type(service.Init) == "function" then
-		-- Chạy hàm Init() trong chế độ an toàn pcall.
-		-- Init là nơi chúng ta thiết lập biến ban đầu, tạo RemoteEvent, nạp cấu hình,... (không chứa logic chạy lâu dài).
+		-- Cháº¡y hÃ m Init() trong cháº¿ Ä‘á»™ an toÃ n pcall.
+		-- Init lÃ  nÆ¡i chÃºng ta thiáº¿t láº­p biáº¿n ban Ä‘áº§u, táº¡o RemoteEvent, náº¡p cáº¥u hÃ¬nh,... (khÃ´ng chá»©a logic cháº¡y lÃ¢u dÃ i).
 		local success, err = pcall(service.Init)
 		if not success then
-			warn("[SERVER ERROR] Lỗi Khởi tạo (Init) dịch vụ: " .. name .. " | Chi tiết lỗi: " .. tostring(err))
+			warn("[SERVER ERROR] Lá»—i Khá»Ÿi táº¡o (Init) dá»‹ch vá»¥: " .. name .. " | Chi tiáº¿t lá»—i: " .. tostring(err))
 		end
 	end
 end
 
 -- ============================================================================
--- GIAI ĐOẠN 3: BẮT ĐẦU CHẠY LOGIC GAME (START)
+-- GIAI ÄOáº N 3: Báº®T Äáº¦U CHáº Y LOGIC GAME (START)
 -- ============================================================================
 for name, service in Services do
-	-- Kiểm tra xem trong dịch vụ đó có hàm "Start" hay không.
+	-- Kiá»ƒm tra xem trong dá»‹ch vá»¥ Ä‘Ã³ cÃ³ hÃ m "Start" hay khÃ´ng.
 	if type(service.Start) == "function" then
-		-- Sử dụng task.spawn để chạy hàm Start() trong một luồng (thread) chạy song song riêng biệt.
-		-- task.spawn() là thư viện quản lý tác vụ hiện đại nhất của Roblox (thay thế cho spawn() cũ lỗi thời).
-		-- Nó đảm bảo nếu một dịch vụ bị dừng hoặc chạy vòng lặp vô hạn, nó cũng KHÔNG làm đóng băng các dịch vụ khác.
+		-- Sá»­ dá»¥ng task.spawn Ä‘á»ƒ cháº¡y hÃ m Start() trong má»™t luá»“ng (thread) cháº¡y song song riÃªng biá»‡t.
+		-- task.spawn() lÃ  thÆ° viá»‡n quáº£n lÃ½ tÃ¡c vá»¥ hiá»‡n Ä‘áº¡i nháº¥t cá»§a Roblox (thay tháº¿ cho spawn() cÅ© lá»—i thá»i).
+		-- NÃ³ Ä‘áº£m báº£o náº¿u má»™t dá»‹ch vá»¥ bá»‹ dá»«ng hoáº·c cháº¡y vÃ²ng láº·p vÃ´ háº¡n, nÃ³ cÅ©ng KHÃ”NG lÃ m Ä‘Ã³ng bÄƒng cÃ¡c dá»‹ch vá»¥ khÃ¡c.
 		task.spawn(function()
 			local success, err = pcall(service.Start)
 			if not success then
-				warn("[SERVER ERROR] Lỗi Bắt đầu (Start) dịch vụ: " .. name .. " | Chi tiết lỗi: " .. tostring(err))
+				warn("[SERVER ERROR] Lá»—i Báº¯t Ä‘áº§u (Start) dá»‹ch vá»¥: " .. name .. " | Chi tiáº¿t lá»—i: " .. tostring(err))
 			end
 		end)
 	end
 end
 
-print("--- [SERVER READY] Tất cả các dịch vụ trên Server đã được nạp thành công! ---")
+print("--- [SERVER READY] Táº¥t cáº£ cÃ¡c dá»‹ch vá»¥ trÃªn Server Ä‘Ã£ Ä‘Æ°á»£c náº¡p thÃ nh cÃ´ng! ---")
 
 ]]></string>
       </Properties>
@@ -9038,7 +9038,7 @@ local KILL_FLOOR_NAME = "KillFloor"
 local LEGACY_CONTROLLER_NAME = "Zone4Controller"
 
 local BOSS_NAME = "MonkeyBoss"
-local RUN_ANIMATION_ID = "rbxassetid://125733527624272"
+local RUN_ANIMATION_ID = "rbxassetid://132081122184261"
 
 local STAGE_NUMBER = 4
 local COMPLETE_STAGE = 5
@@ -9630,45 +9630,45 @@ return BossChaseService
         <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">DataService</string>
-            <string name="Source"><![CDATA[--!strict -- Bật chế độ kiểm tra kiểu dữ liệu của Luau.
+            <string name="Source"><![CDATA[--!strict -- Báº­t cháº¿ Ä‘á»™ kiá»ƒm tra kiá»ƒu dá»¯ liá»‡u cá»§a Luau.
 
--- game:GetService() là cách tốt nhất và an toàn nhất để lấy các dịch vụ hệ thống của Roblox.
-local Players = game:GetService("Players") -- Quản lý tất cả người chơi trong game.
-local RunService = game:GetService("RunService") -- Giúp kiểm tra xem game đang chạy trên Studio hay server thật.
-local ServerScriptService = game:GetService("ServerScriptService") -- Thư mục chứa các script bảo mật chạy trên server.
+-- game:GetService() lÃ  cÃ¡ch tá»‘t nháº¥t vÃ  an toÃ n nháº¥t Ä‘á»ƒ láº¥y cÃ¡c dá»‹ch vá»¥ há»‡ thá»‘ng cá»§a Roblox.
+local Players = game:GetService("Players") -- Quáº£n lÃ½ táº¥t cáº£ ngÆ°á»i chÆ¡i trong game.
+local RunService = game:GetService("RunService") -- GiÃºp kiá»ƒm tra xem game Ä‘ang cháº¡y trÃªn Studio hay server tháº­t.
+local ServerScriptService = game:GetService("ServerScriptService") -- ThÆ° má»¥c chá»©a cÃ¡c script báº£o máº­t cháº¡y trÃªn server.
 
--- Nạp cấu hình Constants dùng chung và thư viện ProfileStore để lưu trữ dữ liệu an toàn.
+-- Náº¡p cáº¥u hÃ¬nh Constants dÃ¹ng chung vÃ  thÆ° viá»‡n ProfileStore Ä‘á»ƒ lÆ°u trá»¯ dá»¯ liá»‡u an toÃ n.
 local Constants = require(game.ReplicatedStorage.Shared.Constants)
 local ProfileStore = require(ServerScriptService.ServerPackages.ProfileStore)
 
--- Định nghĩa kiểu dữ liệu (Luau Types) cho dễ lập trình và tránh nhầm lẫn biến.
+-- Äá»‹nh nghÄ©a kiá»ƒu dá»¯ liá»‡u (Luau Types) cho dá»… láº­p trÃ¬nh vÃ  trÃ¡nh nháº§m láº«n biáº¿n.
 type PlayerData = typeof(Constants.DATA_TEMPLATE)
 type Profile = any
 
--- Tên cơ sở dữ liệu trên máy chủ Roblox. Nếu đổi tên này, toàn bộ người chơi sẽ chơi lại từ đầu (Reset Data).
+-- TÃªn cÆ¡ sá»Ÿ dá»¯ liá»‡u trÃªn mÃ¡y chá»§ Roblox. Náº¿u Ä‘á»•i tÃªn nÃ y, toÃ n bá»™ ngÆ°á»i chÆ¡i sáº½ chÆ¡i láº¡i tá»« Ä‘áº§u (Reset Data).
 local DATA_STORE_NAME = "SpeedEscape_Player_v1"
 local STUDIO_TEST_TOTAL_WINS = 1000000
 local STUDIO_TEST_SPEED = 150
 local STUDIO_TEST_LEVEL = 73
 
--- Tạo một cửa hàng dữ liệu (Store) dựa trên cấu trúc DATA_TEMPLATE mặc định.
+-- Táº¡o má»™t cá»­a hÃ ng dá»¯ liá»‡u (Store) dá»±a trÃªn cáº¥u trÃºc DATA_TEMPLATE máº·c Ä‘á»‹nh.
 local playerStore = ProfileStore.New(DATA_STORE_NAME, Constants.DATA_TEMPLATE)
 
--- HỌC TẬP: Nếu đang chạy test trong Roblox Studio (RunService:IsStudio() == true),
--- chúng ta sẽ chuyển sang chế độ "Mock" (chạy trên bộ nhớ tạm RAM).
--- Điều này giúp kiểm thử dữ liệu nhanh hơn, không tốn tài nguyên mạng và không sợ làm hỏng dữ liệu thật của người chơi.
+-- Há»ŒC Táº¬P: Náº¿u Ä‘ang cháº¡y test trong Roblox Studio (RunService:IsStudio() == true),
+-- chÃºng ta sáº½ chuyá»ƒn sang cháº¿ Ä‘á»™ "Mock" (cháº¡y trÃªn bá»™ nhá»› táº¡m RAM).
+-- Äiá»u nÃ y giÃºp kiá»ƒm thá»­ dá»¯ liá»‡u nhanh hÆ¡n, khÃ´ng tá»‘n tÃ i nguyÃªn máº¡ng vÃ  khÃ´ng sá»£ lÃ m há»ng dá»¯ liá»‡u tháº­t cá»§a ngÆ°á»i chÆ¡i.
 if RunService:IsStudio() then
 	playerStore = playerStore.Mock
 end
 
--- Bảng lưu trữ phiên dữ liệu đang hoạt động của mỗi người chơi.
+-- Báº£ng lÆ°u trá»¯ phiÃªn dá»¯ liá»‡u Ä‘ang hoáº¡t Ä‘á»™ng cá»§a má»—i ngÆ°á»i chÆ¡i.
 local profiles: { [Player]: Profile } = {}
--- Bảng lưu trữ thư mục leaderstats để cập nhật điểm nhanh chóng.
+-- Báº£ng lÆ°u trá»¯ thÆ° má»¥c leaderstats Ä‘á»ƒ cáº­p nháº­t Ä‘iá»ƒm nhanh chÃ³ng.
 local leaderstatsByPlayer: { [Player]: Folder } = {}
 
 local DataService = {}
 
--- Hàm phụ trợ: Tạo nhanh một đối tượng Value (ví dụ IntValue, NumberValue) để hiển thị điểm lên bảng.
+-- HÃ m phá»¥ trá»£: Táº¡o nhanh má»™t Ä‘á»‘i tÆ°á»£ng Value (vÃ­ dá»¥ IntValue, NumberValue) Ä‘á»ƒ hiá»ƒn thá»‹ Ä‘iá»ƒm lÃªn báº£ng.
 local function createValue(parent: Instance, className: string, name: string, value: any): Instance
 	local instance = Instance.new(className)
 	instance.Name = name
@@ -9678,15 +9678,15 @@ local function createValue(parent: Instance, className: string, name: string, va
 	return instance
 end
 
--- HỌC TẬP: Tạo thư mục "leaderstats" bên trong đối tượng Player.
--- Roblox có cơ chế mặc định: Bất kỳ thư mục nào tên đúng là "leaderstats" (chữ thường) 
--- chứa các đối tượng Value bên trong sẽ tự động được vẽ thành bảng xếp hạng ở góc trên bên phải màn hình game!
+-- Há»ŒC Táº¬P: Táº¡o thÆ° má»¥c "leaderstats" bÃªn trong Ä‘á»‘i tÆ°á»£ng Player.
+-- Roblox cÃ³ cÆ¡ cháº¿ máº·c Ä‘á»‹nh: Báº¥t ká»³ thÆ° má»¥c nÃ o tÃªn Ä‘Ãºng lÃ  "leaderstats" (chá»¯ thÆ°á»ng) 
+-- chá»©a cÃ¡c Ä‘á»‘i tÆ°á»£ng Value bÃªn trong sáº½ tá»± Ä‘á»™ng Ä‘Æ°á»£c váº½ thÃ nh báº£ng xáº¿p háº¡ng á»Ÿ gÃ³c trÃªn bÃªn pháº£i mÃ n hÃ¬nh game!
 local function createLeaderstats(player: Player)
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
 	leaderstats.Parent = player
 
-	-- Tạo 4 cột điểm hiển thị trên bảng: Speed, Wins, Level và Rebirths.
+	-- Táº¡o 4 cá»™t Ä‘iá»ƒm hiá»ƒn thá»‹ trÃªn báº£ng: Speed, Wins, Level vÃ  Rebirths.
 	createValue(leaderstats, "NumberValue", "Speed", 0)
 	createValue(leaderstats, "NumberValue", "Wins", 0)
 	createValue(leaderstats, "IntValue", "Level", 1)
@@ -10752,54 +10752,54 @@ local function addSpeed(player: Player, data: PlayerData, amount: number)
 	sendSnapshot(player)
 end
 
--- HỌC TẬP: Vòng lặp chính xử lý tiến trình Speed của từng người chơi.
--- Vòng lặp này chạy độc lập cho mỗi Player bằng task.spawn.
+-- Há»ŒC Táº¬P: VÃ²ng láº·p chÃ­nh xá»­ lÃ½ tiáº¿n trÃ¬nh Speed cá»§a tá»«ng ngÆ°á»i chÆ¡i.
+-- VÃ²ng láº·p nÃ y cháº¡y Ä‘á»™c láº­p cho má»—i Player báº±ng task.spawn.
 local function runProgressionLoop(player: Player)
 	local session = getSession(player)
 
-	-- Điều kiện lặp: Trong khi Player vẫn nằm trong dịch vụ Players (tức là họ chưa thoát game).
-	-- Đây là cách viết cực kỳ quan trọng để Tránh Rò Rỉ Bộ Nhớ (Memory Leak). Nếu player thoát, vòng lặp tự động dừng!
+	-- Äiá»u kiá»‡n láº·p: Trong khi Player váº«n náº±m trong dá»‹ch vá»¥ Players (tá»©c lÃ  há» chÆ°a thoÃ¡t game).
+	-- ÄÃ¢y lÃ  cÃ¡ch viáº¿t cá»±c ká»³ quan trá»ng Ä‘á»ƒ TrÃ¡nh RÃ² Rá»‰ Bá»™ Nhá»› (Memory Leak). Náº¿u player thoÃ¡t, vÃ²ng láº·p tá»± Ä‘á»™ng dá»«ng!
 	while player.Parent == Players do
 		local data = DataService.GetData(player)
 		local humanoid, root = getCharacterParts(player)
 
-		-- Chỉ cộng Speed nếu dữ liệu đã tải xong, nhân vật tồn tại và nhân vật còn sống (Health > 0).
+		-- Chá»‰ cá»™ng Speed náº¿u dá»¯ liá»‡u Ä‘Ã£ táº£i xong, nhÃ¢n váº­t tá»“n táº¡i vÃ  nhÃ¢n váº­t cÃ²n sá»‘ng (Health > 0).
 		if data and humanoid and root and humanoid.Health > 0 then
 			applyTrailVisual(player, data)
 
-			-- 1. Kiểm tra xem người chơi có đang đứng trên Máy chạy bộ nào không
+			-- 1. Kiá»ƒm tra xem ngÆ°á»i chÆ¡i cÃ³ Ä‘ang Ä‘á»©ng trÃªn MÃ¡y cháº¡y bá»™ nÃ o khÃ´ng
 			local treadmillId, treadmillMultiplier, isOnTreadmill = getTreadmillAtPosition(root.Position)
 			session.activeTreadmillId = treadmillId
 			session.activeTreadmillMultiplier = treadmillMultiplier
 			session.isOnTreadmill = isOnTreadmill
 
-			-- 2. Đo đạc khoảng cách di chuyển của người chơi giữa 2 lần kiểm tra (Vector Math)
+			-- 2. Äo Ä‘áº¡c khoáº£ng cÃ¡ch di chuyá»ƒn cá»§a ngÆ°á»i chÆ¡i giá»¯a 2 láº§n kiá»ƒm tra (Vector Math)
 			local lastPosition = session.lastPosition
 			session.lastPosition = root.Position
 
-			-- Tính độ dài khoảng cách di chuyển (Magnitude) của vector hiệu (Vị trí mới - Vị trí cũ)
+			-- TÃ­nh Ä‘á»™ dÃ i khoáº£ng cÃ¡ch di chuyá»ƒn (Magnitude) cá»§a vector hiá»‡u (Vá»‹ trÃ­ má»›i - Vá»‹ trÃ­ cÅ©)
 			local movedDistance = if lastPosition then (root.Position - lastPosition).Magnitude else 0
 			
-			-- 3. Kiểm tra xem người chơi có đang di chuyển thật sự không:
-			-- humanoid.MoveDirection.Magnitude > 0.05: Người chơi đang bấm WASD hoặc cần gạt Analog điện thoại.
-			-- movedDistance >= Constants.MIN_MOVEMENT_FOR_SPEED_GAIN: Người chơi có sự di chuyển thực tế (phòng trường hợp bị trượt hoặc lực đẩy vật lý).
-			-- isOnTreadmill: Hoặc người chơi đang đứng trên máy chạy bộ (kể cả đứng im cũng được tính điểm).
+			-- 3. Kiá»ƒm tra xem ngÆ°á»i chÆ¡i cÃ³ Ä‘ang di chuyá»ƒn tháº­t sá»± khÃ´ng:
+			-- humanoid.MoveDirection.Magnitude > 0.05: NgÆ°á»i chÆ¡i Ä‘ang báº¥m WASD hoáº·c cáº§n gáº¡t Analog Ä‘iá»‡n thoáº¡i.
+			-- movedDistance >= Constants.MIN_MOVEMENT_FOR_SPEED_GAIN: NgÆ°á»i chÆ¡i cÃ³ sá»± di chuyá»ƒn thá»±c táº¿ (phÃ²ng trÆ°á»ng há»£p bá»‹ trÆ°á»£t hoáº·c lá»±c Ä‘áº©y váº­t lÃ½).
+			-- isOnTreadmill: Hoáº·c ngÆ°á»i chÆ¡i Ä‘ang Ä‘á»©ng trÃªn mÃ¡y cháº¡y bá»™ (ká»ƒ cáº£ Ä‘á»©ng im cÅ©ng Ä‘Æ°á»£c tÃ­nh Ä‘iá»ƒm).
 			local isActivelyMoving = humanoid.MoveDirection.Magnitude > 0.05
 				or movedDistance >= Constants.MIN_MOVEMENT_FOR_SPEED_GAIN
 				or isOnTreadmill
 
-			-- 4. Nếu đang di chuyển, tiến hành cộng Speed dựa trên hệ số nhân!
+			-- 4. Náº¿u Ä‘ang di chuyá»ƒn, tiáº¿n hÃ nh cá»™ng Speed dá»±a trÃªn há»‡ sá»‘ nhÃ¢n!
 			if isActivelyMoving then
 				local amount = Constants.BASE_SPEED_GAIN * getGainMultiplier(player, data)
 				addSpeed(player, data, amount)
 			else
-				-- Nếu đứng im trên đất thường, chúng ta chỉ cập nhật lại WalkSpeed của họ (đảm bảo đồng bộ).
+				-- Náº¿u Ä‘á»©ng im trÃªn Ä‘áº¥t thÆ°á»ng, chÃºng ta chá»‰ cáº­p nháº­t láº¡i WalkSpeed cá»§a há» (Ä‘áº£m báº£o Ä‘á»“ng bá»™).
 				applyWalkSpeed(player, data)
 			end
 		end
 
-		-- Dừng vòng lặp một chút (ở đây là 0.35 giây) trước khi lặp lại.
-		-- Không được bỏ task.wait() vì nếu không có nó, vòng lặp sẽ chạy hàng triệu lần mỗi giây làm treo (Crash) Server ngay lập tức!
+		-- Dá»«ng vÃ²ng láº·p má»™t chÃºt (á»Ÿ Ä‘Ã¢y lÃ  0.35 giÃ¢y) trÆ°á»›c khi láº·p láº¡i.
+		-- KhÃ´ng Ä‘Æ°á»£c bá» task.wait() vÃ¬ náº¿u khÃ´ng cÃ³ nÃ³, vÃ²ng láº·p sáº½ cháº¡y hÃ ng triá»‡u láº§n má»—i giÃ¢y lÃ m treo (Crash) Server ngay láº­p tá»©c!
 		task.wait(Constants.SPEED_GAIN_INTERVAL)
 	end
 end
@@ -14504,7 +14504,7 @@ local function RobloxMessageSubscription(profile, unique_session_id)
 	
 	local roblox_message_subscription = MessagingService:SubscribeAsync("PS_" .. unique_session_id, function(message)
 		if type(message.Data) == "table" and message.Data.LoadCount == profile.SessionLoadCount then
-			-- High reaction rate, based on numPlayers × 10 DataStore budget as of writing
+			-- High reaction rate, based on numPlayers Ã— 10 DataStore budget as of writing
 			if os.clock() - last_roblox_message &gt; 6 then 
 				last_roblox_message = os.clock()
 				if profile:IsActive() == true then
@@ -15434,63 +15434,63 @@ return ProfileStore</string>
       <Item class="LocalScript" referent="149">
         <Properties>
           <string name="Name">Client</string>
-          <string name="Source"><![CDATA[--!strict -- Bật chế độ kiểm tra kiểu dữ liệu nghiêm ngặt trên Client.
+          <string name="Source"><![CDATA[--!strict -- Báº­t cháº¿ Ä‘á»™ kiá»ƒm tra kiá»ƒu dá»¯ liá»‡u nghiÃªm ngáº·t trÃªn Client.
 
--- Bộ khởi chạy Client Modular (Custom Bootstrapper)
--- Đây là điểm xuất phát của game trên Client (thiết bị người chơi). Nó tự động chạy các Controllers (bộ điều khiển giao diện, âm thanh, điều khiển nhân vật).
+-- Bá»™ khá»Ÿi cháº¡y Client Modular (Custom Bootstrapper)
+-- ÄÃ¢y lÃ  Ä‘iá»ƒm xuáº¥t phÃ¡t cá»§a game trÃªn Client (thiáº¿t bá»‹ ngÆ°á»i chÆ¡i). NÃ³ tá»± Ä‘á»™ng cháº¡y cÃ¡c Controllers (bá»™ Ä‘iá»u khiá»ƒn giao diá»‡n, Ã¢m thanh, Ä‘iá»u khiá»ƒn nhÃ¢n váº­t).
 
--- Tìm thư mục Controllers nằm bên trong LocalScript này.
+-- TÃ¬m thÆ° má»¥c Controllers náº±m bÃªn trong LocalScript nÃ y.
 local ControllersFolder = script:WaitForChild("Controllers")
 
-print("--- [CLIENT LOADING] Bắt đầu nạp các bộ điều khiển (Controllers) trên Client... ---")
+print("--- [CLIENT LOADING] Báº¯t Ä‘áº§u náº¡p cÃ¡c bá»™ Ä‘iá»u khiá»ƒn (Controllers) trÃªn Client... ---")
 
 local Controllers = {}
 
 -- ============================================================================
--- GIAI ĐOẠN 1: QUÉT VÀ NẠP TẤT CẢ MODULESCRIPT TRONG THƯ MỤC CONTROLLERS
+-- GIAI ÄOáº N 1: QUÃ‰T VÃ€ Náº P Táº¤T Cáº¢ MODULESCRIPT TRONG THÆ¯ Má»¤C CONTROLLERS
 -- ============================================================================
 for _, module in ControllersFolder:GetChildren() do
 	if module:IsA("ModuleScript") then
-		-- Nạp module trong chế độ an toàn pcall. 
-		-- Ở Client, pcall rất quan trọng vì máy người chơi có thể tải tài nguyên chậm hoặc gặp lỗi cục bộ.
+		-- Náº¡p module trong cháº¿ Ä‘á»™ an toÃ n pcall. 
+		-- á»ž Client, pcall ráº¥t quan trá»ng vÃ¬ mÃ¡y ngÆ°á»i chÆ¡i cÃ³ thá»ƒ táº£i tÃ i nguyÃªn cháº­m hoáº·c gáº·p lá»—i cá»¥c bá»™.
 		local success, controller = pcall(require, module)
 		if success then
 			Controllers[module.Name] = controller
 		else
-			warn("[CLIENT ERROR] Lỗi nạp bộ điều khiển: " .. module.Name .. " | Chi tiết lỗi: " .. tostring(controller))
+			warn("[CLIENT ERROR] Lá»—i náº¡p bá»™ Ä‘iá»u khiá»ƒn: " .. module.Name .. " | Chi tiáº¿t lá»—i: " .. tostring(controller))
 		end
 	end
 end
 
 -- ============================================================================
--- GIAI ĐOẠN 2: KHỞI TẠO (INIT)
+-- GIAI ÄOáº N 2: KHá»žI Táº O (INIT)
 -- ============================================================================
 for name, controller in Controllers do
 	if type(controller.Init) == "function" then
-		-- Chạy hàm Init(). Đây là nơi các Controller liên kết sự kiện giao diện (UI) hoặc kết nối RemoteEvent từ Server.
+		-- Cháº¡y hÃ m Init(). ÄÃ¢y lÃ  nÆ¡i cÃ¡c Controller liÃªn káº¿t sá»± kiá»‡n giao diá»‡n (UI) hoáº·c káº¿t ná»‘i RemoteEvent tá»« Server.
 		local success, err = pcall(controller.Init)
 		if not success then
-			warn("[CLIENT ERROR] Lỗi Khởi tạo (Init) bộ điều khiển: " .. name .. " | Chi tiết lỗi: " .. tostring(err))
+			warn("[CLIENT ERROR] Lá»—i Khá»Ÿi táº¡o (Init) bá»™ Ä‘iá»u khiá»ƒn: " .. name .. " | Chi tiáº¿t lá»—i: " .. tostring(err))
 		end
 	end
 end
 
 -- ============================================================================
--- GIAI ĐOẠN 3: BẮT ĐẦU CHẠY LOGIC GAME (START)
+-- GIAI ÄOáº N 3: Báº®T Äáº¦U CHáº Y LOGIC GAME (START)
 -- ============================================================================
 for name, controller in Controllers do
 	if type(controller.Start) == "function" then
-		-- Chạy song song hàm Start(). Đây là nơi các Controller thực thi vòng lặp cập nhật UI, kiểm tra hành vi bấm phím của người chơi.
+		-- Cháº¡y song song hÃ m Start(). ÄÃ¢y lÃ  nÆ¡i cÃ¡c Controller thá»±c thi vÃ²ng láº·p cáº­p nháº­t UI, kiá»ƒm tra hÃ nh vi báº¥m phÃ­m cá»§a ngÆ°á»i chÆ¡i.
 		task.spawn(function()
 			local success, err = pcall(controller.Start)
 			if not success then
-				warn("[CLIENT ERROR] Lỗi Bắt đầu (Start) bộ điều khiển: " .. name .. " | Chi tiết lỗi: " .. tostring(err))
+				warn("[CLIENT ERROR] Lá»—i Báº¯t Ä‘áº§u (Start) bá»™ Ä‘iá»u khiá»ƒn: " .. name .. " | Chi tiáº¿t lá»—i: " .. tostring(err))
 			end
 		end)
 	end
 end
 
-print("--- [CLIENT READY] Tất cả các bộ điều khiển trên Client đã được nạp thành công! ---")
+print("--- [CLIENT READY] Táº¥t cáº£ cÃ¡c bá»™ Ä‘iá»u khiá»ƒn trÃªn Client Ä‘Ã£ Ä‘Æ°á»£c náº¡p thÃ nh cÃ´ng! ---")
 
 ]]></string>
         </Properties>
@@ -18479,556 +18479,6 @@ function Zone5ClientHelper.Start()
 end
 
 return Zone5ClientHelper
-]]></string>
-            </Properties>
-          </Item>
-          <Item class="ModuleScript" referent="153">
-            <Properties>
-              <string name="Name">Zone7GravityController</string>
-              <string name="Source"><![CDATA[--!strict
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-
-local Zone7GravityController = {}
-
-local localPlayer = Players.LocalPlayer
-local GRAVITY_ATTRIBUTE = "Zone7GravityEnabled"
-local GRAVITY_FOLDER_NAME = "GravityController"
-local ZONE_NAME = "Zone7"
-local GROUND_NAME = "Ground"
-local MECHANICS_NAME = "Mechanics"
-local STAGE_START_NAME = "Stage7Start"
-local STAGE_FINISH_NAME = "Stage7Finish"
-local GRAVITY_ZONES_NAME = "GravityZones"
-
-local PLAYER_DEPENDENCIES = {
-	"PlayerModule",
-	"PlayerScriptsLoader",
-	"RbxCharacterSounds",
-}
-
-local LOCAL_SCAN_INTERVAL_SECONDS = 1 / 30
-local TOUCH_PREDICTION_SECONDS = 3
-local SPATIAL_PREDICTION_SECONDS = 1.5
-local LOCAL_PART_MARGIN = Vector3.new(7, 8, 7)
-local GRAVITY_CATCHUP_BIND_NAME = "Zone7GravityCatchUp"
-local GRAVITY_CATCHUP_ALPHA = 0.45
-
-local Controller: any = nil
-local GravityControllerClass: any = nil
-local creatingController = false
-local dependenciesPrepared = false
-local preparingDependencies = false
-local predictedActive = false
-local predictionExpiresAt = 0
-local lastLocalScanAt = 0
-local lastTargetGravityUp = Vector3.yAxis
-local activationParts: { BasePart } = {}
-local activationTouchConnections: { [BasePart]: RBXScriptConnection } = {}
-local finishTouchConnection: RBXScriptConnection?
-
-local PI2 = math.pi * 2
-local ZERO = Vector3.new(0, 0, 0)
-
-local LOWER_RADIUS_OFFSET = 3
-local NUM_DOWN_RAYS = 24
-local ODD_DOWN_RAY_START_RADIUS = 3
-local EVEN_DOWN_RAY_START_RADIUS = 2
-local ODD_DOWN_RAY_END_RADIUS = 1.66666
-local EVEN_DOWN_RAY_END_RADIUS = 1
-
-local NUM_FEELER_RAYS = 9
-local FEELER_LENGTH = 2
-local FEELER_START_OFFSET = 2
-local FEELER_RADIUS = 3.5
-local FEELER_APEX_OFFSET = 1
-local FEELER_WEIGHTING = 8
-
-local function getGravitySourceFolder(): Folder?
-	local source = Workspace:FindFirstChild(GRAVITY_FOLDER_NAME)
-	if source and source:IsA("Folder") then
-		return source
-	end
-
-	return nil
-end
-
-local function getGravityModule(): ModuleScript?
-	local replicatedModule = ReplicatedStorage:FindFirstChild(GRAVITY_FOLDER_NAME)
-	if replicatedModule and replicatedModule:IsA("ModuleScript") then
-		return replicatedModule
-	end
-
-	local source = getGravitySourceFolder()
-	local sourceReplicated = source and source:FindFirstChild("ReplicatedStorage")
-	local sourceModule = sourceReplicated and sourceReplicated:FindFirstChild(GRAVITY_FOLDER_NAME)
-	if sourceModule and sourceModule:IsA("ModuleScript") then
-		return sourceModule
-	end
-
-	return nil
-end
-
-local function cloneDependency(parent: Instance, sourceParent: Instance, childName: string): Instance?
-	local existing = parent:FindFirstChild(childName)
-	if existing then
-		return existing
-	end
-
-	local source = sourceParent:FindFirstChild(childName)
-	if not source then
-		return nil
-	end
-
-	local clone = source:Clone()
-	clone.Parent = parent
-	return clone
-end
-
-local function ensurePlayerScriptDependencies(): boolean
-	local source = getGravitySourceFolder()
-	local sourceStarterPlayer = source and source:FindFirstChild("StarterPlayer")
-	local sourceStarterPlayerScripts = sourceStarterPlayer and sourceStarterPlayer:FindFirstChild("StarterPlayerScripts")
-	if not sourceStarterPlayerScripts then
-		return false
-	end
-
-	local playerScripts = localPlayer:FindFirstChildOfClass("PlayerScripts") or localPlayer:WaitForChild("PlayerScripts", 10)
-	if not playerScripts then
-		return false
-	end
-
-	for _, dependencyName in PLAYER_DEPENDENCIES do
-		if not cloneDependency(playerScripts, sourceStarterPlayerScripts, dependencyName) then
-			return false
-		end
-	end
-
-	return true
-end
-
-local function ensureCharacterAnimate(character: Model): boolean
-	local source = getGravitySourceFolder()
-	local sourceStarterPlayer = source and source:FindFirstChild("StarterPlayer")
-	local sourceStarterCharacterScripts = sourceStarterPlayer and sourceStarterPlayer:FindFirstChild("StarterCharacterScripts")
-	local sourceAnimate = sourceStarterCharacterScripts and sourceStarterCharacterScripts:FindFirstChild("Animate")
-	if not sourceAnimate then
-		return false
-	end
-
-	local animate = character:FindFirstChild("Animate")
-	if animate and animate:FindFirstChild("Controller") then
-		return true
-	end
-	if animate then
-		animate:Destroy()
-	end
-
-	local clone = sourceAnimate:Clone()
-	clone.Parent = character
-	return clone:FindFirstChild("Controller") ~= nil
-end
-
-local function areRuntimeScriptsReady(): boolean
-	local playerScripts = localPlayer:FindFirstChildOfClass("PlayerScripts")
-	if not playerScripts then
-		return false
-	end
-
-	local loader = playerScripts:FindFirstChild("PlayerScriptsLoader")
-	local loaded = loader and loader:FindFirstChild("Loaded")
-	if not loaded or not loaded:IsA("BoolValue") then
-		return false
-	end
-
-	return loaded.Value
-end
-
-local function preloadGravityModule(): boolean
-	if GravityControllerClass then
-		return true
-	end
-
-	local gravityModule = getGravityModule()
-	if not gravityModule then
-		return false
-	end
-
-	GravityControllerClass = require(gravityModule)
-	return GravityControllerClass ~= nil
-end
-
-local function prepareDependencies()
-	if dependenciesPrepared or preparingDependencies then
-		return
-	end
-
-	preparingDependencies = true
-	task.spawn(function()
-		local success, err = pcall(function()
-			local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-			if not character then
-				return
-			end
-
-			dependenciesPrepared = ensurePlayerScriptDependencies()
-				and ensureCharacterAnimate(character)
-				and preloadGravityModule()
-		end)
-
-		if not success then
-			warn("[Zone7GravityController] Failed to preload GravityController: " .. tostring(err))
-			dependenciesPrepared = false
-		end
-
-		preparingDependencies = false
-	end)
-end
-
-local function removeGravityRuntimeObjects(character: Model?)
-	if not character then
-		return
-	end
-
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if root then
-		for _, objectName in { "BodyGyro", "VectorForce" } do
-			local child = root:FindFirstChild(objectName)
-			if child then
-				child:Destroy()
-			end
-		end
-	end
-
-	for _, objectName in { "Sphere", "Floor" } do
-		local child = character:FindFirstChild(objectName)
-		if child then
-			child:Destroy()
-		end
-	end
-end
-
-local function buildIgnoreList(): { Instance }
-	local ignoreList = {}
-	for index, player in Players:GetPlayers() do
-		ignoreList[index] = player.Character
-	end
-
-	return ignoreList
-end
-
-local function getGravityUp(self: any, oldGravityUp: Vector3): Vector3
-	local ignoreList = buildIgnoreList()
-	local hrpCF = self.HRP.CFrame
-	local isR15 = self.Humanoid.RigType == Enum.HumanoidRigType.R15
-	local origin = if isR15 then hrpCF.Position else hrpCF.Position + (0.35 * oldGravityUp)
-	local radialVector = if math.abs(hrpCF.LookVector:Dot(oldGravityUp)) < 0.999
-		then hrpCF.LookVector:Cross(oldGravityUp)
-		else hrpCF.RightVector:Cross(oldGravityUp)
-
-	local centerRayLength = 25
-	local centerRay = Ray.new(origin, -centerRayLength * oldGravityUp)
-	local centerHit, _, centerHitNormal = Workspace:FindPartOnRayWithIgnoreList(centerRay, ignoreList)
-
-	local downHitCount = 0
-	local feelerHitCount = 0
-	local mainDownNormal = ZERO
-	if centerHit then
-		mainDownNormal = centerHitNormal
-	end
-
-	local downRaySum = ZERO
-	for index = 1, NUM_DOWN_RAYS do
-		local dtheta = PI2 * ((index - 1) / NUM_DOWN_RAYS)
-		local angleWeight = 0.25 + (0.75 * math.abs(math.cos(dtheta)))
-		local isEvenRay = index % 2 == 0
-		local startRadius = if isEvenRay then EVEN_DOWN_RAY_START_RADIUS else ODD_DOWN_RAY_START_RADIUS
-		local endRadius = if isEvenRay then EVEN_DOWN_RAY_END_RADIUS else ODD_DOWN_RAY_END_RADIUS
-		local offset = CFrame.fromAxisAngle(oldGravityUp, dtheta) * radialVector
-		local direction = (LOWER_RADIUS_OFFSET * -oldGravityUp) + ((endRadius - startRadius) * offset)
-		local ray = Ray.new(origin + (startRadius * offset), centerRayLength * direction.Unit)
-		local hit, _, hitNormal = Workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
-		if hit then
-			downRaySum += angleWeight * hitNormal
-			downHitCount += 1
-		end
-	end
-
-	local feelerNormalSum = ZERO
-	for index = 1, NUM_FEELER_RAYS do
-		local dtheta = 2 * math.pi * ((index - 1) / NUM_FEELER_RAYS)
-		local angleWeight = 0.25 + (0.75 * math.abs(math.cos(dtheta)))
-		local offset = CFrame.fromAxisAngle(oldGravityUp, dtheta) * radialVector
-		local direction = ((FEELER_RADIUS * offset) + (LOWER_RADIUS_OFFSET * -oldGravityUp)).Unit
-		local feelerOrigin = origin - (FEELER_APEX_OFFSET * -oldGravityUp) + (FEELER_START_OFFSET * direction)
-		local ray = Ray.new(feelerOrigin, FEELER_LENGTH * direction)
-		local hit, _, hitNormal = Workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
-		if hit then
-			feelerNormalSum += FEELER_WEIGHTING * angleWeight * hitNormal
-			feelerHitCount += 1
-		end
-	end
-
-	if downHitCount + feelerHitCount > 0 or centerHit then
-		local normalSum = mainDownNormal + downRaySum + feelerNormalSum
-		if normalSum ~= ZERO then
-			lastTargetGravityUp = normalSum.Unit
-			return lastTargetGravityUp
-		end
-	end
-
-	lastTargetGravityUp = oldGravityUp
-	return oldGravityUp
-end
-
-local function isLocalCharacterHit(hit: BasePart): boolean
-	local character = localPlayer.Character
-	return character ~= nil and hit:IsDescendantOf(character)
-end
-
-local function shouldBeActive(): boolean
-	return localPlayer:GetAttribute(GRAVITY_ATTRIBUTE) == true or predictedActive
-end
-
-local function destroyController()
-	RunService:UnbindFromRenderStep(GRAVITY_CATCHUP_BIND_NAME)
-
-	local controller = Controller
-	Controller = nil
-	if controller then
-		pcall(function()
-			controller:Destroy()
-		end)
-	end
-
-	local character = localPlayer.Character
-	removeGravityRuntimeObjects(character)
-end
-
-local function createController()
-	if Controller or creatingController then
-		return
-	end
-	if not shouldBeActive() then
-		return
-	end
-
-	creatingController = true
-	local success, err = pcall(function()
-		local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-		if not character then
-			return
-		end
-
-		if not dependenciesPrepared then
-			dependenciesPrepared = ensurePlayerScriptDependencies()
-				and ensureCharacterAnimate(character)
-				and preloadGravityModule()
-		end
-
-		if not dependenciesPrepared then
-			warn("[Zone7GravityController] GravityController dependencies are missing")
-			return
-		end
-
-		if not areRuntimeScriptsReady() then
-			prepareDependencies()
-			return
-		end
-
-		local gravityClass = GravityControllerClass
-		if not gravityClass then
-			warn("[Zone7GravityController] GravityController module is missing")
-			return
-		end
-
-		local controller = gravityClass.new(localPlayer)
-		controller.GetGravityUp = getGravityUp
-
-		local initialGravityUp = getGravityUp(controller, controller.GravityUp)
-		if initialGravityUp ~= ZERO then
-			controller.GravityUp = initialGravityUp
-		end
-
-		Controller = controller
-		RunService:BindToRenderStep(GRAVITY_CATCHUP_BIND_NAME, Enum.RenderPriority.Input.Value + 2, function()
-			local activeController = Controller
-			if not activeController then
-				return
-			end
-
-			local blendedGravityUp = activeController.GravityUp:Lerp(lastTargetGravityUp, GRAVITY_CATCHUP_ALPHA)
-			if blendedGravityUp ~= ZERO then
-				activeController.GravityUp = blendedGravityUp.Unit
-			end
-		end)
-	end)
-	creatingController = false
-
-	if not success then
-		warn("[Zone7GravityController] Failed to start GravityController: " .. tostring(err))
-		destroyController()
-	end
-end
-
-local function syncController()
-	if shouldBeActive() then
-		createController()
-	else
-		destroyController()
-	end
-end
-
-local function requestPredictedActivation(durationSeconds: number)
-	local now = os.clock()
-	predictedActive = true
-	predictionExpiresAt = math.max(predictionExpiresAt, now + durationSeconds)
-	prepareDependencies()
-	syncController()
-end
-
-local function stopPrediction()
-	predictedActive = false
-	predictionExpiresAt = 0
-	syncController()
-end
-
-local function isPositionInsidePart(part: BasePart, position: Vector3, margin: Vector3): boolean
-	local localPosition = part.CFrame:PointToObjectSpace(position)
-	local halfSize = part.Size * 0.5
-
-	return math.abs(localPosition.X) <= halfSize.X + margin.X
-		and math.abs(localPosition.Y) <= halfSize.Y + margin.Y
-		and math.abs(localPosition.Z) <= halfSize.Z + margin.Z
-end
-
-local function addActivationPart(part: Instance?)
-	if not part or not part:IsA("BasePart") then
-		return
-	end
-
-	table.insert(activationParts, part)
-	if not activationTouchConnections[part] then
-		activationTouchConnections[part] = part.Touched:Connect(function(hit: BasePart)
-			if isLocalCharacterHit(hit) then
-				requestPredictedActivation(TOUCH_PREDICTION_SECONDS)
-			end
-		end)
-	end
-end
-
-local function refreshActivationParts()
-	table.clear(activationParts)
-
-	local zone = Workspace:FindFirstChild(ZONE_NAME)
-	if not zone then
-		return
-	end
-
-	local mechanicsFolder = zone:FindFirstChild(MECHANICS_NAME)
-	local groundFolder = zone:FindFirstChild(GROUND_NAME)
-	if mechanicsFolder then
-		addActivationPart(mechanicsFolder:FindFirstChild(STAGE_START_NAME))
-
-		local gravityZonesFolder = mechanicsFolder:FindFirstChild(GRAVITY_ZONES_NAME)
-		if gravityZonesFolder then
-			for _, descendant in gravityZonesFolder:GetDescendants() do
-				addActivationPart(descendant)
-			end
-		end
-
-		local finishPart = mechanicsFolder:FindFirstChild(STAGE_FINISH_NAME)
-		if finishPart and finishPart:IsA("BasePart") and not finishTouchConnection then
-			finishTouchConnection = finishPart.Touched:Connect(function(hit: BasePart)
-				if isLocalCharacterHit(hit) then
-					stopPrediction()
-				end
-			end)
-		end
-	end
-
-	if groundFolder then
-		for _, child in groundFolder:GetChildren() do
-			if child:IsA("BasePart") and child.Name:match("^Platform_%d+$") then
-				addActivationPart(child)
-			end
-		end
-	end
-end
-
-local function scanLocalActivation()
-	local now = os.clock()
-	if now - lastLocalScanAt < LOCAL_SCAN_INTERVAL_SECONDS then
-		return
-	end
-	lastLocalScanAt = now
-
-	if predictedActive and now > predictionExpiresAt and localPlayer:GetAttribute(GRAVITY_ATTRIBUTE) ~= true then
-		predictedActive = false
-		syncController()
-	end
-
-	if localPlayer:GetAttribute(GRAVITY_ATTRIBUTE) == true or predictedActive then
-		if not Controller then
-			createController()
-		end
-		return
-	end
-
-	if #activationParts == 0 then
-		refreshActivationParts()
-	end
-
-	local character = localPlayer.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not character or not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
-		return
-	end
-
-	local position = root.Position
-	for _, part in activationParts do
-		if part.Parent and isPositionInsidePart(part, position, LOCAL_PART_MARGIN) then
-			requestPredictedActivation(SPATIAL_PREDICTION_SECONDS)
-			return
-		end
-	end
-end
-
-function Zone7GravityController.Init()
-end
-
-function Zone7GravityController.Start()
-	refreshActivationParts()
-	prepareDependencies()
-
-	localPlayer:GetAttributeChangedSignal(GRAVITY_ATTRIBUTE):Connect(function()
-		if localPlayer:GetAttribute(GRAVITY_ATTRIBUTE) == true then
-			predictedActive = false
-			predictionExpiresAt = 0
-		end
-		syncController()
-	end)
-
-	localPlayer.CharacterAdded:Connect(function()
-		dependenciesPrepared = false
-		destroyController()
-		prepareDependencies()
-		task.defer(syncController)
-	end)
-
-	localPlayer.CharacterRemoving:Connect(function()
-		stopPrediction()
-		destroyController()
-	end)
-
-	RunService.PreSimulation:Connect(scanLocalActivation)
-	syncController()
-end
-
-return Zone7GravityController
 ]]></string>
             </Properties>
           </Item>

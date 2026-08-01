@@ -7,5 +7,6 @@
     "editor.defaultFormatter": "JohnnyMorganz.stylua-vscode",
     "editor.formatOnSave": true
   },
-  "rojo.projectFile": "default.project.json"
+  "rojo.projectFile": "default.project.json",
+  "luau-lsp.studioPlugin.enabled": true
 }

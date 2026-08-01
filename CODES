@@ -1,0 +1,23 @@
+================================================================================
+                    SPEED ESCAPE — DANH SÁCH MÃ QUÀ TẶNG (PROMO CODES)
+================================================================================
+
+Dưới đây là danh sách các Mã Quà Tặng (Promo Codes) đang hoạt động trong game:
+
+1. RELEASE
+   - Phần thưởng: +1,000 Wins & 🎟️ 1 Vé quay Roulette
+
+2. SPEED
+   - Phần thưởng: +5,000 Speed Boost
+
+3. FREEWINS
+   - Phần thưởng: +2,500 Wins
+
+4. LUCKY
+   - Phần thưởng: +10,000 Speed Boost & 🎟️ 2 Vé quay Roulette
+
+--------------------------------------------------------------------------------
+HƯỚNG DẪN THÊM CODE MỚI:
+Để thêm hoặc chỉnh sửa danh sách Code, mở file cấu hình:
+-> src/shared/Config/Economy/Codes.luau
+================================================================================

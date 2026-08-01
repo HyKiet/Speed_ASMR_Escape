@@ -1,0 +1,101 @@
+--!strict
+--[[
+	CodeService.luau — Quản lý & Đổi mã quà tặng (Promo Codes).
+
+	Xử lý gói tin requestRedeemCode từ Client, kiểm tra mã hợp lệ,
+	chống nhận trùng (lưu vào data.RedeemedCodes) và phát thưởng Wins, Speed, Spin Tickets.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Codes = require(ReplicatedStorage.Shared.Config.Economy.Codes)
+local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
+local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+
+local PROMO_CODES = Codes
+
+
+local DataService: any = nil
+local ProgressionService: any = nil
+
+local CodeService = {}
+
+function CodeService.RedeemCode(player: Player, rawCode: string)
+	local data = DataService.GetData(player)
+	if not data then
+		return
+	end
+
+	local cleanCode = string.upper(string.gsub(rawCode, "%s+", ""))
+	if #cleanCode == 0 then
+		GamePackets.toast.sendTo({
+			kind = "code",
+			message = "Please enter a valid code!",
+			amount = 0,
+		}, player)
+		return
+	end
+
+	local reward = PROMO_CODES[cleanCode]
+	if not reward then
+		GamePackets.toast.sendTo({
+			kind = "code",
+			message = "Invalid or expired code!",
+			amount = 0,
+		}, player)
+		return
+	end
+
+	-- Chống nhập lặp lại mã đã dùng
+	data.RedeemedCodes = data.RedeemedCodes or {}
+	if data.RedeemedCodes[cleanCode] then
+		GamePackets.toast.sendTo({
+			kind = "code",
+			message = "You have already claimed this code!",
+			amount = 0,
+		}, player)
+		return
+	end
+
+	-- Đánh dấu đã nhận
+	data.RedeemedCodes[cleanCode] = true
+
+	-- Trao phần thưởng
+	if reward.wins and reward.wins > 0 then
+		ProgressionService.AwardWins(player, reward.wins, "code")
+	end
+
+	if reward.speed and reward.speed > 0 then
+		ProgressionService.GrantSpeed(player, reward.speed)
+	end
+
+	if reward.spin and reward.spin > 0 then
+		local rouletteService = ServiceLocator.Find("RouletteService")
+		if rouletteService then
+			rouletteService.GrantTickets(player, reward.spin, true)
+		end
+	end
+
+	-- Thông báo thành công
+	GamePackets.toast.sendTo({
+		kind = "code",
+		message = `Code Redeemed: {reward.description}!`,
+		amount = 0,
+	}, player)
+
+	print(`[CodeService] Player {player.Name} ({player.UserId}) successfully redeemed code "{cleanCode}" ({reward.description})`)
+end
+
+function CodeService.Init()
+	DataService = ServiceLocator.Get("DataService")
+	ProgressionService = ServiceLocator.Get("ProgressionService")
+end
+
+function CodeService.Start()
+	GamePackets.requestRedeemCode.listen(function(packet, player: Player)
+		CodeService.RedeemCode(player, packet.code)
+	end)
+end
+
+return CodeService

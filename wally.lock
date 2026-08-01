@@ -3,6 +3,11 @@
 registry = "test"
 
 [[package]]
+name = "1foreverhd/topbarplus"
+version = "3.4.0"
+dependencies = []
+
+[[package]]
 name = "aspecky/sweeper"
 version = "2.2.0"
 dependencies = []
@@ -15,7 +20,7 @@ dependencies = []
 [[package]]
 name = "chojshin/hoverboardspeedescape"
 version = "0.1.0"
-dependencies = [["ByteNet", "bongusbingis/bytenet@0.6.0"], ["Fusion", "elttob/fusion@0.2.0"], ["Janitor", "aspecky/sweeper@2.2.0"], ["ZonePlus", "mattschrubb/zoneplus@3.2.0"]]
+dependencies = [["ByteNet", "bongusbingis/bytenet@0.6.0"], ["Fusion", "elttob/fusion@0.2.0"], ["Janitor", "aspecky/sweeper@2.2.0"], ["TopbarPlus", "1foreverhd/topbarplus@3.4.0"], ["ZonePlus", "mattschrubb/zoneplus@3.2.0"]]
 
 [[package]]
 name = "elttob/fusion"

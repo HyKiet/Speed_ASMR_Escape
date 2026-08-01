@@ -1,0 +1,19 @@
+# Sinh ra bởi build/analyze — không bao giờ commit
+build-test.rbxlx
+build-ci.rbxl
+*.rbxl
+sourcemap.json
+sourcemap-check.json
+lsp-out.txt
+globalTypes.d.luau
+
+# Media nặng, không phải source (đã upload lên Roblox rồi)
+*.mp3
+*.mp4
+
+# Bản sao lưu place cũ — dùng Version History trên Creator Dashboard thay thế
+*.backup-*.rbxlx
+
+# Rác của công cụ
+.claude/worktrees/
+.codegraph/

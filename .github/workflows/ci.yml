@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  LUAU_LSP_VERSION: "1.69.0"
+  LUNE_VERSION: "0.10.5"
+
+jobs:
+  check:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cài toolchain từ aftman.toml
+        uses: ok-nick/setup-aftman@v0.4.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 1. Cổng chặn cứng: place phải build được. Hỏng ở đây = không publish nổi.
+      - name: Rojo build
+        run: rojo build default.project.json -o build-ci.rbxl
+
+      - name: Rojo sourcemap
+        run: rojo sourcemap default.project.json -o sourcemap.json
+
+      # 2. Cổng chặn cứng: selene error (warning thì cho qua — repo đang có ~52 cái).
+      - name: Selene (chặn khi có error)
+        run: selene --allow-warnings src
+
+      # 3. Không chặn: 76 file chưa format, dọn dần chứ không dọn một lượt.
+      - name: StyLua (chỉ báo cáo)
+        continue-on-error: true
+        run: stylua --check src
+
+      # 4. Ratchet kiểu typing: được phép còn nợ, nhưng không được nợ thêm.
+      - name: Tải luau-lsp
+        run: |
+          curl -sL -o luau-lsp.zip \
+            "https://github.com/JohnnyMorganz/luau-lsp/releases/download/${LUAU_LSP_VERSION}/luau-lsp-linux.zip"
+          unzip -q luau-lsp.zip
+          chmod +x luau-lsp
+          curl -sL -o globalTypes.d.luau \
+            https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
+
+      - name: luau-lsp analyze (không được vượt baseline)
+        run: |
+          ./luau-lsp analyze \
+            --sourcemap=sourcemap.json \
+            --definitions=globalTypes.d.luau \
+            --settings=.vscode/settings.json \
+            --ignore="**/Packages/**" \
+            --ignore="**/ServerPackages/**" \
+            src > lsp-out.txt 2>&1 || true
+          COUNT=$(grep -c "TypeError\|SyntaxError\|UnknownSymbol" lsp-out.txt || true)
+          BASELINE=$(cat tests/luau-lsp-baseline.txt)
+          echo "Type errors: $COUNT (baseline $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Thêm $((COUNT - BASELINE)) lỗi type mới so với baseline."
+            grep "TypeError\|SyntaxError\|UnknownSymbol" lsp-out.txt | head -40
+            exit 1
+          fi
+          if [ "$COUNT" -lt "$BASELINE" ]; then
+            echo "::notice::Giảm được $((BASELINE - COUNT)) lỗi — hạ tests/luau-lsp-baseline.txt xuống $COUNT."
+          fi
+
+      # 5. Cổng chặn cứng: unit test công thức thuần (XP curve, walkspeed cap,
+      #    roulette weight, giá kinh tế). Chạy ngoài Roblox nên nhanh và rẻ.
+      - name: Chạy unit test (Lune)
+        run: |
+          curl -sL -o lune.zip \
+            "https://github.com/lune-org/lune/releases/download/v${LUNE_VERSION}/lune-${LUNE_VERSION}-linux-x86_64.zip"
+          unzip -q -o lune.zip
+          chmod +x lune
+          ./lune run tests/run.luau
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-and-reports
+          path: |
+            build-ci.rbxl
+            lsp-out.txt
+          retention-days: 7

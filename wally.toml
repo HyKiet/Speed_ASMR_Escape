@@ -9,6 +9,7 @@ Fusion = "elttob/fusion@0.2.0"
 Janitor = "aspecky/sweeper@2.2.0"
 ByteNet = "bongusbingis/bytenet@0.6.0"
 ZonePlus = "mattschrubb/zoneplus@3.2.0"
+TopbarPlus = "1foreverhd/topbarplus@3.4.0"
 
 [server-dependencies]
 ProfileStore = "lm-loleris/profilestore@1.0.3"

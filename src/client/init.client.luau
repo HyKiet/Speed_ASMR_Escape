@@ -1,58 +1,93 @@
---!strict -- Bật chế độ kiểm tra kiểu dữ liệu nghiêm ngặt trên Client.
+--!strict
+-- Bootstrapper Client.
+-- Duyệt đệ quy thư mục `Controllers/`, nạp mọi ModuleScript thành Controller,
+-- đăng ký vào ServiceLocator, rồi gọi Init() và Start() theo thứ tự.
 
--- Bộ khởi chạy Client Modular (Custom Bootstrapper)
--- Đây là điểm xuất phát của game trên Client (thiết bị người chơi). Nó tự động chạy các Controllers (bộ điều khiển giao diện, âm thanh, điều khiển nhân vật).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Tìm thư mục Controllers nằm bên trong LocalScript này.
+local ServiceLocator = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("ServiceLocator"))
+
 local ControllersFolder = script:WaitForChild("Controllers")
 
 print("--- [CLIENT LOADING] Bắt đầu nạp các bộ điều khiển (Controllers) trên Client... ---")
 
-local Controllers = {}
+type Controller = { Init: (() -> ())?, Start: (() -> ())? }
+local controllers: { [string]: Controller } = {}
 
--- ============================================================================
--- GIAI ĐOẠN 1: QUÉT VÀ NẠP TẤT CẢ MODULESCRIPT TRONG THƯ MỤC CONTROLLERS
--- ============================================================================
-for _, module in ControllersFolder:GetChildren() do
-	if module:IsA("ModuleScript") then
-		-- Nạp module trong chế độ an toàn pcall. 
-		-- Ở Client, pcall rất quan trọng vì máy người chơi có thể tải tài nguyên chậm hoặc gặp lỗi cục bộ.
-		local success, controller = pcall(require, module)
-		if success then
-			Controllers[module.Name] = controller
-		else
-			warn("[CLIENT ERROR] Lỗi nạp bộ điều khiển: " .. module.Name .. " | Chi tiết lỗi: " .. tostring(controller))
+local function collectModules(folder: Instance, into: { ModuleScript })
+	for _, child in folder:GetChildren() do
+		if child:IsA("ModuleScript") then
+			table.insert(into, child)
+		elseif child:IsA("Folder") then
+			collectModules(child, into)
 		end
 	end
 end
 
--- ============================================================================
--- GIAI ĐOẠN 2: KHỞI TẠO (INIT)
--- ============================================================================
-for name, controller in Controllers do
+-- Cây Controllers replicate DẦN về client. WaitForChild("Controllers") chỉ đảm bảo có thư mục
+-- gốc, không đảm bảo các thư mục con (Zones/, HUD/, ASMR/, CoreLoop/...) đã tới. Nếu quét ngay
+-- thì có phiên chỉ bắt được vài module con trực tiếp — số còn lại IM LẶNG không nạp, không warn,
+-- mà vẫn in "nạp thành công" (đã bắt được phiên chỉ nạp 1/90 module, Zone 9 sóng thần đứng im).
+-- Chờ số lượng con cháu ổn định vài khung hình rồi mới quét.
+local function awaitTreeStable(root: Instance)
+	local last = -1
+	local stableFrames = 0
+	local deadline = os.clock() + 10
+	while os.clock() < deadline do
+		local count = #root:GetDescendants()
+		if count == last and count > 0 then
+			stableFrames += 1
+			if stableFrames >= 3 then
+				return
+			end
+		else
+			stableFrames = 0
+			last = count
+		end
+		task.wait(0.1)
+	end
+end
+
+awaitTreeStable(ControllersFolder)
+
+local modules: { ModuleScript } = {}
+collectModules(ControllersFolder, modules)
+
+-- Giai đoạn 1: require + register
+for _, module in modules do
+	local success, controller = pcall(require, module)
+	if success then
+		if controllers[module.Name] then
+			warn(`[CLIENT WARN] Hai bộ điều khiển trùng tên: {module.Name}. Giữ bản đầu tiên.`)
+		else
+			controllers[module.Name] = controller
+			ServiceLocator.Register(module.Name, controller)
+		end
+	else
+		warn(`[CLIENT ERROR] Lỗi nạp bộ điều khiển: {module.Name} | Chi tiết: {tostring(controller)}`)
+	end
+end
+
+-- Giai đoạn 2: Init đồng bộ
+for name, controller in controllers do
 	if type(controller.Init) == "function" then
-		-- Chạy hàm Init(). Đây là nơi các Controller liên kết sự kiện giao diện (UI) hoặc kết nối RemoteEvent từ Server.
 		local success, err = pcall(controller.Init)
 		if not success then
-			warn("[CLIENT ERROR] Lỗi Khởi tạo (Init) bộ điều khiển: " .. name .. " | Chi tiết lỗi: " .. tostring(err))
+			warn(`[CLIENT ERROR] Lỗi Init bộ điều khiển: {name} | Chi tiết: {tostring(err)}`)
 		end
 	end
 end
 
--- ============================================================================
--- GIAI ĐOẠN 3: BẮT ĐẦU CHẠY LOGIC GAME (START)
--- ============================================================================
-for name, controller in Controllers do
+-- Giai đoạn 3: Start song song
+for name, controller in controllers do
 	if type(controller.Start) == "function" then
-		-- Chạy song song hàm Start(). Đây là nơi các Controller thực thi vòng lặp cập nhật UI, kiểm tra hành vi bấm phím của người chơi.
 		task.spawn(function()
 			local success, err = pcall(controller.Start)
 			if not success then
-				warn("[CLIENT ERROR] Lỗi Bắt đầu (Start) bộ điều khiển: " .. name .. " | Chi tiết lỗi: " .. tostring(err))
+				warn(`[CLIENT ERROR] Lỗi Start bộ điều khiển: {name} | Chi tiết: {tostring(err)}`)
 			end
 		end)
 	end
 end
 
-print("--- [CLIENT READY] Tất cả các bộ điều khiển trên Client đã được nạp thành công! ---")
-
+print(`--- [CLIENT READY] Đã nạp {#modules} bộ điều khiển trên Client. ---`)

@@ -1,0 +1,7 @@
+# Giữ LF cho mọi file source: Rojo, selene, stylua và luau-lsp đều chạy trên
+# Linux trong CI. Trộn CRLF/LF làm diff phình ra và stylua báo lệch format giả.
+* text=auto eol=lf
+
+# File place là XML do Roblox sinh — không đụng vào nội dung.
+*.rbxlx -text
+*.rbxl binary
