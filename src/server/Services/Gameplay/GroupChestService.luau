@@ -7,6 +7,7 @@ local Workspace = game:GetService("Workspace")
 
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local GroupChestConfig = require(ReplicatedStorage.Shared.Config.GroupChest)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
 
 local CHEST_MODEL_NAME = "GroupChest"
@@ -171,6 +172,20 @@ function GroupChestService.TryClaim(player: Player): boolean
 		return false
 	end
 
+	--[[
+		Wins TRAO NGAY (2026-08-10): xem khối cân bằng trong `Config/GroupChest.luau`.
+		Cộng SAU khi Speed đã vào chắc chắn — `GrantSpeed` là bước duy nhất có thể thất bại và
+		phải rollback cờ; đảo thứ tự thì lỡ Speed hỏng là người chơi đã ôm Wins mà rương vẫn
+		mở lại được.
+
+		`AwardWins` tự nhân x1.1 của chính buff group này (ProgressionService), nên số vào túi
+		là 11 chứ không phải 10 — không sửa: người vừa join group hưởng buff ngay từ đồng Wins
+		đầu tiên là đúng, và chênh 1 Win không đụng tới phép tính "13 < 15" đã chốt.
+	]]
+	ProgressionService.AwardWins(player, GroupChestConfig.INSTANT_WINS_REWARD, "groupChest")
+
+	-- Toast này là thứ kích hoạt thẻ chúc mừng bay (HUDController lọc kind == "groupChest"
+	-- kèm amount > 0), nên `amount` phải là con số ĐÁNG khoe nhất: Speed.
 	sendToast(player, "Speed from Group Chest", GroupChestConfig.STARTER_SPEED_REWARD)
 	sendState(player)
 	return true
@@ -188,9 +203,12 @@ local function bindChestPrompt()
 		return
 	end
 
-	table.insert(promptConnections, prompt.Triggered:Connect(function(player: Player)
-		GroupChestService.OpenChest(player)
-	end))
+	table.insert(
+		promptConnections,
+		prompt.Triggered:Connect(function(player: Player)
+			GroupChestService.OpenChest(player)
+		end)
+	)
 end
 
 function GroupChestService.Init()
@@ -215,13 +233,21 @@ function GroupChestService.Start()
 	bindChestPrompt()
 
 	GamePackets.requestGroupChestState.listen(function(_request, player: Player)
+		if NetRateLimit.ShouldDrop(player, "groupChestState") then
+			return
+		end
 		GroupChestService.OpenChest(player)
 	end)
 
 	GamePackets.requestGroupChestLikeConfirm.listen(function(_request, player: Player)
+		if NetRateLimit.ShouldDrop(player, "groupChestLike") then
+			return
+		end
 		GroupChestService.ConfirmLike(player)
 	end)
 
+	-- TryClaim đã tự có cooldown riêng (canAttemptClaim / CLAIM_COOLDOWN_SECONDS),
+	-- nên không cần khoác thêm rate-limit chung ở đây.
 	GamePackets.requestGroupChestClaim.listen(function(_request, player: Player)
 		GroupChestService.TryClaim(player)
 	end)

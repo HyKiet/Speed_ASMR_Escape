@@ -11,10 +11,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Codes = require(ReplicatedStorage.Shared.Config.Economy.Codes)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
 
 local PROMO_CODES = Codes
-
 
 local DataService: any = nil
 local ProgressionService: any = nil
@@ -84,7 +84,9 @@ function CodeService.RedeemCode(player: Player, rawCode: string)
 		amount = 0,
 	}, player)
 
-	print(`[CodeService] Player {player.Name} ({player.UserId}) successfully redeemed code "{cleanCode}" ({reward.description})`)
+	print(
+		`[CodeService] Player {player.Name} ({player.UserId}) successfully redeemed code "{cleanCode}" ({reward.description})`
+	)
 end
 
 function CodeService.Init()
@@ -94,6 +96,9 @@ end
 
 function CodeService.Start()
 	GamePackets.requestRedeemCode.listen(function(packet, player: Player)
+		if NetRateLimit.ShouldDrop(player, "redeemCode") then
+			return
+		end
 		CodeService.RedeemCode(player, packet.code)
 	end)
 end

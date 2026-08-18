@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local Products = require(ReplicatedStorage.Shared.Config.Economy.Products)
 local RouletteConfig = require(ReplicatedStorage.Shared.Config.Roulette)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
@@ -42,6 +43,27 @@ local function getTickets(data: any): number
 	return math.max(0, math.floor(tonumber(data.SpinTickets) or 0))
 end
 
+--[[
+	Nhịp hồi vé + trần tích trữ giờ THEO NGƯỜI CHƠI, không còn là hằng số: VIP Membership hồi
+	8 phút/vé và giữ được 5 vé (xem khối lý do trong `Config/Roulette.luau`).
+
+	Đọc attribute `IsVIP` do GamepassService set — KHÔNG gọi `UserOwnsGamePassAsync` ở đây:
+	vòng lặp tích vé chạy mỗi giây cho mọi người trong server, gọi web API trong đó là tự
+	bắn hàng trăm request mỗi phút. Attribute được set lúc profile load và ngay khi mua giữa
+	session, nên nó luôn kịp thời.
+]]
+local function ticketInterval(player: Player): number
+	return if player:GetAttribute("IsVIP") == true
+		then RouletteConfig.VIP_TICKET_INTERVAL_SECONDS
+		else RouletteConfig.FREE_TICKET_INTERVAL_SECONDS
+end
+
+local function ticketCap(player: Player): number
+	return if player:GetAttribute("IsVIP") == true
+		then RouletteConfig.VIP_TICKET_STOCK_CAP
+		else RouletteConfig.FREE_TICKET_STOCK_CAP
+end
+
 local function sendState(player: Player)
 	local data = DataService.GetData(player)
 	if not data then
@@ -50,8 +72,8 @@ local function sendState(player: Player)
 
 	local tickets = getTickets(data)
 	local nextFree = -1
-	if tickets < RouletteConfig.FREE_TICKET_STOCK_CAP then
-		nextFree = math.max(0, RouletteConfig.FREE_TICKET_INTERVAL_SECONDS - (freeAccrualSeconds[player] or 0))
+	if tickets < ticketCap(player) then
+		nextFree = math.max(0, ticketInterval(player) - (freeAccrualSeconds[player] or 0))
 	end
 
 	GamePackets.rouletteState.sendTo({
@@ -68,7 +90,7 @@ function RouletteService.GrantTickets(player: Player, amount: number, ignoreFree
 	end
 
 	local tickets = getTickets(data)
-	local cap = if ignoreFreeCap then RouletteConfig.MAX_TICKETS else RouletteConfig.FREE_TICKET_STOCK_CAP
+	local cap = if ignoreFreeCap then RouletteConfig.MAX_TICKETS else ticketCap(player)
 	local newTickets = math.min(cap, tickets + math.floor(amount))
 	if newTickets <= tickets then
 		return false
@@ -175,7 +197,6 @@ local function onSpinRequest(player: Player)
 	end)
 end
 
-
 -- ============================================================================
 -- Receipt processor (gói lượt quay Robux)
 -- ============================================================================
@@ -215,6 +236,9 @@ function RouletteService.Start()
 	end)
 
 	GamePackets.requestRouletteState.listen(function(_data, player: Player)
+		if NetRateLimit.ShouldDrop(player, "rouletteState") then
+			return
+		end
 		sendState(player)
 	end)
 
@@ -222,7 +246,53 @@ function RouletteService.Start()
 		freeAccrualSeconds[player] = 0
 	end)
 
-	-- Studio-only: tặng 3 vé test khi profile load xong (không chạy ở production).
+	--[[
+		Studio-only: tặng vé test khi profile load xong. KHÔNG chạy ở production —
+		người chơi thật vào game có 0 vé và phải online 15 phút mới được vé đầu tiên.
+
+		2026-08-13: hạ 3 → 1. Con số 3 làm chính người phát triển tưởng game đang tặng 3 vé
+		cho người mới (badge "Spin FULL" ngay lần đầu vào Studio). Một vé là đủ để thử
+		luồng quay, mà lại khớp với thứ nhìn thấy ở production.
+	]]
+	--[[
+		[Studio-only test hook] BẮN THẲNG MỘT KẾT QUẢ QUAY (2026-08-14).
+
+		Đặt attribute `StudioTestSpin` = số ô (1..8) lên Player ⇒ server gửi đúng gói `spinResult`
+		mà một lượt quay thật gửi, KHÔNG trừ vé và KHÔNG phát thưởng. Dùng để nghiệm thu phần
+		HIỂN THỊ phía client (bánh xe dừng đúng ô + banner chúc mừng) mà không phải cày vé cho
+		từng ô — ô hiếm nhất là 1%, không có hook thì không ai QA nổi nó.
+
+		Attribute chứ không phải hàm gọi thẳng: `execute_luau` chạy VM riêng nên không với tới
+		service thật (cùng lý do với hook cosmetic trong ProgressionService).
+	]]
+	if RunService:IsStudio() then
+		local function watchTestSpin(player: Player)
+			player:GetAttributeChangedSignal("StudioTestSpin"):Connect(function()
+				local slotIndex = tonumber(player:GetAttribute("StudioTestSpin"))
+				if not slotIndex then
+					return
+				end
+				player:SetAttribute("StudioTestSpin", nil)
+				slotIndex = math.clamp(math.floor(slotIndex), 1, #RouletteConfig.SLOTS)
+
+				local data = DataService.GetData(player)
+				GamePackets.spinResult.sendTo({
+					slotIndex = slotIndex,
+					rewardText = "",
+					tickets = if data then math.clamp(getTickets(data), 0, 255) else 0,
+				}, player)
+				print(
+					`[RouletteService] [Studio hook] Gửi spinResult ô {slotIndex} `
+						.. `("{RouletteConfig.SLOTS[slotIndex].label}") cho {player.Name} — không trừ vé, không phát thưởng.`
+				)
+			end)
+		end
+		for _, player in Players:GetPlayers() do
+			watchTestSpin(player)
+		end
+		Players.PlayerAdded:Connect(watchTestSpin)
+	end
+
 	if RunService:IsStudio() then
 		task.spawn(function()
 			while true do
@@ -231,7 +301,7 @@ function RouletteService.Start()
 					local data = DataService.GetData(player)
 					if data and not player:GetAttribute("StudioSpinGranted") then
 						player:SetAttribute("StudioSpinGranted", true)
-						RouletteService.GrantTickets(player, 3, true)
+						RouletteService.GrantTickets(player, 1, true)
 					end
 				end
 			end
@@ -242,7 +312,8 @@ function RouletteService.Start()
 		lastSpinAt[player] = nil
 	end)
 
-	-- Tích vé free: đếm mỗi giây, đủ 15 phút → +1 vé (chỉ khi chưa đầy cap free).
+	-- Tích vé free: đếm mỗi giây, đủ một nhịp → +1 vé (chỉ khi chưa đầy cap).
+	-- Nhịp và cap lấy theo người chơi: thường 15 phút/3 vé, VIP 8 phút/5 vé.
 	task.spawn(function()
 		while true do
 			task.wait(1)
@@ -252,13 +323,13 @@ function RouletteService.Start()
 					continue
 				end
 
-				if getTickets(data) >= RouletteConfig.FREE_TICKET_STOCK_CAP then
+				if getTickets(data) >= ticketCap(player) then
 					freeAccrualSeconds[player] = 0
 					continue
 				end
 
 				local accrued = (freeAccrualSeconds[player] or 0) + 1
-				if accrued >= RouletteConfig.FREE_TICKET_INTERVAL_SECONDS then
+				if accrued >= ticketInterval(player) then
 					freeAccrualSeconds[player] = 0
 					RouletteService.GrantTickets(player, 1)
 				else
