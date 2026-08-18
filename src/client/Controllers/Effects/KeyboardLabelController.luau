@@ -163,7 +163,10 @@ local function planBoard(model: Instance, walk: BasePart): { KeyPlan }?
 		-- yaw đọc từ CHÍNH phím (không từ WalkSurface): phím lát lệch so với bàn vẫn đúng
 		local _, keyYaw = r.part.CFrame:ToOrientation()
 		local rot = (math.deg(keyYaw) + labelYaw) % 360
-		table.insert(plan, { part = r.part, char = string.sub(rowStr, ci, ci), rot = rot, fill = fill, stroke = stroke })
+		table.insert(
+			plan,
+			{ part = r.part, char = string.sub(rowStr, ci, ci), rot = rot, fill = fill, stroke = stroke }
+		)
 	end
 	return plan
 end

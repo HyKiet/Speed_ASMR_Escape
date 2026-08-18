@@ -5,6 +5,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
+local Tokens = require(script.Parent.Parent.Tokens)
+local Toast = require(script.Parent.Parent.Toast)
 
 local Children = Fusion.Children
 local Computed = Fusion.Computed
@@ -34,10 +36,41 @@ function FriendsHud.Build()
 				Image = "rbxassetid://85786506345593",
 				Position = UDim2.fromOffset(10, -5),
 				Size = UDim2.fromOffset(50, 50),
+				--[[
+					MỜI BẠN BÈ — 2026-08-14.
+
+					⚠️ TRONG STUDIO NÚT NÀY LUÔN BÁO LỖI, VÀ ĐÓ KHÔNG PHẢI LỖI CỦA CHÚNG TA.
+					`PromptGameInvite` mở đúng bảng "Invite Friends" của Roblox (CoreGui
+					ShareGame), rồi CHÍNH bảng đó tự gọi web API để lấy danh sách bạn — lời gọi
+					ấy không có phiên người chơi thật nên trả về lỗi, và bảng hiện "An error
+					occurred, please try again later" kèm một đống stack React trong Output.
+					Bảng MỞ ĐƯỢC đã là bằng chứng lời gọi của ta thành công. Muốn nghiệm thu
+					thật thì phải chạy trên client đã publish, không nghiệm thu được trong Studio.
+
+					`pcall` cũ nuốt sạch lỗi nên không phân biệt nổi "Roblox chặn" với "code
+					mình sai" — giờ hỏi `CanSendGameInviteAsync` trước và nói thẳng ra khi không
+					mời được, thay vì bấm nút rồi không có gì xảy ra.
+				]]
 				[OnEvent("Activated")] = function()
 					local SocialService = game:GetService("SocialService")
-					pcall(function()
-						SocialService:PromptGameInvite(Players.LocalPlayer)
+					task.spawn(function()
+						local ok, result = pcall(function()
+							return SocialService:CanSendGameInviteAsync(Players.LocalPlayer)
+						end)
+						if not ok then
+							warn(`[FriendsHud] CanSendGameInviteAsync lỗi: {result}`)
+						elseif result == false then
+							Toast.Show("Can't send invites right now — try again later.", "error")
+							return
+						end
+
+						local promptOk, promptError = pcall(function()
+							SocialService:PromptGameInvite(Players.LocalPlayer)
+						end)
+						if not promptOk then
+							warn(`[FriendsHud] PromptGameInvite lỗi: {promptError}`)
+							Toast.Show("Invite panel failed to open.", "error")
+						end
 					end)
 				end,
 				[OnEvent("MouseEnter")] = function()
@@ -74,7 +107,7 @@ function FriendsHud.Build()
 				ZIndex = 50,
 				[Children] = {
 					Theme.MakeCorner(12),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 3),
+					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), Tokens.BORDER),
 					Theme.MakeOutlineLabel({
 						Position = UDim2.fromOffset(16, 16),
 						Size = UDim2.fromOffset(388, 64),

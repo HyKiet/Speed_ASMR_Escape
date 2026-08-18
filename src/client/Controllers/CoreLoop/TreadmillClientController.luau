@@ -36,30 +36,29 @@ local VERTICAL_MARGIN = 8.0
 
 local localPlayer = Players.LocalPlayer
 
-local hitboxes: { BasePart } = {}
+local models: { Model } = {}
 local registeredModels: { [Instance]: boolean } = {}
 local currentHitbox: BasePart? = nil
 local lastSentAt = 0
 
--- LƯU Ý replication: lúc client Start, Workspace có thể CHƯA replicate xong; kể cả khi
--- Model đã đến qua DescendantAdded thì child Hitbox có thể đến SAU (parent-first).
--- → luôn WaitForChild trong task riêng, và dedupe vì model có thể được gọi 2 lần
--- (initial scan + DescendantAdded).
+-- LƯU Ý StreamingEnabled: vỏ Model replicate NGAY khi client vào game, nhưng part Hitbox
+-- chỉ đến khi zone lọt vào bán kính stream. Bản cũ dùng WaitForChild("Hitbox", 10): với
+-- Zone 2..14 (cách Lobby hàng nghìn studs) 10s trôi qua trước khi zone stream vào, hitbox
+-- trả về nil và KHÔNG BAO GIỜ được thử lại → treadmill mọi zone trừ Zone 1 chết câm.
+-- → giữ danh sách MODEL, phân giải Hitbox theo nhu cầu ở mỗi lần quét (rẻ: ≤20 model),
+-- nên stream vào/ra bao nhiêu lần cũng tự hồi.
 local function registerModel(model: Instance)
-	if not (model:IsA("Model") and TREADMILL_MODEL_NAMES[model.Name]) then
+	if not model:IsA("Model") then
+		return
+	end
+	if not TREADMILL_MODEL_NAMES[model.Name] then
 		return
 	end
 	if registeredModels[model] then
 		return
 	end
 	registeredModels[model] = true
-
-	task.spawn(function()
-		local hitbox = model:FindFirstChild("Hitbox") or model:WaitForChild("Hitbox", 10)
-		if hitbox and hitbox:IsA("BasePart") then
-			table.insert(hitboxes, hitbox)
-		end
-	end)
+	table.insert(models, model)
 end
 
 local function isWithinHitbox(rootPos: Vector3, hitbox: BasePart): boolean
@@ -71,8 +70,16 @@ local function isWithinHitbox(rootPos: Vector3, hitbox: BasePart): boolean
 end
 
 local function findHitboxUnder(rootPos: Vector3): BasePart?
-	for _, hitbox in hitboxes do
-		if hitbox.Parent and isWithinHitbox(rootPos, hitbox) then
+	for index = #models, 1, -1 do
+		local model = models[index]
+		if not model.Parent then
+			-- Model bị stream ra hẳn: bỏ khỏi danh sách, DescendantAdded sẽ đăng ký lại.
+			registeredModels[model] = nil
+			table.remove(models, index)
+			continue
+		end
+		local hitbox = model:FindFirstChild("Hitbox")
+		if hitbox and hitbox:IsA("BasePart") and isWithinHitbox(rootPos, hitbox) then
 			return hitbox
 		end
 	end

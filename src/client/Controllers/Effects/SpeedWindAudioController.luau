@@ -103,11 +103,8 @@ local function triggerSonicBoom(camera: Camera)
 	task.spawn(function()
 		local originalCFrame = camera.CFrame
 		for i = 1, 15 do
-			local offset = Vector3.new(
-				math.random(-50, 50) / 100,
-				math.random(-50, 50) / 100,
-				math.random(-50, 50) / 100
-			)
+			local offset =
+				Vector3.new(math.random(-50, 50) / 100, math.random(-50, 50) / 100, math.random(-50, 50) / 100)
 			camera.CFrame = camera.CFrame * CFrame.new(offset)
 			task.wait(0.02)
 		end
@@ -126,7 +123,7 @@ function SpeedWindAudioController.Start()
 		local char = localPlayer.Character
 		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 		local root = char and char:FindFirstChild("HumanoidRootPart")
-		
+
 		if not humanoid or not root or humanoid.Health <= 0 then
 			-- Fade out sound when dead
 			if windFader then
@@ -137,7 +134,7 @@ function SpeedWindAudioController.Start()
 
 		-- Read physical WalkSpeed
 		local speed = humanoid.WalkSpeed
-		
+
 		if windFader and windPitchShifter then
 			-- Dynamic Volume based on Speed: starts at 50 speed, caps at 200 speed
 			local targetVolume = 0
@@ -150,7 +147,8 @@ function SpeedWindAudioController.Start()
 
 			-- Smooth interpolation
 			windFader.Volume = windFader.Volume + (targetVolume - windFader.Volume) * 0.1
-			windPitchShifter.PitchRatio = windPitchShifter.PitchRatio + (targetPitch - windPitchShifter.PitchRatio) * 0.1
+			windPitchShifter.PitchRatio = windPitchShifter.PitchRatio
+				+ (targetPitch - windPitchShifter.PitchRatio) * 0.1
 		end
 
 		-- Sonic Boom trigger: speed exceeds 200 studs/s

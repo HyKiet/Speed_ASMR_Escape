@@ -13,11 +13,13 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
 local Icon = require(ReplicatedStorage.Packages.TopbarPlus)
-local BgmController = require(script.Parent.Parent.Effects.BgmController)
-local ClientSettingsController = require(script.Parent.Parent.Effects.ClientSettingsController)
+local Manager = require(script.Parent.Modals.Manager)
 
 local localPlayer = Players.LocalPlayer
 
@@ -26,6 +28,96 @@ local TopBarController = {}
 -- Icon trong bộ material chính chủ Roblox (đã verify IsLoaded=true trong Studio).
 local ICON_HIDE = "rbxassetid://6031075929" -- mắt gạch chéo
 local ICON_SETTINGS = "rbxassetid://6031280882" -- bánh răng
+-- Ổ khoá (bộ icon Roblox chính chủ, cùng bộ với hai icon trên nên nhìn đồng bộ).
+local ICON_CAMERA_LOCK = "rbxassetid://6031082533"
+
+--[[
+	══ SHIFT LOCK TỰ DỰNG ═══════════════════════════════════════════════════════════════════
+
+	⚠️ KHÔNG dùng `Player.DevTouchCameraMode` / `DevComputerCameraMode` — ĐÃ THỬ VÀ HỎNG
+	(2026-08-14). Hai thuộc tính đó chỉ SERVER ghi được; gọi từ LocalScript thì Roblox ném
+	thẳng lỗi và nút thành nút câm:
+	    "The current thread cannot set 'DevTouchCameraMode' (lacking capability RobloxScript)"
+	Chúng cũng không phải thứ user muốn: `Follow` chỉ xoay camera theo hướng chạy, còn shift
+	lock là NHÂN VẬT XOAY THEO CAMERA (chạy ngang mà vẫn nhìn thẳng) — hai hành vi khác hẳn.
+
+	Nên dựng tay, và đây là toàn bộ shift lock:
+	  1. Nhân vật luôn quay theo hướng camera  ⇒ tắt `AutoRotate` rồi tự ghi CFrame mỗi frame.
+	  2. Trên PC khoá con trỏ vào giữa màn hình (`MouseBehavior = LockCenter`) để rê chuột là
+	     xoay camera. Trên mobile không có con trỏ nên bỏ qua — vuốt màn hình vẫn xoay camera,
+	     và nhân vật xoay theo, đúng thứ người chơi obby cần.
+
+	Chạy ở `RenderPriority.Character.Value + 1`: PHẢI sau bước cập nhật nhân vật mặc định của
+	Roblox, chạy trước là bị nó ghi đè ngay trong cùng frame và nhân vật giật qua lại.
+]]
+local CAMERA_LOCK_BIND = "SpeedEscapeCameraLock"
+local cameraLocked = false
+
+local function applyCameraLockStep()
+	local character = localPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not (humanoid and root and root:IsA("BasePart")) then
+		return
+	end
+	humanoid.AutoRotate = false
+
+	local camera = Workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	-- Chỉ lấy thành phần NGANG của hướng nhìn: giữ nguyên Y thì nhân vật ngả người theo góc
+	-- camera nhìn lên/xuống.
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 0.001 then
+		return
+	end
+	root.CFrame = CFrame.lookAt(root.Position, root.Position + flat.Unit)
+end
+
+local function setCameraLocked(locked: boolean)
+	if cameraLocked == locked then
+		return
+	end
+	cameraLocked = locked
+
+	if locked then
+		RunService:BindToRenderStep(CAMERA_LOCK_BIND, Enum.RenderPriority.Character.Value + 1, applyCameraLockStep)
+		if not UserInputService.TouchEnabled then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		end
+		return
+	end
+
+	RunService:UnbindFromRenderStep(CAMERA_LOCK_BIND)
+	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	local character = localPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.AutoRotate = true
+	end
+end
+
+--[[
+	Hồi sinh là có Humanoid MỚI, mà `AutoRotate = false` nằm trên Humanoid cũ. Không gắn lại
+	thì sau lần chết đầu tiên nút vẫn sáng nhưng nhân vật quay tự do như chưa khoá.
+	`applyCameraLockStep` tự set `AutoRotate` mỗi frame nên chỉ cần đảm bảo nó còn chạy.
+]]
+localPlayer.CharacterAdded:Connect(function()
+	if cameraLocked then
+		task.defer(function()
+			if cameraLocked then
+				RunService:UnbindFromRenderStep(CAMERA_LOCK_BIND)
+				RunService:BindToRenderStep(
+					CAMERA_LOCK_BIND,
+					Enum.RenderPriority.Character.Value + 1,
+					applyCameraLockStep
+				)
+			end
+		end)
+	end
+end)
 
 -- ScreenGui của TopbarPlus — không bao giờ được tắt. Đo trong Studio: nó dựng tới BỐN cái
 -- (`TopbarStandard`, `TopbarCentered` + hai bản `…Clipped` để vẽ dropdown tràn ra ngoài
@@ -85,30 +177,6 @@ local function setHidden(hide: boolean)
 	applyHidden(hide)
 end
 
--- ── Mục trong dropdown Cài đặt ───────────────────────────────────────────────
-
--- Nhãn tự nói trạng thái: dropdown TopbarPlus chỉ tô sáng mục đang chọn, ở kích thước đó
--- người chơi khó thấy — ghi thẳng BẬT/TẮT là đọc được ngay.
-local function makeToggleItem(label: string, startsOn: boolean, onChanged: (boolean) -> ())
-	local item = Icon.new()
-		:setLabel(`{label}  •  {if startsOn then "BẬT" else "TẮT"}`)
-		:autoDeselect(false)
-
-	local function sync(on: boolean)
-		item:setLabel(`{label}  •  {if on then "BẬT" else "TẮT"}`)
-		onChanged(on)
-	end
-
-	item:bindEvent("selected", function()
-		sync(true)
-	end)
-	item:bindEvent("deselected", function()
-		sync(false)
-	end)
-
-	return item
-end
-
 function TopBarController.Init()
 	localPlayer:WaitForChild("PlayerGui")
 
@@ -125,24 +193,53 @@ function TopBarController.Init()
 			setHidden(false)
 		end)
 
-	-- 2. Nút cài đặt + dropdown 3 công tắc.
-	local settingsIcon = Icon.new():setName("SettingsIcon"):setImage(ICON_SETTINGS):setCaption("Cài đặt")
+	--[[
+		2. Nút cài đặt — giờ MỞ MODAL `Modals/SettingsModal` thay vì bung dropdown.
 
-	local performanceItem = makeToggleItem("Performance Mode", false, function(on)
-		ClientSettingsController.SetPerformanceMode(on)
-	end)
-	local nightItem = makeToggleItem("Night Mode", false, function(on)
-		ClientSettingsController.SetNightMode(on)
-	end)
-	local musicItem = makeToggleItem("Nhạc nền", true, function(on)
-		BgmController.SetEnabled(on)
-	end)
+		Bản cũ nhét ba công tắc vào dropdown TopbarPlus. Dropdown đó không chứa nổi slider
+		âm lượng (yêu cầu 2026-08-04), chữ quá nhỏ để đọc trạng thái BẬT/TẮT khi liếc qua,
+		và nhìn hoàn toàn lạc khỏi hệ UI vàng-cam của game. Modal mới giữ cả ba công tắc cũ
+		(chuyển sang tab HIỂN THỊ / ÂM THANH) nên không mất chức năng nào.
 
-	settingsIcon:setDropdown({ performanceItem, nightItem, musicItem })
+		`oneClick(true)` để icon không kẹt ở trạng thái "đang chọn" sau khi modal đã đóng
+		bằng nút X — trạng thái chọn của icon và trạng thái mở của modal là hai thứ khác
+		nhau, để chúng tự đồng bộ chỉ tổ lệch pha.
+	]]
+	Icon.new()
+		:setName("SettingsIcon")
+		:setImage(ICON_SETTINGS)
+		:setCaption("Cài đặt")
+		:oneClick(true)
+		:bindEvent("selected", function()
+			Manager.ToggleSettings()
+		end)
 
-	-- Chọn SAU khi đã vào dropdown: `:select()` lúc icon còn mồ côi khiến TopbarPlus tính
-	-- trạng thái mở/đóng của dropdown theo một icon chưa có cha.
-	musicItem:select()
+	--[[
+		3. KHOÁ CAMERA — thêm 2026-08-14 theo yêu cầu user, chủ yếu phục vụ người chơi mobile.
+
+		Vấn đề nó giải quyết: trên điện thoại, ngón trái đẩy joystick còn ngón phải vuốt để xoay
+		camera. Đang chạy obby mà lỡ chạm nửa màn hình phải là camera xoay ngang, người chơi mất
+		phương hướng giữa lúc đang nhảy — và ở game này tốc độ 100–250 WS thì mất phương hướng
+		nửa giây là rơi.
+
+		Cách khoá: `DevTouchCameraMode = Follow` (và bản Computer tương ứng) — camera TỰ BÁM SAU
+		LƯNG theo hướng chạy, đúng thứ người chơi obby muốn. Đây là chế độ có sẵn của Roblox nên
+		không phải tự viết vòng lặp camera đè lên camera mặc định (cách đó luôn giật khi hai bên
+		cùng ghi CFrame mỗi frame).
+
+		`oneClick(false)` (mặc định): đây là CÔNG TẮC, trạng thái "đang chọn" của icon chính là
+		dấu hiệu camera đang khoá — khác với nút Cài đặt vốn chỉ mở modal rồi thôi.
+	]]
+	Icon.new()
+		:setName("CameraLockIcon")
+		:setImage(ICON_CAMERA_LOCK)
+		:setCaption("Khoá camera")
+		:bindEvent("selected", function()
+			setCameraLocked(true)
+		end)
+		:bindEvent("deselected", function()
+			setCameraLocked(false)
+		end)
 end
 
 function TopBarController.Start()

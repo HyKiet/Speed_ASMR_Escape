@@ -13,16 +13,17 @@ local TweenService = game:GetService("TweenService")
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local Products = require(ReplicatedStorage.Shared.Config.Economy.Products)
+local ModalShell = require(script.Parent.Parent.Components.ModalShell)
 local RouletteConfig = require(ReplicatedStorage.Shared.Config.Roulette)
 local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
+local Tokens = require(script.Parent.Parent.Tokens)
 local Toast = require(script.Parent.Parent.Toast)
 local Manager = require(script.Parent.Manager)
 
 local Children = Fusion.Children
 local Computed = Fusion.Computed
 local New = Fusion.New
-local OnEvent = Fusion.OnEvent
 local Value = Fusion.Value
 
 local localPlayer = Players.LocalPlayer
@@ -35,6 +36,11 @@ local SPIN_TIME = 4.2
 local SPIN_EXTRA_TURNS = 4
 
 local RouletteModal = {}
+
+-- ⚠️ Đây là modal RỘNG NHẤT game. Nới nó thì phải nới `Tokens.SAFE_CONTENT_WIDTH` theo, nếu
+-- không nó bị cắt mép trên máy màn hình nhỏ.
+local PANEL_WIDTH = 1040
+local PANEL_HEIGHT = 610
 
 local wheelFrame: Frame? = nil
 local currentRotation = 0
@@ -65,7 +71,7 @@ local function makeSlotCard(index: number)
 		ZIndex = 44,
 		[Children] = {
 			Theme.MakeCorner(12),
-			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 3),
+			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), Tokens.BORDER),
 			Theme.MakeGradientDynamic(slot.color, slot.color:Lerp(Color3.fromRGB(0, 0, 0), 0.4)),
 			Theme.MakeStandardStuds(12, 45),
 			Theme.MakeOutlineLabel({
@@ -81,11 +87,9 @@ local function makeSlotCard(index: number)
 				Text = slot.rarity,
 				TextColor3 = Color3.fromRGB(255, 238, 70), -- Chữ % Vàng Neon Hoàng Gia rực rỡ nổi bật
 				TextStrokeColor3 = Color3.fromRGB(15, 8, 28),
-				TextStrokeThickness = 2.5,
 				MaxTextSize = 19,
 				ZIndex = 46,
 			}),
-
 		},
 	})
 end
@@ -100,14 +104,17 @@ local function buildWheel()
 		table.insert(slotCards, makeSlotCard(index))
 	end
 	-- Tâm bánh xe
-	table.insert(slotCards, New("ImageLabel")({
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundTransparency = 1,
-		Image = Theme.UI_ASSETS.Spin,
-		Position = UDim2.fromOffset(WHEEL_SIZE / 2, WHEEL_SIZE / 2),
-		Size = UDim2.fromOffset(86, 86),
-		ZIndex = 47,
-	}))
+	table.insert(
+		slotCards,
+		New("ImageLabel")({
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Image = Theme.UI_ASSETS.Spin,
+			Position = UDim2.fromOffset(WHEEL_SIZE / 2, WHEEL_SIZE / 2),
+			Size = UDim2.fromOffset(86, 86),
+			ZIndex = 47,
+		})
+	)
 
 	local wheel = New("Frame")({
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -158,10 +165,9 @@ local function playTickSound()
 	sound:Destroy()
 end
 
-
 local function playWinSound()
 	local sound = Instance.new("Sound")
-	sound.SoundId = Theme.UI_ASSETS.LevelUpSound
+	sound.SoundId = Theme.UI_ASSETS.CelebrationSound
 	sound.Volume = 0.8
 	sound.PlaybackSpeed = 1.15
 	sound.Parent = SoundService
@@ -201,7 +207,7 @@ local function animateSpin(slotIndex: number, onDone: () -> ())
 
 	currentRotation = wheel.Rotation
 	local targetTheta = (slotIndex - 1) * SLOT_ANGLE
-	local desired = (-targetTheta) % 360
+	local desired = -targetTheta % 360
 	local delta = (desired - (currentRotation % 360)) % 360
 	local target = currentRotation + SPIN_EXTRA_TURNS * 360 + delta
 	currentRotation = target
@@ -242,7 +248,6 @@ local function animateSpin(slotIndex: number, onDone: () -> ())
 	tween:Play()
 end
 
-
 -- HUDController gọi khi nhận spinResult từ server.
 function RouletteModal.OnSpinResult(data: { slotIndex: number, rewardText: string, tickets: number })
 	animateSpin(data.slotIndex, function()
@@ -251,16 +256,25 @@ function RouletteModal.OnSpinResult(data: { slotIndex: number, rewardText: strin
 		local text = if wonSlot then `Won {wonSlot.label}!` else data.rewardText
 		State.rouletteResultText:set(text)
 
+		--[[
+			BANNER CHÚC MỪNG CHỈ DÀNH CHO FROZEN BLOOM (chốt lại 2026-08-14 sau khi user xem thử
+			bản chúc mừng cho mọi ô).
 
-		-- Ăn mừng cực lớn khi quay trúng Frozen Bloom
-		local wonSlot = RouletteConfig.SLOTS[data.slotIndex]
-		if wonSlot and (wonSlot.id == "aura_frozen_bloom" or wonSlot.kind == "aura") then
+			Bảy ô còn lại KHÔNG có banner, và đó là chủ ý: vòng quay được bấm liên tục, ô thường
+			nhất rơi 25% số lượt. Cho nó cùng màn banner + confetti với jackpot 1% thì trong một
+			buổi chơi người ta thấy màn ăn mừng vài chục lần — đúng cách làm cho lần trúng Frozen
+			Bloom thật sự mất thiêng. Phần thưởng thường vẫn được báo bằng dòng kết quả ngay dưới
+			bánh xe + Toast của server.
+
+			⚠️ Đừng "cải tiến" bằng cách mở banner cho ô hiếm nhì/ba: đã thử phân tầng theo trọng
+			số và user bác. Ranh giới là AURA, không phải độ hiếm.
+		]]
+		if wonSlot and wonSlot.kind == "aura" then
 			local BoostCelebration = require(script.Parent.Parent.BoostCelebration)
-			BoostCelebration.TriggerPurchase("FROZEN BLOOM", "ULTRA RARE LEGENDARY AURA (1%)!")
+			BoostCelebration.TriggerPurchase("FROZEN BLOOM", `ULTRA RARE LEGENDARY AURA ({wonSlot.rarity})!`)
 		end
 	end)
 end
-
 
 -- ============================================================================
 -- Controls
@@ -288,48 +302,51 @@ end
 
 local function makeBuyButton(pack: Products.SpinPack, order: number)
 	local hovered = Value(false)
-	return New("TextButton")({
-		AutoButtonColor = false,
-		BackgroundColor3 = Color3.fromRGB(52, 160, 240),
+	return Theme.MakeSurface({
+		ClassName = "TextButton",
 		LayoutOrder = order,
-		Size = UDim2.fromOffset(150, 62),
-		Text = "",
+		Size = UDim2.fromOffset(142, 54),
 		ZIndex = 45,
-		[OnEvent("Activated")] = function()
+		Radius = 12,
+		Border = 4,
+		Color = Color3.fromRGB(85, 190, 255),
+		ColorB = Color3.fromRGB(28, 100, 210),
+		GradientRotation = 0,
+		Zoom = { Hovered = hovered, Scale = 1.08 },
+		Activated = function()
 			if pack.productId <= 0 then
 				Toast.Show("Spin pack chưa có Product ID!", "roulette")
 				return
 			end
 			MarketplaceService:PromptProductPurchase(localPlayer, pack.productId)
 		end,
-		[OnEvent("MouseEnter")] = function()
+		MouseEnter = function()
 			hovered:set(true)
 		end,
-		[OnEvent("MouseLeave")] = function()
+		MouseLeave = function()
 			hovered:set(false)
 		end,
-		[Children] = {
-			Theme.MakeCorner(12),
-			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-			Theme.MakeGradient(Color3.fromRGB(85, 190, 255), Color3.fromRGB(28, 100, 210), 0),
-			Theme.MakeStandardStuds(12, 46),
-			Theme.HoverZoom(hovered, 1.08),
-			Theme.MakeOutlineLabel({
-				Position = UDim2.fromOffset(0, 6),
-				Size = UDim2.fromOffset(150, 28),
-				Text = `{pack.spins} SPIN{if pack.spins > 1 then "S" else ""}`,
-				MaxTextSize = 22,
-				ZIndex = 47,
-			}),
-			Theme.MakeOutlineLabel({
-				Position = UDim2.fromOffset(0, 32),
-				Size = UDim2.fromOffset(150, 26),
-				Text = `\u{E002} {pack.priceRobux}`,
-				TextColor3 = Color3.fromRGB(190, 255, 170),
-				MaxTextSize = 20,
-				ZIndex = 47,
-			}),
-		},
+		Content = function(zoom)
+			return {
+				Theme.MakeOutlineLabel({
+					Position = UDim2.fromOffset(0, 2),
+					Size = UDim2.fromOffset(142, 28),
+					Text = `{pack.spins} SPIN{if pack.spins > 1 then "S" else ""}`,
+					Zoom = zoom,
+					MaxTextSize = 22,
+					ZIndex = 47,
+				}),
+				Theme.MakeOutlineLabel({
+					Position = UDim2.fromOffset(0, 28),
+					Size = UDim2.fromOffset(142, 26),
+					Text = `\u{E002} {pack.priceRobux}`,
+					TextColor3 = Color3.fromRGB(190, 255, 170),
+					Zoom = zoom,
+					MaxTextSize = 20,
+					ZIndex = 47,
+				}),
+			}
+		end,
 	})
 end
 
@@ -391,56 +408,49 @@ local function buildRightColumn()
 				ZIndex = 45,
 			}),
 			-- Nút SPIN
-			New("TextButton")({
+			Theme.MakeSurface({
+				ClassName = "TextButton",
 				AnchorPoint = Vector2.new(0.5, 0),
-				AutoButtonColor = false,
-				BackgroundColor3 = Computed(function()
-					if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0 then
-						return Color3.fromRGB(96, 70, 110)
-					end
-					return if spinHovered:get() then Color3.fromRGB(120, 245, 140) else Color3.fromRGB(70, 210, 100)
-				end),
 				Position = UDim2.fromOffset(240, 200),
 				Size = UDim2.fromOffset(360, 84),
-				Text = "",
 				ZIndex = 45,
-				[OnEvent("Activated")] = requestSpin,
-				[OnEvent("MouseEnter")] = function()
+				Radius = 18,
+				Border = Tokens.BORDER,
+				Color = Computed(function()
+					return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
+						then Color3.fromRGB(110, 80, 124)
+						else Color3.fromRGB(108, 240, 130)
+				end),
+				ColorB = Computed(function()
+					return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
+						then Color3.fromRGB(66, 44, 84)
+						else Color3.fromRGB(30, 150, 72)
+				end),
+				Zoom = { Hovered = spinHovered, Scale = 1.06 },
+				Activated = requestSpin,
+				MouseEnter = function()
 					spinHovered:set(true)
 				end,
-				[OnEvent("MouseLeave")] = function()
+				MouseLeave = function()
 					spinHovered:set(false)
 				end,
-				[Children] = {
-					Theme.MakeCorner(18),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 5),
-					Theme.MakeGradientDynamic(
-						Computed(function()
-							return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
-								then Color3.fromRGB(110, 80, 124)
-								else Color3.fromRGB(108, 240, 130)
-						end),
-						Computed(function()
-							return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
-								then Color3.fromRGB(66, 44, 84)
-								else Color3.fromRGB(30, 150, 72)
-						end)
-					),
-					Theme.MakeStandardStuds(18, 46),
-					Theme.HoverZoom(spinHovered, 1.06),
-					Theme.MakeOutlineLabel({
-						Position = UDim2.fromScale(0, 0),
-						Size = UDim2.fromScale(1, 1),
-						Text = Computed(function()
-							if State.rouletteSpinning:get() then
-								return "SPINNING..."
-							end
-							return "SPIN (1 🎟️)"
-						end),
-						MaxTextSize = 42,
-						ZIndex = 47,
-					}),
-				},
+				Content = function(zoom)
+					return {
+						Theme.MakeOutlineLabel({
+							Position = UDim2.fromScale(0, 0),
+							Size = UDim2.fromScale(1, 1),
+							Text = Computed(function()
+								if State.rouletteSpinning:get() then
+									return "SPINNING..."
+								end
+								return "SPIN (1 🎟️)"
+							end),
+							Zoom = zoom,
+							MaxTextSize = 42,
+							ZIndex = 47,
+						}),
+					}
+				end,
 			}),
 			-- Tiêu đề mua thêm
 			Theme.MakeOutlineLabel({
@@ -465,7 +475,6 @@ local function buildRightColumn()
 				Text = "Free: +1 ticket / 15 min online (stock 3) + Day 7 login",
 				TextColor3 = Color3.fromRGB(210, 210, 235),
 				MaxTextSize = 18,
-				TextStrokeThickness = 2,
 				ZIndex = 45,
 			}),
 		},
@@ -476,93 +485,22 @@ end
 -- Panel
 -- ============================================================================
 
-local function buildPanel()
-	local closeHovered = State.rouletteCloseHovered
-
-	return New("CanvasGroup")({
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(16, 6, 36),
-		BackgroundTransparency = 0.24,
-		ClipsDescendants = true,
-		GroupTransparency = Computed(function()
-			return 1 - State.rouletteModalAnimation:get()
-		end),
-		Position = Computed(function()
-			return UDim2.fromOffset(960, 492 - (18 * State.rouletteModalAnimation:get()))
-		end),
-		Size = UDim2.fromOffset(1040, 610),
-		ZIndex = 40,
-		[Children] = {
-			Theme.MakeCorner(18),
-			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-
-			-- Header (tím neon — theo shop-style chuẩn)
-			New("Frame")({
-				BackgroundColor3 = Color3.fromRGB(186, 90, 255),
-				Size = UDim2.fromOffset(1040, 90),
-				ZIndex = 45,
-				[Children] = {
-					Theme.MakeCorner(18),
-					Theme.MakeStroke(Color3.fromRGB(18, 18, 30), 4),
-					Theme.MakeGradient(Color3.fromRGB(210, 130, 255), Color3.fromRGB(110, 40, 220), 0),
-					Theme.MakeStudsPattern(0.86, 47),
-					New("ImageLabel")({
-						BackgroundTransparency = 1,
-						Image = Theme.UI_ASSETS.Spin,
-						Position = UDim2.fromOffset(20, 11),
-						Size = UDim2.fromOffset(68, 68),
-						ZIndex = 47,
-					}),
-					Theme.MakeOutlineLabel({
-						Position = UDim2.fromOffset(100, 8),
-						Size = UDim2.fromOffset(716, 74),
-						Text = "Speed Roulette",
-						TextXAlignment = Enum.TextXAlignment.Left,
-						MaxTextSize = 54,
-						ZIndex = 47,
-					}),
-					New("TextButton")({
-						BackgroundColor3 = Computed(function()
-							return if closeHovered:get() then Color3.fromRGB(255, 92, 84) else Color3.fromRGB(211, 39, 49)
-						end),
-						Font = Enum.Font.GothamBlack,
-						Position = UDim2.fromOffset(948, 12),
-						Size = UDim2.fromOffset(66, 66),
-						Text = "X",
-						TextColor3 = Color3.fromRGB(255, 255, 255),
-						TextScaled = true,
-						ZIndex = 48,
-						[OnEvent("Activated")] = Manager.CloseRoulette,
-						[OnEvent("MouseEnter")] = function()
-							closeHovered:set(true)
-						end,
-						[OnEvent("MouseLeave")] = function()
-							closeHovered:set(false)
-						end,
-						[Children] = {
-							Theme.MakeCorner(10),
-							Theme.MakeStroke(Color3.fromRGB(48, 8, 13), 4),
-							Theme.HoverZoom(closeHovered, 1.1),
-						},
-					}),
-				},
-			}),
-
+function RouletteModal.Build()
+	return ModalShell.Build({
+		Id = "roulette",
+		Width = PANEL_WIDTH,
+		Height = PANEL_HEIGHT,
+		PanelColor = Color3.fromRGB(16, 6, 36),
+		PanelTransparency = 0.24,
+		-- Header tím neon — theo shop-style chuẩn.
+		HeaderColor = Color3.fromRGB(210, 130, 255),
+		HeaderColorB = Color3.fromRGB(110, 40, 220),
+		Icon = Theme.UI_ASSETS.Spin,
+		Title = "Speed Roulette",
+		OnClose = Manager.CloseRoulette,
+		Content = {
 			buildWheel(),
 			buildRightColumn(),
-		},
-	})
-end
-
-function RouletteModal.Build()
-	return New("Frame")({
-		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0, 0),
-		Size = UDim2.fromOffset(Theme.DESIGN_WIDTH, Theme.DESIGN_HEIGHT),
-		Visible = State.rouletteModalMounted,
-		ZIndex = 38,
-		[Children] = {
-			buildPanel(),
 		},
 	})
 end
@@ -576,4 +514,3 @@ Fusion.Observer(State.rouletteModalMounted):onChange(function()
 end)
 
 return RouletteModal
-

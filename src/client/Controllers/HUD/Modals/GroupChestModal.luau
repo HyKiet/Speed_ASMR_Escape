@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local GroupChestConfig = require(ReplicatedStorage.Shared.Config.GroupChest)
+local ModalShell = require(script.Parent.Parent.Components.ModalShell)
 local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
 local Toast = require(script.Parent.Parent.Toast)
@@ -15,13 +16,14 @@ local Manager = require(script.Parent.Manager)
 local Children = Fusion.Children
 local Computed = Fusion.Computed
 local New = Fusion.New
-local OnEvent = Fusion.OnEvent
-local Tween = Fusion.Tween
 
 local CHEST_ICON = "rbxassetid://76987123050422"
 local FAN_TAG_ICON = "rbxassetid://139927899217214"
 
 local GroupChestModal = {}
+
+local PANEL_WIDTH = 760
+local PANEL_HEIGHT = 548
 
 local function makeStatusPill(text: string, doneValue: any, position: UDim2)
 	local colorA = Computed(function()
@@ -64,7 +66,14 @@ local function makeStatusPill(text: string, doneValue: any, position: UDim2)
 	})
 end
 
-local function makeRewardCard(position: UDim2, icon: string, title: string, subtitle: string, colorA: Color3, colorB: Color3)
+local function makeRewardCard(
+	position: UDim2,
+	icon: string,
+	title: string,
+	subtitle: string,
+	colorA: Color3,
+	colorB: Color3
+)
 	return New("Frame")({
 		BackgroundColor3 = colorA,
 		ClipsDescendants = true,
@@ -132,8 +141,7 @@ local function runJoinLikeClaim()
 	end)
 end
 
-local function buildPanel()
-	local closeHovered = State.groupChestCloseHovered
+local function buildContent(): { any }
 	local claimHovered = State.groupChestClaimHovered
 
 	local canClaim = Computed(function()
@@ -142,138 +150,78 @@ local function buildPanel()
 			and not State.groupChestHasClaimed:get()
 	end)
 
-	return New("CanvasGroup")({
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(54, 16, 18),
-		BackgroundTransparency = 0.18,
-		ClipsDescendants = true,
-		GroupTransparency = Computed(function()
-			return 1 - State.groupChestModalAnimation:get()
-		end),
-		Position = Computed(function()
-			return UDim2.fromOffset(960, 492 - (18 * State.groupChestModalAnimation:get()))
-		end),
-		Size = UDim2.fromOffset(760, 548),
-		ZIndex = 40,
-		[Children] = {
-			Theme.MakeCorner(18),
-			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-			New("Frame")({
-				BackgroundColor3 = Color3.fromRGB(235, 55, 60),
-				Position = UDim2.fromOffset(0, 0),
-				Size = UDim2.fromOffset(760, 96),
-				ZIndex = 45,
-				[Children] = {
-					Theme.MakeCorner(18),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-					Theme.MakeGradient(Color3.fromRGB(255, 91, 84), Color3.fromRGB(171, 18, 34), 0),
-					Theme.MakeStandardStuds(18, 47),
-					New("ImageLabel")({
-						BackgroundTransparency = 1,
-						Image = CHEST_ICON,
-						Position = UDim2.fromOffset(20, 11),
-						Size = UDim2.fromOffset(68, 68),
-						ZIndex = 47,
-					}),
-					Theme.MakeOutlineLabel({
-						Position = UDim2.fromOffset(100, 8),
-						Size = UDim2.fromOffset(548, 74),
-						Text = "Group Chest",
-						TextXAlignment = Enum.TextXAlignment.Left,
-						MaxTextSize = 54,
-						ZIndex = 47,
-					}),
-					New("TextButton")({
-						BackgroundColor3 = Computed(function()
-							return if closeHovered:get() then Color3.fromRGB(255, 92, 84) else Color3.fromRGB(211, 39, 49)
-						end),
-						Font = Enum.Font.GothamBlack,
-						Position = UDim2.fromOffset(680, 12),
-						Size = UDim2.fromOffset(66, 66),
-						Text = "X",
-						TextColor3 = Color3.fromRGB(255, 255, 255),
-						TextScaled = true,
-						ZIndex = 48,
-						[OnEvent("Activated")] = Manager.CloseGroupChest,
-						[OnEvent("MouseEnter")] = function()
-							closeHovered:set(true)
-						end,
-						[OnEvent("MouseLeave")] = function()
-							closeHovered:set(false)
-						end,
-						[Children] = {
-							Theme.MakeCorner(10),
-							Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-							Theme.HoverZoom(closeHovered, 1.1),
-							New("UIStroke")({
-								Color = Color3.fromRGB(0, 0, 0),
-								Thickness = 3,
-								ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
-							}),
-						},
-					}),
-				},
-			}),
+	return {
+		Theme.MakeOutlineLabel({
+			Position = UDim2.fromOffset(34, 108),
+			Size = UDim2.fromOffset(692, 34),
+			Text = "One tap starts the group join prompt, confirms like, then claims your reward.",
+			TextColor3 = Color3.fromRGB(255, 226, 226),
+			MaxTextSize = 24,
+			ZIndex = 42,
+		}),
 
-			Theme.MakeOutlineLabel({
-				Position = UDim2.fromOffset(34, 108),
-				Size = UDim2.fromOffset(692, 34),
-				Text = "One tap starts the group join prompt, confirms like, then claims your reward.",
-				TextColor3 = Color3.fromRGB(255, 226, 226),
-				MaxTextSize = 24,
-				ZIndex = 42,
-			}),
+		makeRewardCard(
+			UDim2.fromOffset(36, 158),
+			CHEST_ICON,
+			"+5,000 Speed",
+			"one-time starter gift",
+			Color3.fromRGB(255, 118, 68),
+			Color3.fromRGB(190, 36, 24)
+		),
+		-- Wins TRAO NGAY ở dòng to (thứ quyết định người chơi có bấm Join hay không), buff
+		-- vĩnh viễn xuống dòng phụ. Số lấy thẳng từ config để chữ trên thẻ không bao giờ
+		-- hứa sai — xem khối cân bằng trong `Config/GroupChest.luau`.
+		makeRewardCard(
+			UDim2.fromOffset(273, 158),
+			Theme.UI_ASSETS.Trophy,
+			`+{GroupChestConfig.INSTANT_WINS_REWARD} Wins now`,
+			`+{math.floor((GroupChestConfig.WINS_MULTIPLIER - 1) * 100 + 0.5)}% Wins forever`,
+			Color3.fromRGB(255, 72, 88),
+			Color3.fromRGB(150, 18, 42)
+		),
+		makeRewardCard(
+			UDim2.fromOffset(510, 158),
+			FAN_TAG_ICON,
+			"[Fan] Tag",
+			"green chat prefix",
+			Color3.fromRGB(255, 93, 128),
+			Color3.fromRGB(138, 22, 74)
+		),
 
-			makeRewardCard(UDim2.fromOffset(36, 158), CHEST_ICON, "+5,000 Speed", "one-time starter gift", Color3.fromRGB(255, 118, 68), Color3.fromRGB(190, 36, 24)),
-			makeRewardCard(UDim2.fromOffset(273, 158), Theme.UI_ASSETS.Trophy, "+10% Wins", "permanent group buff", Color3.fromRGB(255, 72, 88), Color3.fromRGB(150, 18, 42)),
-			makeRewardCard(UDim2.fromOffset(510, 158), FAN_TAG_ICON, "[Fan] Tag", "green chat prefix", Color3.fromRGB(255, 93, 128), Color3.fromRGB(138, 22, 74)),
+		makeStatusPill("Join Group", State.groupChestIsGroupMember, UDim2.fromOffset(64, 322)),
+		makeStatusPill("Like Game", State.groupChestHasConfirmedLike, UDim2.fromOffset(396, 322)),
 
-			makeStatusPill("Join Group", State.groupChestIsGroupMember, UDim2.fromOffset(64, 322)),
-			makeStatusPill("Like Game", State.groupChestHasConfirmedLike, UDim2.fromOffset(396, 322)),
-
-			New("TextButton")({
-				AnchorPoint = Vector2.new(0.5, 0),
-				AutoButtonColor = false,
-				BackgroundColor3 = Computed(function()
-					if State.groupChestHasClaimed:get() then
-						return Color3.fromRGB(70, 110, 80)
-					end
-					if not canClaim:get() then
-						return Color3.fromRGB(210, 54, 46)
-					end
-					return if claimHovered:get() then Color3.fromRGB(255, 104, 86) else Color3.fromRGB(230, 55, 48)
-				end),
-				ClipsDescendants = true,
-				Position = UDim2.fromOffset(380, 404),
-				Size = UDim2.fromOffset(560, 76),
-				Text = "",
-				ZIndex = 45,
-				[OnEvent("Activated")] = runJoinLikeClaim,
-				[OnEvent("MouseEnter")] = function()
-					claimHovered:set(true)
-				end,
-				[OnEvent("MouseLeave")] = function()
-					claimHovered:set(false)
-				end,
-				[Children] = {
-					Theme.MakeCorner(16),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-					Theme.MakeGradientDynamic(
-						Computed(function()
-							if State.groupChestHasClaimed:get() then
-								return Color3.fromRGB(80, 132, 86)
-							end
-							return if claimHovered:get() then Color3.fromRGB(255, 118, 92) else Color3.fromRGB(235, 62, 54)
-						end),
-						Computed(function()
-							if State.groupChestHasClaimed:get() then
-								return Color3.fromRGB(34, 82, 42)
-							end
-							return Color3.fromRGB(150, 18, 28)
-						end)
-					),
-					Theme.MakeStandardStuds(16, 47),
-					Theme.HoverZoom(claimHovered, 1.06),
+		-- Nút CLAIM: `MakeSurface` + `Zoom` (viền và chữ phóng cùng nhịp, nở đều 4 góc).
+		Theme.MakeSurface({
+			ClassName = "TextButton",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.fromOffset(380, 404),
+			Size = UDim2.fromOffset(560, 76),
+			ZIndex = 45,
+			Radius = 16,
+			Border = 4,
+			Color = Computed(function()
+				if State.groupChestHasClaimed:get() then
+					return Color3.fromRGB(80, 132, 86)
+				end
+				return if claimHovered:get() then Color3.fromRGB(255, 118, 92) else Color3.fromRGB(235, 62, 54)
+			end),
+			ColorB = Computed(function()
+				if State.groupChestHasClaimed:get() then
+					return Color3.fromRGB(34, 82, 42)
+				end
+				return Color3.fromRGB(150, 18, 28)
+			end),
+			Zoom = { Hovered = claimHovered, Scale = 1.06 },
+			Activated = runJoinLikeClaim,
+			MouseEnter = function()
+				claimHovered:set(true)
+			end,
+			MouseLeave = function()
+				claimHovered:set(false)
+			end,
+			Content = function(zoom)
+				return {
 					Theme.MakeOutlineLabel({
 						Position = UDim2.fromScale(0, 0),
 						Size = UDim2.fromScale(1, 1),
@@ -283,25 +231,29 @@ local function buildPanel()
 							end
 							return if canClaim:get() then "CLAIM GROUP CHEST" else "JOIN + LIKE + CLAIM"
 						end),
+						Zoom = zoom,
 						MaxTextSize = 32,
 						ZIndex = 48,
 					}),
-				},
-			}),
-		},
-	})
+				}
+			end,
+		}),
+	}
 end
 
 function GroupChestModal.Build()
-	return New("Frame")({
-		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0, 0),
-		Size = UDim2.fromOffset(Theme.DESIGN_WIDTH, Theme.DESIGN_HEIGHT),
-		Visible = State.groupChestModalMounted,
-		ZIndex = 38,
-		[Children] = {
-			buildPanel(),
-		},
+	return ModalShell.Build({
+		Id = "groupChest",
+		Width = PANEL_WIDTH,
+		Height = PANEL_HEIGHT,
+		PanelColor = Color3.fromRGB(54, 16, 18),
+		PanelTransparency = 0.18,
+		HeaderColor = Color3.fromRGB(255, 91, 84),
+		HeaderColorB = Color3.fromRGB(171, 18, 34),
+		Icon = CHEST_ICON,
+		Title = "Group Chest",
+		OnClose = Manager.CloseGroupChest,
+		Content = buildContent(),
 	})
 end
 

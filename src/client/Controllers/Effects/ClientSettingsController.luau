@@ -58,7 +58,6 @@ local function applyPerformance(on: boolean)
 		table.clear(savedEffects)
 	end
 
-
 	-- 3. Bóng đổ động + chất lượng nước (sóng nước tính mỗi frame trên toàn mặt biển lobby).
 	-- ⚠️ `Terrain.Decoration` KHÔNG còn tồn tại trên engine hiện tại (gán vào là lỗi
 	-- "not a valid member" và huỷ luôn phần còn lại của hàm — đã dính 2026-07-29).
@@ -313,7 +312,11 @@ function ClientSettingsController.SetNightMode(enabled: boolean)
 		-- Atmosphere phủ lên trên mọi thứ; không tối nó theo thì trời vẫn trắng đục.
 		applyNightPreset("atmosphere", Lighting:FindFirstChildOfClass("Atmosphere"), NIGHT_ATMOSPHERE)
 		applyNightPreset("bloom", Lighting:FindFirstChildOfClass("BloomEffect"), NIGHT_BLOOM)
-		applyNightPreset("colorCorrection", Lighting:FindFirstChildOfClass("ColorCorrectionEffect"), NIGHT_COLOR_CORRECTION)
+		applyNightPreset(
+			"colorCorrection",
+			Lighting:FindFirstChildOfClass("ColorCorrectionEffect"),
+			NIGHT_COLOR_CORRECTION
+		)
 		applyNightPreset("sunRays", Lighting:FindFirstChildOfClass("SunRaysEffect"), NIGHT_SUN_RAYS)
 		-- Áp cho MỌI Sky, không phải `FindFirstChildOfClass`. Lighting chỉ RENDER được một Sky,
 		-- nhưng khi có nhiều hơn một thì cái được render và cái `FindFirstChildOfClass` trả về

@@ -11,8 +11,10 @@ local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local RobuxPrice = require(ReplicatedStorage.Shared.Util.RobuxPrice)
 local Ownership = require(script.Parent.Parent.Ownership)
+local Responsive = require(script.Parent.Parent.Responsive)
 local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
+local Tokens = require(script.Parent.Parent.Tokens)
 local Toast = require(script.Parent.Parent.Toast)
 local Manager = require(script.Parent.Parent.Modals.Manager)
 
@@ -26,6 +28,26 @@ local OnEvent = Fusion.OnEvent
 local Value = Fusion.Value
 
 local RightPanel = {}
+
+--[[
+	Nút icon thô (`ImageButton`) KHÔNG đi qua `Theme.MakeSurface` nên không được luật ngón tay
+	tự động phủ. Helper này dựng nút rồi gắn tay vùng chạm — chỉ 2 nút trong cột phải (Spin,
+	Playtime) rơi vào diện này, nhưng cả hai đều là nút bấm thật.
+]]
+local function makeIconButton(props: { [any]: any }, activated: () -> ())
+	local button = New("ImageButton")(props)
+	Responsive.AttachHitArea(button, activated)
+	return button
+end
+
+-- Ô nhập tốc độ: cùng lý do như trên, nhưng "bấm" ở đây nghĩa là đặt con trỏ vào ô.
+local function makeSpeedInput(props: { [any]: any })
+	local box = New("TextBox")(props)
+	Responsive.AttachHitArea(box, function()
+		(box :: TextBox):CaptureFocus()
+	end)
+	return box
+end
 
 -- Tier speed pass ĐANG chào bán = pass rẻ nhất player CHƯA sở hữu (1..3; 0 = đã own hết).
 -- Quyền sở hữu do `HUD/Ownership` giữ (dùng chung với ShopModal) — trước đây file này tự
@@ -53,29 +75,81 @@ end
 
 local function getPlaytimeMultiplier(seconds: number): number
 	local m = math.floor(seconds / 60)
-	if m >= 60 then return 4
-	elseif m >= 40 then return 3
-	elseif m >= 20 then return 2
-	else return 1 end
+	if m >= 60 then
+		return 4
+	elseif m >= 40 then
+		return 3
+	elseif m >= 20 then
+		return 2
+	else
+		return 1
+	end
 end
 
-local function submitCustomSpeed()
+--[[
+	══ CUSTOM SPEED TỰ ÁP DỤNG — KHÔNG CÒN NÚT OK (user chốt 2026-08-15) ════════════════════
+
+	Nút OK là một cú bấm thừa: người chơi gõ số xong đã coi như xong việc, phải với thêm sang
+	một nút 66px nữa mới ăn. Giờ gõ tới đâu áp tới đó.
+
+	⚠️ BẪY CHÍNH của kiểu tự-áp-dụng, và cách file này né:
+	Người chơi muốn 52 thì trong lúc gõ có một khoảnh khắc ô chỉ có "5". Nếu cứ thế mà KẸP rồi
+	GHI NGƯỢC vào ô, "5" bị kéo lên tốc độ tối thiểu và ô nhảy thành "16" ngay dưới ngón tay —
+	không thể gõ nổi số nào có 2 chữ số. Vì vậy tách hẳn hai việc:
+	  • `normalizeText = false` (lúc đang gõ): CHỈ gửi packet, TUYỆT ĐỐI không đụng vào chữ
+	    trong ô. Người chơi vẫn thấy đúng cái mình gõ.
+	  • `normalizeText = true` (lúc rời ô / bấm Enter): mới ghi lại con số đã kẹp.
+
+	Kèm hai lớp chống spam: chờ `APPLY_DELAY` sau phím cuối, và bỏ qua nếu giá trị không đổi so
+	với lần gửi trước — gõ "1", "12", "123" chỉ tốn đúng một gói tin.
+]]
+local APPLY_DELAY = 0.45
+local applyToken = 0
+local lastSentSpeed = -1
+
+local function applyCustomSpeed(normalizeText: boolean)
+	local snapshot = State.GetSnapshot()
 	local requestedSpeed = tonumber(State.customSpeedDraft:get())
+
+	-- Ô rỗng hoặc không phải số: lúc đang gõ thì kệ (người chơi vừa xoá sạch để gõ lại),
+	-- lúc rời ô mới kéo về tốc độ đang chạy cho ô không đứng trơ ra.
 	if not requestedSpeed then
-		State.SyncCustomSpeedDraft(State.GetSnapshot().customSpeedLimit)
-		Toast.Show("Enter a valid speed")
+		if normalizeText then
+			State.SyncCustomSpeedDraft(snapshot.customSpeedLimit)
+		end
 		return
 	end
 
-	local clampedSpeed = math.clamp(
-		math.floor(requestedSpeed),
-		Constants.DEFAULT_WALK_SPEED,
-		State.GetSnapshot().maxWalkSpeed
-	)
-	State.SyncCustomSpeedDraft(clampedSpeed)
+	local clampedSpeed = math.clamp(math.floor(requestedSpeed), Constants.DEFAULT_WALK_SPEED, snapshot.maxWalkSpeed)
+
+	-- Báo MỘT LẦN khi người chơi đòi cao hơn trần: im lặng kẹp xuống thì họ tưởng ô nhập hỏng.
+	-- Chỉ báo lúc rời ô, không báo giữa lúc gõ (gõ "999" sẽ bắn 3 toast).
+	if normalizeText and requestedSpeed > snapshot.maxWalkSpeed then
+		Toast.Show(`Max speed is {math.floor(snapshot.maxWalkSpeed)}`)
+	end
+
+	if normalizeText then
+		State.SyncCustomSpeedDraft(clampedSpeed)
+	end
+
+	if clampedSpeed == lastSentSpeed then
+		return
+	end
+	lastSentSpeed = clampedSpeed
 	GamePackets.requestCustomSpeed.send({
 		walkSpeed = clampedSpeed,
 	})
+end
+
+-- Gõ xong `APPLY_DELAY` giây không gõ nữa thì tự áp dụng.
+local function scheduleAutoApply()
+	applyToken += 1
+	local token = applyToken
+	task.delay(APPLY_DELAY, function()
+		if token == applyToken then
+			applyCustomSpeed(false)
+		end
+	end)
 end
 
 function RightPanel.Build()
@@ -102,13 +176,12 @@ function RightPanel.Build()
 
 	return New("Frame")({
 		BackgroundTransparency = 1,
+		-- Toàn bộ cột phải giờ là MỘT chồng dọc; vị trí lấy từ bảng slot dùng chung
+		-- (xem `Theme.RIGHT_STACK`). Root neo ở đỉnh chồng, con xếp theo offset slot.
 		Position = Computed(function()
-			local _, top, right, bottom, scale = Theme.GetVisibleDesignBounds()
-			local x = if scale < 0.75 then right - 286 - (14 / scale) else 1608
-			local y = if scale < 0.75 then top + ((bottom - top - 310) * 0.5) else 355
-			return UDim2.fromOffset(x, y)
+			return Theme.RightSlotPosition("starterPack")
 		end),
-		Size = UDim2.fromOffset(286, 310),
+		Size = UDim2.fromOffset(Theme.RIGHT_COLUMN_WIDTH, 688),
 		[Children] = {
 			-- (2026-07-29) Nút Feedback đã GỠ khỏi HUD theo yêu cầu. Hòm thư
 			-- `Workspace.Feedback.Mailbox` + biển khu vực trong lobby vẫn còn, và
@@ -117,11 +190,11 @@ function RightPanel.Build()
 			-- Nút Speed Roulette (icon + đếm ngược vé free, giống Playtime Boost) — TRÊN Playtime.
 			New("Frame")({
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(166, -302),
+				Position = UDim2.fromOffset(166, Theme.RIGHT_STACK.spin),
 				Size = UDim2.fromOffset(120, 130),
 
 				[Children] = {
-					New("ImageButton")({
+					makeIconButton({
 						BackgroundTransparency = 1,
 						Image = Theme.UI_ASSETS.Spin,
 						Position = UDim2.fromOffset(10, 0),
@@ -133,7 +206,7 @@ function RightPanel.Build()
 						[OnEvent("MouseLeave")] = function()
 							hoveredSpin:set(false)
 						end,
-					}),
+					}, Manager.ToggleRoulette),
 					Theme.MakeOutlineLabel({
 						Position = UDim2.fromOffset(0, 60),
 						Size = UDim2.fromOffset(120, 25),
@@ -158,19 +231,22 @@ function RightPanel.Build()
 						MaxTextSize = 22,
 						ZIndex = 5,
 					}),
-					-- Badge số vé
-					New("Frame")({
+					-- Badge số vé. Dựng bằng `MakeSurface` (2026-08-16) thay vì tự chồng "khung đen +
+					-- ruột": chỉ khối đi qua `MakeSurface` mới được kẹp SÀN độ dày viền theo px thật,
+					-- nên trên cửa sổ nhỏ viền không mỏng tới mức biến mất.
+					Theme.MakeSurface({
 						AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundColor3 = Color3.fromRGB(226, 35, 55),
 						Position = UDim2.fromOffset(102, 14),
 						Size = UDim2.fromOffset(38, 38),
+						ZIndex = 6,
+						Radius = 19,
+						Border = Tokens.BORDER,
+						Studs = false,
+						Color = Color3.fromRGB(226, 35, 55),
 						Visible = Computed(function()
 							return State.rouletteTickets:get() > 0
 						end),
-						ZIndex = 6,
-						[Children] = {
-							Theme.MakeCorner(19),
-							Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 3),
+						Content = {
 							Theme.MakeOutlineLabel({
 								Position = UDim2.fromScale(0, 0),
 								Size = UDim2.fromScale(1, 1),
@@ -187,23 +263,28 @@ function RightPanel.Build()
 
 			New("Frame")({
 				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(166, -160),
+				Position = UDim2.fromOffset(166, Theme.RIGHT_STACK.playtime),
 				Size = UDim2.fromOffset(120, 110),
 				[Children] = {
-					New("ImageButton")({
+					--[[
+						⚠️ Bảng giải thích Playtime Boost trước đây CHỈ hiện khi RÊ CHUỘT — tức là
+						người chơi mobile không có cách nào đọc được nó, mà mobile là phần lớn
+						người chơi. Trên cảm ứng không tồn tại trạng thái "rê", nên chạm = bật/tắt.
+					]]
+					makeIconButton({
 						BackgroundTransparency = 1,
 						Image = "rbxassetid://105847442035004",
 						Position = UDim2.fromOffset(10, 0),
 						Size = UDim2.fromOffset(100, 100),
-						[OnEvent("Activated")] = function()
-						end,
 						[OnEvent("MouseEnter")] = function()
 							hoveredPlaytime:set(true)
 						end,
 						[OnEvent("MouseLeave")] = function()
 							hoveredPlaytime:set(false)
 						end,
-					}),
+					}, function()
+						hoveredPlaytime:set(not hoveredPlaytime:get(false))
+					end),
 					Theme.MakeOutlineLabel({
 						Position = UDim2.fromOffset(0, 60),
 						Size = UDim2.fromOffset(120, 25),
@@ -220,16 +301,17 @@ function RightPanel.Build()
 						MaxTextSize = 22,
 						ZIndex = 5,
 					}),
-					New("Frame")({
-						BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-						BackgroundTransparency = 0.25,
+					Theme.MakeSurface({
 						Position = UDim2.fromOffset(-440, -30),
 						Size = UDim2.fromOffset(420, 160),
 						Visible = hoveredPlaytime,
 						ZIndex = 50,
-						[Children] = {
-							Theme.MakeCorner(12),
-							Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 3),
+						Radius = 12,
+						Border = Tokens.BORDER,
+						Studs = false,
+						Color = Color3.fromRGB(0, 0, 0),
+						FillTransparency = 0.25,
+						Content = {
 							Theme.MakeOutlineLabel({
 								Position = UDim2.fromOffset(16, 16),
 								Size = UDim2.fromOffset(388, 64),
@@ -273,18 +355,19 @@ function RightPanel.Build()
 			-- `ClipsDescendants` (cần thiết để gradient/studs không lòi ra khỏi bo góc) nên
 			-- badge KHÔNG thể là con của nút, nếu không sẽ bị cắt cụt. Vì vậy bọc tất cả
 			-- trong một Frame container: hào quang và badge là ANH EM của nút, không phải con.
-			-- HoverZoom cũng chuyển lên container để badge phóng to cùng nút.
-			New("Frame")({
-				BackgroundTransparency = 1,
+			-- Phóng đặt ở container để badge phóng cùng nút. `MakeZoomHost` (không phải
+			-- `HoverZoom` trực tiếp): container neo (0,0) nên `UIScale` gắn thẳng lên nó chỉ nở
+			-- về phải + xuống dưới — xem khối lý do ở `Theme.MakeZoomHost`.
+			Theme.MakeZoomHost({
 				-- Cỡ theo ảnh tham chiếu (2026-07-28): 286×110 cũ quá to so với panel Custom
 				-- Speed ngay dưới; rút còn 214×70, canh phải theo cột.
-				Position = UDim2.fromOffset(286 - 214, 0),
+				Position = UDim2.fromOffset(Theme.RIGHT_COLUMN_WIDTH - 214, Theme.RIGHT_STACK.speedPromo),
 				Size = UDim2.fromOffset(214, 70),
 				Visible = Computed(function()
 					return promoTierIndex:get() > 0
 				end),
-				[Children] = {
-					Theme.HoverZoom(hoveredPromo, 1.05),
+				Zoom = { Hovered = hoveredPromo, Scale = 1.05 },
+				Children = {
 
 					-- 1) HÀO QUANG — nằm DƯỚI nút, to hơn nút nên phải ở ngoài (nút clip).
 					Theme.MakeSunburst({
@@ -293,43 +376,39 @@ function RightPanel.Build()
 						ZIndex = 1,
 					}),
 
-					-- 2) NÚT
-					New("TextButton")({
-						BackgroundColor3 = Computed(function()
+					-- 2) NÚT — nền kiểu mới `Theme.MakeSurface` (viền là khối hình học, không
+					-- phải UIStroke). Xem chú thích dài ở `Theme.MakeSurface` để biết vì sao.
+					Theme.MakeSurface({
+						ClassName = "TextButton",
+						Size = UDim2.fromScale(1, 1),
+						ZIndex = 2,
+						Radius = 18,
+						Color = Computed(function()
 							return getPromoTier().colorA
 						end),
-						ClipsDescendants = true,
-						Size = UDim2.fromScale(1, 1),
-						Text = "",
-						ZIndex = 2,
-						[OnEvent("Activated")] = function()
+						ColorB = Computed(function()
+							return getPromoTier().colorB
+						end),
+						GradientRotation = 0,
+						Activated = function()
 							local tier = Theme.SPEED_PASS_TIERS[promoTierIndex:get()]
 							if tier then
 								MarketplaceService:PromptGamePassPurchase(localPlayer, tier.passId)
 							end
 						end,
-						[OnEvent("MouseEnter")] = function()
+						MouseEnter = function()
 							hoveredPromo:set(true)
 						end,
-						[OnEvent("MouseLeave")] = function()
+						MouseLeave = function()
 							hoveredPromo:set(false)
 						end,
-						[Children] = {
-							Theme.MakeCorner(18),
-							-- Viền 5px = ĐÚNG chuẩn `Theme.MakeButton` (menu trái, nút OK, modal).
-							-- Đã thử 3px cho mảnh hơn nhưng nút lệch hẳn khỏi phần còn lại của HUD.
-							Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 5),
-							Theme.MakeGradientDynamic(
-								Computed(function()
-									return getPromoTier().colorA
-								end),
-								Computed(function()
-									return getPromoTier().colorB
-								end),
-								0
-							),
-							Theme.MakeStandardStuds(18, 3),
-							-- 3) icon GIÀY — DƯỚI chữ (đổi từ tia sét theo yêu cầu user 2026-07-28)
+						Content = {
+							-- 3) icon GIÀY — DƯỚI chữ (đổi từ tia sét theo yêu cầu user 2026-07-28).
+							-- ⚠️ LUÔN là icon giày CHUNG, KHÔNG dùng `tier.icon` (2026-08-09,
+							-- user chốt): icon riêng từng bậc đã có sẵn chữ "x2/x4/x8" in trên
+							-- thân giày, đặt cạnh nhãn "x2 Speed" của nút là lặp số hai lần
+							-- trong một ô 214px. Icon riêng chỉ dùng ở banner chúc mừng (chỗ đó
+							-- không có nhãn nào khác) — xem BoostCelebration.
 							New("ImageLabel")({
 								AnchorPoint = Vector2.new(0.5, 0.5),
 								BackgroundTransparency = 1,
@@ -339,7 +418,6 @@ function RightPanel.Build()
 								ZIndex = 4,
 							}),
 							-- 4) chữ — bên PHẢI icon (nút 214 rộng: icon 10..62, chữ 66..206).
-							-- Bản đầu để chữ bắt đầu ở x=44 nên nó đè kín icon giày.
 							Theme.MakeOutlineLabel({
 								Position = UDim2.fromOffset(66, 14),
 								Size = UDim2.fromOffset(140, 42),
@@ -355,7 +433,9 @@ function RightPanel.Build()
 					-- 5) GIÁ ROBUX — ký tự UNICODE U+E002 (glyph riêng của font Roblox), KHÔNG
 					-- phải ImageLabel: chữ và số nằm chung một TextLabel nên luôn cùng cỡ, cùng
 					-- viền, cùng nghiêng. Nghiêng nhẹ -8° cho giống nhãn dán như trong ảnh.
-					Theme.MakeOutlineLabel({
+					-- `MakePriceLabel`: xanh Robux + nhấp nháy (xem Theme). Đây là badge giá của
+					-- cả ba bậc x2/x4/x8 vì promo xoay vòng qua `getPromoTier()`.
+					Theme.MakePriceLabel({
 						-- Badge nhô LÊN TRÊN mép nút (ảnh tham chiếu: phần lớn nằm ngoài nút),
 						-- không nằm gọn trong góc.
 						Position = UDim2.fromOffset(-6, -22),
@@ -366,99 +446,124 @@ function RightPanel.Build()
 						end),
 						TextXAlignment = Enum.TextXAlignment.Left,
 						MaxTextSize = 30,
-						TextStrokeThickness = 4,
 						ZIndex = 20,
 					}),
 				},
 			}),
-			New("Frame")({
-				BackgroundColor3 = Color3.fromRGB(15, 164, 255),
-				ClipsDescendants = true,
-				-- Nút promo rút từ 110 → 70 cao, kéo panel này lên theo cho khỏi hở một mảng.
-				Position = UDim2.fromOffset(0, 92),
-				Size = UDim2.fromOffset(286, 172),
-				[Children] = {
-					Theme.MakeCorner(18),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 5),
-					Theme.MakeGradient(Color3.fromRGB(34, 198, 255), Color3.fromRGB(0, 95, 230)),
-					Theme.MakeStandardStuds(18, 1),
+			--[[
+				CUSTOM SPEED — CÙNG KHỔ VỚI NÚT x2 SPEED (user chốt 2026-08-15).
+
+				Trước đây panel này rộng 286 (nguyên bề ngang cột) × cao 172, đứng ngay cạnh nút
+				x2 Speed chỉ 214×70 — hai khối lệch nhau gần một phần ba bề ngang nên cột phải
+				trông như hai cụm khác nhau bị ghép lại. Giờ rộng ĐÚNG 214 như nút x2 Speed và
+				căn cùng mép phải; chiều cao rút 172 → 138 bằng cách gom hai dòng chữ ở trên lại
+				và thu ô nhập + nút OK theo tỉ lệ.
+
+				Bố cục bên trong (panel 214×118), gọn còn BA tầng thay vì bốn:
+				  tiêu đề 6..30 · ô nhập TRÀN NGANG 34..86 · dòng trạng thái 90..112
+				Ô nhập chiếm nguyên bề ngang (190px thay vì 116px) vì giờ nó là thứ DUY NHẤT
+				phải bấm trúng — vùng chạm rộng gần gấp đôi, quan trọng nhất trên mobile.
+				Dòng "Max" và "Current" gộp làm một để bỏ được một tầng chữ.
+			]]
+			--[[
+				Cả panel lẫn ô nhập bên trong đều dựng bằng `Theme.MakeSurface` (nền kiểu mới):
+				viền là khối hình học, không còn `UIStroke`. Ô nhập là chỗ user khoanh đỏ
+				2026-08-15 — nó là một khối trắng nhỏ nằm trên nền xanh nên viền lệch bao nhiêu
+				cũng lộ ra hết.
+
+				Viền nằm PHÍA NGOÀI ô khai báo nên toạ độ con giữ nguyên số cũ.
+			]]
+			Theme.MakeSurface({
+				Position = UDim2.fromOffset(Theme.RIGHT_COLUMN_WIDTH - 214, Theme.RIGHT_STACK.customSpeed),
+				Size = UDim2.fromOffset(214, 118),
+				ZIndex = 1,
+				Radius = 14,
+				Color = Color3.fromRGB(34, 198, 255),
+				ColorB = Color3.fromRGB(0, 95, 230),
+				Content = {
 					Theme.MakeOutlineLabel({
-						Position = UDim2.fromOffset(16, 8),
-						Size = UDim2.fromOffset(254, 32),
+						Position = UDim2.fromOffset(12, 6),
+						Size = UDim2.fromOffset(190, 24),
 						Text = "Custom Speed",
-						MaxTextSize = 28,
+						MaxTextSize = 22,
+						ZIndex = 4,
+					}),
+					Theme.MakeSurface({
+						Position = UDim2.fromOffset(12, 34),
+						Size = UDim2.fromOffset(190, 52),
+						ZIndex = 4,
+						Radius = 10,
+						Border = Theme.BORDER_INNER,
+						Color = Color3.fromRGB(235, 239, 242),
+						-- Ô nhập cố ý KHÔNG có hoa văn: nền phải sạch để con số dễ đọc.
+						Studs = false,
+						Content = {
+							--[[
+								Ô nhập cao 52 design px ⇒ 23 px thật trên điện thoại: chưa tới nửa
+								ngưỡng ngón tay. `MakeSurface` không phủ hộ được vì đây là `TextBox`
+								chứ không phải nút có `Activated`, nên gắn tay — lớp chạm gọi
+								`CaptureFocus()` để bàn phím ảo bật lên đúng như chạm thẳng vào ô.
+							]]
+							makeSpeedInput({
+								BackgroundTransparency = 1,
+								ClearTextOnFocus = false,
+								Font = Theme.FONT,
+								PlaceholderText = "Speed",
+								Size = UDim2.fromScale(1, 1),
+								Text = State.customSpeedDraft,
+								TextColor3 = Color3.fromRGB(40, 46, 70),
+								TextScaled = true,
+								TextStrokeTransparency = 1,
+								ZIndex = 6,
+								--[[
+							CHẶN CHỮ VÀ KÝ HIỆU NGAY TẠI ĐÂY (user chốt 2026-08-15).
+
+							`OnChange("Text")` chạy sau MỖI ký tự, kể cả ký tự dán từ clipboard và
+							ký tự do bàn phím ảo mobile bắn vào, nên lọc ở đây là chốt chặn duy
+							nhất cần có — không có đường nào lọt vào `applyCustomSpeed` mà chưa
+							qua bộ lọc này.
+
+							`%d` = chỉ giữ chữ số: chặn luôn cả dấu trừ, dấu chấm và dấu cách, nên
+							không bao giờ có tốc độ âm hay số thập phân. Cắt 5 chữ số vì trần tốc
+							độ của game không bao giờ chạm 6 chữ số, mà để dài hơn thì `TextScaled`
+							bóp chữ bé xíu không đọc nổi.
+						]]
+								[OnChange("Text")] = function(text: string)
+									local digitsOnly = string.gsub(text, "%D", "")
+									digitsOnly = string.sub(digitsOnly, 1, 5)
+									if State.customSpeedDraft:get() ~= digitsOnly then
+										State.customSpeedDraft:set(digitsOnly)
+									end
+									scheduleAutoApply()
+								end,
+								[OnEvent("Focused")] = function()
+									State.isEditingCustomSpeed = true
+								end,
+								-- Rời ô HOẶC bấm Enter đều rơi vào đây (Roblox bắn `FocusLost` cho
+								-- cả hai), nên không cần bắt phím Enter riêng.
+								[OnEvent("FocusLost")] = function()
+									State.isEditingCustomSpeed = false
+									applyToken += 1 -- huỷ lần tự-áp-dụng đang chờ, tránh gửi hai lần
+									applyCustomSpeed(true)
+								end,
+								[Children] = {
+									Theme.MakeTextSizeConstraint(34, 12),
+								},
+							}),
+						},
 					}),
 					Theme.MakeOutlineLabel({
-						Position = UDim2.fromOffset(16, 38),
-						Size = UDim2.fromOffset(254, 24),
+						Position = UDim2.fromOffset(12, 90),
+						Size = UDim2.fromOffset(190, 22),
 						Text = Computed(function()
-							return `Your Max Speed: {math.floor(State.GetSnapshot().maxWalkSpeed)}`
+							local snapshot = State.GetSnapshot()
+							return `Now {math.floor(snapshot.customSpeedLimit)}  ·  Max {math.floor(
+								snapshot.maxWalkSpeed
+							)}`
 						end),
 						TextColor3 = Color3.fromRGB(255, 238, 89),
 						MaxTextSize = 18,
-					}),
-					New("TextBox")({
-						BackgroundColor3 = Color3.fromRGB(235, 239, 242),
-						ClearTextOnFocus = false,
-						Font = Enum.Font.GothamBlack,
-						Position = UDim2.fromOffset(14, 72),
-						Size = UDim2.fromOffset(152, 58),
-						Text = State.customSpeedDraft,
-						TextColor3 = Color3.fromRGB(80, 80, 100),
-						TextScaled = true,
-						TextStrokeTransparency = 1,
-						[OnChange("Text")] = function(text: string)
-							local digitsOnly = string.gsub(text, "[^%d]", "")
-							if State.customSpeedDraft:get() ~= digitsOnly then
-								State.customSpeedDraft:set(digitsOnly)
-							end
-						end,
-						[OnEvent("Focused")] = function()
-							State.isEditingCustomSpeed = true
-						end,
-						[OnEvent("FocusLost")] = function()
-							State.isEditingCustomSpeed = false
-							submitCustomSpeed()
-						end,
-						[Children] = {
-							Theme.MakeCorner(10),
-							Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-							New("UITextSizeConstraint")({
-								MaxTextSize = 34,
-								MinTextSize = 12,
-							}),
-						},
-					}),
-					New("TextButton")({
-						AutoButtonColor = true,
-						BackgroundColor3 = Color3.fromRGB(75, 222, 61),
-						Font = Enum.Font.GothamBlack,
-						Position = UDim2.fromOffset(174, 72),
-						Size = UDim2.fromOffset(98, 58),
-						Text = "OK",
-						TextColor3 = Color3.fromRGB(255, 255, 255),
-						TextScaled = true,
-						TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
-						TextStrokeTransparency = 0,
-						[OnEvent("Activated")] = submitCustomSpeed,
-						[Children] = {
-							Theme.MakeCorner(12),
-							Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-							Theme.MakeGradient(Color3.fromRGB(88, 230, 68), Color3.fromRGB(34, 155, 33)),
-							Theme.MakeStandardStuds(12),
-							New("UITextSizeConstraint")({
-								MaxTextSize = 32,
-								MinTextSize = 12,
-							}),
-						},
-					}),
-					Theme.MakeOutlineLabel({
-						Position = UDim2.fromOffset(14, 138),
-						Size = UDim2.fromOffset(258, 24),
-						Text = Computed(function()
-							return `Current Speed: {math.floor(State.GetSnapshot().customSpeedLimit)}`
-						end),
-						MaxTextSize = 18,
+						ZIndex = 4,
 					}),
 				},
 			}),

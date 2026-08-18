@@ -10,6 +10,7 @@ local Workspace = game:GetService("Workspace")
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local State = require(script.Parent.State)
 local Theme = require(script.Parent.Theme)
+local Tokens = require(script.Parent.Tokens)
 
 local Children = Fusion.Children
 local Computed = Fusion.Computed
@@ -28,7 +29,13 @@ local function getSpeedPopupGui(): ScreenGui
 
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "SpeedEscapeSpeedPopups"
-	gui.DisplayOrder = 80
+	--[[
+		⚠️ DisplayOrder ÂM là cố ý (2026-08-10, user): popup "+340 🥿" bám theo nhân vật là thứ
+		VUI nhưng KHÔNG QUAN TRỌNG — trước để 80 nên nó nổi trên cả modal Shop, che mất đúng
+		mấy tấm thẻ đang bán hàng. Dưới 0 thì nó chui xuống dưới toàn bộ HUD/modal: chỗ nào
+		màn hình trống vẫn thấy, mở panel lên là tự nhường chỗ.
+	]]
+	gui.DisplayOrder = -1
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
 	gui.Parent = playerGui
@@ -50,12 +57,28 @@ local KIND_STYLE: { [string]: KindStyle } = {
 }
 local DEFAULT_STYLE: KindStyle = { accent = Color3.fromRGB(255, 210, 80), icon = "★", sound = "pop" }
 
-
-
 -- Server gửi message với kind theo HỆ THỐNG (treadmill/pad/...) — tự nhận diện thêm
 -- sắc thái tích cực/tiêu cực từ nội dung để chọn nhạc + hiệu ứng phù hợp.
 local POSITIVE_PATTERNS = { "unlocked", "redeemed", "collected", "success", "claimed", "granted" }
-local NEGATIVE_PATTERNS = { "not enough", "need ", "unlock pad", "purchase this", "failed", "invalid", "expired", "cooldown", "locked", "cannot", "can't" }
+local NEGATIVE_PATTERNS = {
+	"not enough",
+	"need ",
+	"unlock pad",
+	"purchase this",
+	"failed",
+	"invalid",
+	"expired",
+	"cooldown",
+	"locked",
+	"cannot",
+	"can't",
+	-- Lời từ chối của bệ nhận Wins (`StageCheckpointService.denyPad`). Chúng đi kèm kind
+	-- `stage` nên nếu không bắt tường minh ở đây, chúng rơi vào nhánh tích cực và hiện ra
+	-- như một tin mừng — trong khi người chơi vừa bị chặn không cho nhận thưởng.
+	"too fast",
+	"run the stage",
+	"run stage",
+}
 
 local function resolveStyle(text: string, kind: string?): (KindStyle, string)
 	local style = KIND_STYLE[kind or ""] or DEFAULT_STYLE
@@ -97,8 +120,20 @@ local function playToastSound(gui: ScreenGui, preset: string)
 		end)
 	end
 
+	--[[
+		⚠️ TOAST KHÔNG DÙNG ÂM CHÚC MỪNG (2026-08-12, user).
+
+		Toast là kênh THÔNG BÁO HỆ THỐNG: nó báo "đã nhận", "không đủ Wins", "chạy lại stage
+		cho tử tế". Bản trước gán `CelebrationSound` cho preset success, nên một lời TỪ CHỐI
+		như "Too fast — run the stage properly" (kind `stage` ⇒ preset success) lại kêu đúng
+		tiếng ăn mừng rebirth. Người chơi nghe tiếng thắng trong lúc bị chặn thưởng.
+
+		Âm chúc mừng chỉ thuộc về các hệ thống ĂN MỪNG THẬT (banner rebirth/boost, thẻ Wins
+		bay, mở pad, trúng roulette, pháo hoa cuối zone). Toast dùng một tiếng chuông ngắn,
+		trung tính — 9120150515 (Tone Clusters 23, 0.40s, đã đo IsLoaded=true).
+	]]
 	if preset == "success" then
-		spawnSound(Theme.UI_ASSETS.LevelUpSound, 0.4, 1.3)
+		spawnSound(Theme.UI_ASSETS.NotifySound, 0.45, 1.0)
 	elseif preset == "error" then
 		-- Double-thud trầm = "denied" cổ điển (tái dùng ClickSound pitch thấp, không cần asset mới).
 		spawnSound(Theme.UI_ASSETS.ClickSound, 0.75, 0.42)
@@ -134,7 +169,7 @@ local function burstSparkles(gui: ScreenGui, centerX: number, centerY: number, a
 		local star = Instance.new("TextLabel")
 		star.AnchorPoint = Vector2.new(0.5, 0.5)
 		star.BackgroundTransparency = 1
-		star.Font = Enum.Font.GothamBlack
+		star.Font = Theme.FONT
 		star.Text = "★"
 		star.TextColor3 = accent
 
@@ -183,6 +218,23 @@ function Toast.Show(text: string, kind: string?)
 	local gui = getToastGui()
 	local style, soundPreset = resolveStyle(text, kind)
 
+	--[[
+		⚠️ TOAST PHẢI CO THEO MÀN HÌNH (2026-08-14, user: "UI thông báo hệ thống đang bị rất to").
+
+		Pill này dựng bằng PIXEL MÀN HÌNH THẬT (ScreenGui riêng, không nằm trong canvas
+		1920×1080 nên không có UIScale) và dùng `AutomaticSize`, tức chiều cao do cỡ chữ +
+		padding quyết định. Cỡ chữ cứng 26 + padding 12 cho ra pill cao ~62px: trên PC 1080 là
+		6% màn hình, nhưng trên điện thoại cao 413 thì vẫn 62px = 15% — dải thông báo to bằng
+		một phần bảy màn hình và che mất chỗ đang chơi.
+
+		`k` co mọi con số theo chiều cao màn hình. Ở 1080 nó = 1 ⇒ PC không đổi một pixel nào.
+		Sàn 0.5 để chữ không bao giờ nhỏ hơn 13px thật.
+	]]
+	local toastK = math.clamp(gui.AbsoluteSize.Y / 1080, 0.5, 1)
+	local function k(value: number): number
+		return math.round(value * toastK)
+	end
+
 	-- Pill bo tròn giữa mép trên: pop-in Back easing, viền màu hệ thống, icon + text outline.
 	-- LƯU Ý: KHÔNG dùng CanvasGroup + AutomaticSize (bug engine: canvas không resize → con
 	-- không render). Dùng Frame thường, fade-out tween từng phần tử.
@@ -192,12 +244,12 @@ function Toast.Show(text: string, kind: string?)
 	pill.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
 	pill.BackgroundTransparency = 0.06
 	pill.BorderSizePixel = 0
-	pill.Position = UDim2.new(0.5, 0, 0, 26)
+	pill.Position = UDim2.new(0.5, 0, 0, k(26))
 	pill.ZIndex = 9999
 	pill.Parent = gui
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 16)
+	corner.CornerRadius = UDim.new(0, k(16))
 	corner.Parent = pill
 
 	local stroke = Instance.new("UIStroke")
@@ -212,26 +264,26 @@ function Toast.Show(text: string, kind: string?)
 	gradient.Parent = pill
 
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 12)
-	padding.PaddingBottom = UDim.new(0, 12)
-	padding.PaddingLeft = UDim.new(0, 20)
-	padding.PaddingRight = UDim.new(0, 22)
+	padding.PaddingTop = UDim.new(0, k(12))
+	padding.PaddingBottom = UDim.new(0, k(12))
+	padding.PaddingLeft = UDim.new(0, k(20))
+	padding.PaddingRight = UDim.new(0, k(22))
 	padding.Parent = pill
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, 12)
+	layout.Padding = UDim.new(0, k(12))
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = pill
 
 	local iconLabel = Instance.new("TextLabel")
 	iconLabel.AutomaticSize = Enum.AutomaticSize.XY
 	iconLabel.BackgroundTransparency = 1
-	iconLabel.Font = Enum.Font.GothamBlack
+	iconLabel.Font = Theme.FONT
 	iconLabel.Text = style.icon
 	iconLabel.TextColor3 = style.accent
-	iconLabel.TextSize = 22
+	iconLabel.TextSize = k(22)
 	iconLabel.LayoutOrder = 1
 	iconLabel.ZIndex = 10000
 	iconLabel.Parent = pill
@@ -244,10 +296,10 @@ function Toast.Show(text: string, kind: string?)
 	local label = Instance.new("TextLabel")
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBlack
+	label.Font = Theme.FONT
 	label.Text = text
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
-	label.TextSize = 26
+	label.TextSize = k(26)
 	label.LayoutOrder = 2
 	label.ZIndex = 10000
 	label.Parent = pill
@@ -263,7 +315,8 @@ function Toast.Show(text: string, kind: string?)
 	activeToast = pill
 
 	playToastSound(gui, soundPreset)
-	TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+		:Play()
 
 	if soundPreset == "error" then
 		shakeToast(pill)
@@ -272,7 +325,12 @@ function Toast.Show(text: string, kind: string?)
 			if pill.Parent then
 				local absolutePosition = pill.AbsolutePosition
 				local absoluteSize = pill.AbsoluteSize
-				burstSparkles(gui, absolutePosition.X + absoluteSize.X / 2, absolutePosition.Y + absoluteSize.Y / 2, style.accent)
+				burstSparkles(
+					gui,
+					absolutePosition.X + absoluteSize.X / 2,
+					absolutePosition.Y + absoluteSize.Y / 2,
+					style.accent
+				)
 			end
 		end)
 	end
@@ -362,12 +420,18 @@ function Toast.ShowSpeedPopup(amount: number)
 
 	local elementsToFade = {}
 
-	for _, offset in {
-		Vector2.new(-2, 0), Vector2.new(2, 0),
-		Vector2.new(0, -2), Vector2.new(0, 2),
-		Vector2.new(2, 2), Vector2.new(-2, -2),
-		Vector2.new(2, -2), Vector2.new(-2, 2)
-	} do
+	for _, offset in
+		{
+			Vector2.new(-2, 0),
+			Vector2.new(2, 0),
+			Vector2.new(0, -2),
+			Vector2.new(0, 2),
+			Vector2.new(2, 2),
+			Vector2.new(-2, -2),
+			Vector2.new(2, -2),
+			Vector2.new(-2, 2),
+		}
+	do
 		local outline = Instance.new("ImageLabel")
 		outline.BackgroundTransparency = 1
 		outline.Image = "rbxassetid://93408043939834"
@@ -389,7 +453,7 @@ function Toast.ShowSpeedPopup(amount: number)
 
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBlack
+	label.Font = Theme.FONT
 	label.Text = `+{Theme.FormatInteger(amount)}`
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.TextSize = 38
@@ -400,7 +464,7 @@ function Toast.ShowSpeedPopup(amount: number)
 	label.ZIndex = 83
 	label.Parent = popup
 	table.insert(elementsToFade, label)
-	
+
 	local gradient = Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 230, 255))
 	gradient.Rotation = 90
@@ -410,7 +474,7 @@ function Toast.ShowSpeedPopup(amount: number)
 	local randomX = math.random(-40, 40)
 	local randomY = math.random(-15, 15)
 	local driftX = math.random(-25, 25)
-	
+
 	local lift = Instance.new("NumberValue")
 	lift.Value = 0
 	local drift = Instance.new("NumberValue")
@@ -422,7 +486,9 @@ function Toast.ShowSpeedPopup(amount: number)
 	connection = RunService.RenderStepped:Connect(function()
 		camera = Workspace.CurrentCamera
 		if not camera or not root.Parent then
-			if connection then connection:Disconnect() end
+			if connection then
+				connection:Disconnect()
+			end
 			popup:Destroy()
 			return
 		end
@@ -442,10 +508,19 @@ function Toast.ShowSpeedPopup(amount: number)
 		)
 	end)
 
-	local popTween = TweenService:Create(popProgress, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Value = 1 })
-	local liftTween = TweenService:Create(lift, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Value = 90 })
-	local driftTween = TweenService:Create(drift, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Value = driftX })
-	
+	local popTween = TweenService:Create(
+		popProgress,
+		TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		{ Value = 1 }
+	)
+	local liftTween =
+		TweenService:Create(lift, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Value = 90 })
+	local driftTween = TweenService:Create(
+		drift,
+		TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		{ Value = driftX }
+	)
+
 	popTween:Play()
 	liftTween:Play()
 	driftTween:Play()
@@ -462,7 +537,9 @@ function Toast.ShowSpeedPopup(amount: number)
 	end)
 
 	liftTween.Completed:Connect(function()
-		if connection then connection:Disconnect() end
+		if connection then
+			connection:Disconnect()
+		end
 		lift:Destroy()
 		drift:Destroy()
 		popProgress:Destroy()
@@ -483,9 +560,11 @@ function Toast.BuildLevelUpFrame()
 		ZIndex = 30,
 		[Children] = {
 			Theme.MakeCorner(18),
-			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 5),
+			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), Tokens.BORDER),
 			Theme.MakeGradient(Color3.fromRGB(255, 226, 95), Color3.fromRGB(255, 135, 32), 0),
-			Theme.MakeStudsPattern(0.72, 31),
+			-- 0.86 = độ mờ CHUẨN của cả HUD (`MakeStandardStuds`). Bản cũ 0.72 làm hoa văn ở
+			-- riêng khung này đậm gấp đôi mọi khối khác — đúng chỗ "vân nền không đồng bộ".
+			Theme.MakeStandardStuds(18, 31),
 			New("ImageLabel")({
 				BackgroundTransparency = 1,
 				Image = Theme.UI_ASSETS.Trophy,
@@ -524,9 +603,9 @@ function Toast.BuildCenterToast()
 		ZIndex = Theme.TOAST_Z_INDEX,
 		[Children] = {
 			Theme.MakeCorner(18),
-			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 5),
+			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), Tokens.BORDER),
 			Theme.MakeGradient(Color3.fromRGB(92, 63, 196), Color3.fromRGB(31, 20, 61), 0),
-			Theme.MakeStudsPattern(0.84, Theme.TOAST_Z_INDEX + 1),
+			Theme.MakeStandardStuds(18, Theme.TOAST_Z_INDEX + 1),
 			Theme.MakeOutlineLabel({
 				Position = UDim2.fromOffset(24, 6),
 				Size = UDim2.fromOffset(712, 64),

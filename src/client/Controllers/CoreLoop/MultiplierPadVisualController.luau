@@ -4,16 +4,20 @@
 --   - UNLOCKED (đã đạt/mở khóa, chưa ở) → xanh lá `Color3.fromRGB(80, 220, 80)`
 --   - LOCKED   (chưa đạt)               → xám `Color3.fromRGB(110, 110, 110)`
 --
--- Theo TIẾN ĐỘ tuần tự (HighestPadIndex), KHÔNG theo Wins hiện tại (Wins có thể tụt khi tiêu).
+-- Theo attribute `HighestPadIndex` do server phát. ⚠️ Từ 2026-08-10 attribute đó KHÔNG còn là
+-- cột mốc vĩnh viễn nữa mà là mức Wins HIỆN TẠI với tới (xem MultiplierPadService): Wins tụt
+-- xuống dưới ngưỡng thì pad tương ứng xám lại và server tự hạ người chơi về pad còn đủ.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
-local SoundService = game:GetService("SoundService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local Theme = require(script.Parent.Parent.HUD.Theme)
+local Toast = require(script.Parent.Parent.HUD.Toast)
 
 local MultiplierPadVisualController = {}
 
@@ -60,21 +64,40 @@ end
 -- Play a highly satisfying, addictive level-up visual and audio celebration
 local function playUnlockCelebration(padIndex: number)
 	local config = Constants.GetMultiplierPadById(`pad_{padIndex}`)
-	if not config then return end
+	if not config then
+		return
+	end
 
-	-- 1. Play success chime SFX
-	-- ⚠️ ID cũ 6085521634 KHÔNG PHẢI Audio (là ảnh áo hoodie của 'mee9236') — sound câm suốt,
-	-- không log lỗi cho tới khi Play() thật. Đổi sang ID Level Up thật, cùng ID với
-	-- Theme.UI_ASSETS.LevelUpSound (group sở hữu, đã xác nhận IsA Audio + đang phát tốt).
-	local sound = Instance.new("Sound")
-	sound.SoundId = "rbxassetid://89481514209130" -- Level Up (group, xem Theme.UI_ASSETS.LevelUpSound)
-	sound.Volume = 0.75
-	sound.Parent = SoundService
-	sound:Play()
-	task.spawn(function()
-		sound.Ended:Wait()
-		sound:Destroy()
-	end)
+	--[[
+		1. CHUÔNG MỞ KHOÁ — HAI NỐT ĐI LÊN (đổi 2026-08-14, user: "trùng với sound chúc mừng").
+
+		Lịch sử của đúng một dòng SoundId này:
+		  • 6085521634 — KHÔNG PHẢI Audio (là ảnh áo hoodie của 'mee9236'), câm suốt và không
+		    log lỗi cho tới lúc Play() thật.
+		  • 4612383790 — âm chúc mừng chung. Kêu được, nhưng nó là fanfare rebirth 1.71s: mở pad
+		    nghe y hệt lúc rebirth thành công, mà mở pad thì người chơi CHƯA nhận được gì.
+		  • Nay: `Theme.UI_ASSETS.UnlockSound`, ping 0.72s có sẵn trong client, phát hai lần —
+		    nốt hai cao hơn quãng năm (1.5) và nhẹ hơn. Đi lên = "vừa mở ra", đi xuống = "hỏng";
+		    một nốt đơn thì chỉ là tiếng thông báo chung chung không mang nghĩa gì.
+
+		⚠️ ĐỪNG gán lại `CelebrationSound` vào đây. Âm chúc mừng thuộc về lúc NHẬN (banner
+		rebirth/boost, thẻ Wins bay, trúng roulette) — pad mới mở là lời MỜI, không phải phần thưởng.
+	]]
+	local function playUnlockChime(pitch: number, volume: number, delaySeconds: number)
+		task.delay(delaySeconds, function()
+			local sound = Instance.new("Sound")
+			sound.SoundId = Theme.UI_ASSETS.UnlockSound
+			sound.PlaybackSpeed = pitch
+			sound.Volume = volume
+			sound.Parent = SoundService
+			-- `PlayOnRemove` + Destroy ngay: âm vẫn kêu trọn vẹn mà không để lại instance nào
+			-- phải chờ `Ended` rồi dọn — pad có thể mở dồn dập khi người chơi bùng Wins.
+			sound.PlayOnRemove = true
+			sound:Destroy()
+		end)
+	end
+	playUnlockChime(1.0, 0.7, 0)
+	playUnlockChime(1.5, 0.55, 0.11)
 
 	-- 2. Physical Fountain of Sparkles at the unlocked PadPart
 	task.spawn(function()
@@ -90,12 +113,12 @@ local function playUnlockCelebration(padIndex: number)
 			emitter.Color = ColorSequence.new({
 				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 230, 0)),
 				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 191)),
-				ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 255))
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 255)),
 			})
 			emitter.Size = NumberSequence.new({
 				NumberSequenceKeypoint.new(0, 1.8),
 				NumberSequenceKeypoint.new(0.8, 1.0),
-				NumberSequenceKeypoint.new(1, 0.0)
+				NumberSequenceKeypoint.new(1, 0.0),
 			})
 			emitter.Texture = "rbxassetid://258122939" -- Star Sparkle
 			emitter.Lifetime = NumberRange.new(1.2, 2.0)
@@ -112,123 +135,20 @@ local function playUnlockCelebration(padIndex: number)
 		end
 	end)
 
-	-- 3. Confetti Rain and Elastic Text Pop on screen
-	task.spawn(function()
-		local playerGui = localPlayer:WaitForChild("PlayerGui")
-		local old = playerGui:FindFirstChild("PadUnlockCelebration")
-		if old then old:Destroy() end
+	--[[
+		3. BÁO TRÊN ĐỈNH MÀN HÌNH, KHÔNG PHẢI GIỮA (2026-08-10, user).
 
-		local screenGui = Instance.new("ScreenGui")
-		screenGui.Name = "PadUnlockCelebration"
-		screenGui.DisplayOrder = 1000
-		screenGui.IgnoreGuiInset = true
-		screenGui.Parent = playerGui
+		Bản trước là chữ vàng khổng lồ giữa màn hình + mưa confetti toàn màn — đúng ngôn ngữ
+		của "bạn vừa NHẬN được thứ gì đó". Nhưng đây chỉ là tin "bạn đủ điều kiện rồi, ra pad
+		mà lấy": người chơi chưa nhận gì cả, và cái chữ to đó còn che mất chính khu pad họ cần
+		nhìn để đi tới.
 
-		-- Text Container
-		local container = Instance.new("Frame")
-		container.AnchorPoint = Vector2.new(0.5, 0.5)
-		container.BackgroundTransparency = 1
-		container.Position = UDim2.fromScale(0.5, 0.38)
-		container.Size = UDim2.fromOffset(500, 150)
-		container.Parent = screenGui
-
-		local title = Instance.new("TextLabel")
-		title.AnchorPoint = Vector2.new(0.5, 0.5)
-		title.BackgroundTransparency = 1
-		title.Position = UDim2.fromScale(0.5, 0.3)
-		title.Size = UDim2.fromScale(0, 0) -- Starts minimized
-		title.Font = Enum.Font.GothamBlack
-		title.Text = "NEW PAD UNLOCKED!"
-		title.TextColor3 = Color3.fromRGB(255, 220, 0) -- Gold neon
-		title.TextScaled = true
-		title.Parent = container
-
-		local tStroke = Instance.new("UIStroke")
-		tStroke.Thickness = 4.5
-		tStroke.Color = Color3.fromRGB(0, 0, 0)
-		tStroke.Parent = title
-
-		local sub = Instance.new("TextLabel")
-		sub.AnchorPoint = Vector2.new(0.5, 0.5)
-		sub.BackgroundTransparency = 1
-		sub.Position = UDim2.fromScale(0.5, 0.7)
-		sub.Size = UDim2.fromScale(0, 0)
-		sub.Font = Enum.Font.GothamBold
-		sub.Text = `+{config.speedPerStep} Speed / Step`
-		sub.TextColor3 = Color3.fromRGB(0, 255, 255) -- Cyan neon
-		sub.TextScaled = true
-		sub.Parent = container
-
-		local sStroke = Instance.new("UIStroke")
-		sStroke.Thickness = 3.5
-		sStroke.Color = Color3.fromRGB(0, 0, 0)
-		sStroke.Parent = sub
-
-		-- Elastic Pop In Tweens
-		TweenService:Create(title, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Size = UDim2.fromScale(1, 0.45)
-		}):Play()
-		
-		task.wait(0.15)
-		TweenService:Create(sub, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Size = UDim2.fromScale(0.8, 0.35)
-		}):Play()
-
-		-- Generate Raining Confetti Frame Pieces
-		local colors = {
-			Color3.fromRGB(255, 60, 60),
-			Color3.fromRGB(255, 220, 0),
-			Color3.fromRGB(60, 255, 60),
-			Color3.fromRGB(60, 200, 255),
-			Color3.fromRGB(255, 60, 255),
-			Color3.fromRGB(0, 255, 255)
-		}
-
-		for i = 1, 55 do
-			local piece = Instance.new("Frame")
-			piece.BackgroundColor3 = colors[math.random(1, #colors)]
-			piece.BorderSizePixel = 0
-			
-			local width = math.random(12, 24)
-			local height = math.random(6, 14)
-			piece.Size = UDim2.fromOffset(width, height)
-			
-			local startX = math.random(0, 100) / 100
-			piece.Position = UDim2.fromScale(startX, -0.05)
-			piece.Rotation = math.random(0, 360)
-			piece.Parent = screenGui
-
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0.2, 0)
-			corner.Parent = piece
-
-			-- Animate gravity fall
-			local targetX = startX + (math.random(-12, 12) / 100)
-			local duration = math.random(18, 28) / 10
-			local rotSpeed = math.random(-360, 360)
-
-			TweenService:Create(piece, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-				Position = UDim2.fromScale(targetX, 1.05),
-				Rotation = piece.Rotation + rotSpeed
-			}):Play()
-
-			task.delay(duration, function()
-				piece:Destroy()
-			end)
-		end
-
-		-- Clean up central titles
-		task.wait(2.2)
-		TweenService:Create(title, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Size = UDim2.fromScale(0, 0)
-		}):Play()
-		TweenService:Create(sub, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Size = UDim2.fromScale(0, 0)
-		}):Play()
-		
-		task.wait(0.5)
-		screenGui:Destroy()
-	end)
+		Giờ dùng lại `Toast` — dải nhỏ trên đỉnh, có sẵn pill + icon + âm thanh + hàng đợi,
+		nên tin này xếp hàng tử tế với mọi thông báo khác thay vì đè lên chúng. Cột lửa hạt
+		ngay tại PadPart (mục 2 ở trên) vẫn giữ: đó mới là thứ chỉ ĐƯỜNG, và nó nằm trong thế
+		giới chứ không che màn hình.
+	]]
+	Toast.Show(`Pad {padIndex} ready — step on it for +{config.speedPerStep} Speed/step`, "pad")
 end
 
 local function tintPad(padPart: BasePart, targetColor: Color3)
@@ -290,7 +210,6 @@ local function refreshAll()
 		tintPad(padPart, targetColor)
 	end
 end
-
 
 local function bootstrap()
 	-- Folder giờ nằm trong Workspace.Lobby — chờ bằng poll đệ quy thay vì WaitForChild trực tiếp.

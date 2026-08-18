@@ -5,7 +5,8 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ServiceLocator = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("ServiceLocator"))
+local ServiceLocator =
+	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("ServiceLocator"))
 
 local ControllersFolder = script:WaitForChild("Controllers")
 

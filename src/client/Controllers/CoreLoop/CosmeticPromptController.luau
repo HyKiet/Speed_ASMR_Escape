@@ -57,13 +57,19 @@ local function attachPromptToFolder(folder: Instance)
 	local targetPart: BasePart? = nil
 	local rig = folder:FindFirstChild("Rig")
 	if rig then
-		targetPart = rig:FindFirstChild("HumanoidRootPart") or rig:FindFirstChild("Torso") or rig:FindFirstChildWhichIsA("BasePart", true)
+		targetPart = rig:FindFirstChild("HumanoidRootPart")
+			or rig:FindFirstChild("Torso")
+			or rig:FindFirstChildWhichIsA("BasePart", true)
 	end
 
 	-- Ưu tiên 2: BasePart vật lý cố định trên mặt đất của bệ (Bỏ qua Billboard và Part có Script di chuyển)
 	if not targetPart or not targetPart:IsA("BasePart") then
 		for _, descendant in ipairs(folder:GetDescendants()) do
-			if descendant:IsA("BasePart") and descendant.Name ~= "Billboard" and not descendant:FindFirstChildWhichIsA("Script") then
+			if
+				descendant:IsA("BasePart")
+				and descendant.Name ~= "Billboard"
+				and not descendant:FindFirstChildWhichIsA("Script")
+			then
 				targetPart = descendant
 				break
 			end
@@ -88,7 +94,6 @@ local function attachPromptToFolder(folder: Instance)
 			end
 		end
 	end
-
 
 	local prompt = targetPart:FindFirstChild(PROMPT_NAME)
 	if not prompt then
@@ -139,13 +144,21 @@ function CosmeticPromptController.Start()
 
 	-- Lắng hệ khi model bệ stream-in vào Workspace
 	Workspace.DescendantAdded:Connect(function(descendant)
-		if descendant:IsA("Folder") and (descendant.Parent and (descendant.Parent.Name == "AuraBase" or descendant.Parent.Name == "TrailBase")) then
+		if
+			descendant:IsA("Folder")
+			and (descendant.Parent and (descendant.Parent.Name == "AuraBase" or descendant.Parent.Name == "TrailBase"))
+		then
 			attachPromptToFolder(descendant)
 		elseif descendant:IsA("BasePart") and descendant.Name == "Billboard" then
 			local folder = descendant.Parent
 			if folder and folder.Parent and (folder.Parent.Name == "AuraBase" or folder.Parent.Name == "TrailBase") then
 				attachPromptToFolder(folder)
-			elseif folder and folder.Parent and folder.Parent.Parent and (folder.Parent.Parent.Name == "AuraBase" or folder.Parent.Parent.Name == "TrailBase") then
+			elseif
+				folder
+				and folder.Parent
+				and folder.Parent.Parent
+				and (folder.Parent.Parent.Name == "AuraBase" or folder.Parent.Parent.Name == "TrailBase")
+			then
 				attachPromptToFolder(folder.Parent)
 			end
 		end

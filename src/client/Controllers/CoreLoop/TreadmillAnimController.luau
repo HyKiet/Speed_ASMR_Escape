@@ -159,24 +159,33 @@ local function watchPlayer(player: Player)
 	entries[player] = entry
 	prefetchRunAnim(player)
 
-	table.insert(entry.connections, player:GetAttributeChangedSignal("TreadmillFarming"):Connect(function()
-		refresh(player)
-	end))
-	table.insert(entry.connections, player.CharacterAdded:Connect(function(character)
-		-- Humanoid/Animator replicate SAU character — phải đợi thật sự rồi mới refresh.
-		task.spawn(function()
-			local humanoid = character:WaitForChild("Humanoid", 10)
-			if humanoid then
-				humanoid:WaitForChild("Animator", 5)
-			end
-			if entries[player] and player.Character == character then
-				refresh(player)
-			end
+	table.insert(
+		entry.connections,
+		player:GetAttributeChangedSignal("TreadmillFarming"):Connect(function()
+			refresh(player)
 		end)
-	end))
-	table.insert(entry.connections, player.CharacterRemoving:Connect(function()
-		stopTrack(player, entry)
-	end))
+	)
+	table.insert(
+		entry.connections,
+		player.CharacterAdded:Connect(function(character)
+			-- Humanoid/Animator replicate SAU character — phải đợi thật sự rồi mới refresh.
+			task.spawn(function()
+				local humanoid = character:WaitForChild("Humanoid", 10)
+				if humanoid then
+					humanoid:WaitForChild("Animator", 5)
+				end
+				if entries[player] and player.Character == character then
+					refresh(player)
+				end
+			end)
+		end)
+	)
+	table.insert(
+		entry.connections,
+		player.CharacterRemoving:Connect(function()
+			stopTrack(player, entry)
+		end)
+	)
 
 	refresh(player)
 end

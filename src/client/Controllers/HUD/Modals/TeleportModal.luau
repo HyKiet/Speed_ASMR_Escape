@@ -1,13 +1,17 @@
 --!strict
--- Modal Teleport: danh sách dọc từng hàng, thanh toán Wins hoặc Robux.
+-- Modal Teleport: danh sách dọc từng hàng, CHỈ thanh toán bằng Wins.
+--
+-- 2026-08-07 (yêu cầu user): gỡ hẳn nút mua bằng Robux. Teleport là tiện ích rút ngắn
+-- đường đi, không phải món kiếm tiền — bán bằng Robux làm loãng giá trị của Wins (thứ
+-- người chơi cày cả buổi để có). Nút Wins nở rộng lấp chỗ trống của nút cũ.
+-- Đường mua bằng Robux phía server (product) vẫn còn nguyên, chỉ là UI không gọi tới.
 
-local MarketplaceService = game:GetService("MarketplaceService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
+local ModalShell = require(script.Parent.Parent.Components.ModalShell)
 local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
 local Toast = require(script.Parent.Parent.Toast)
@@ -16,12 +20,12 @@ local Manager = require(script.Parent.Manager)
 local Children = Fusion.Children
 local Computed = Fusion.Computed
 local New = Fusion.New
-local OnEvent = Fusion.OnEvent
 local Value = Fusion.Value
 
-local localPlayer = Players.LocalPlayer
-
 local TeleportModal = {}
+
+local PANEL_WIDTH = 632
+local PANEL_HEIGHT = 680
 
 type DestinationConfig = State.TeleportDestinationConfig
 
@@ -29,8 +33,33 @@ local function isDestinationVisible(destination: DestinationConfig): boolean
 	return destination.targetPath ~= ""
 end
 
+--[[
+	VIP Membership teleport miễn phí — CHỈ trong phạm vi đã từng đến (2026-08-12).
+
+	Luật này phải khớp CHÍNH XÁC `TeleportService.tryPayWins`, nếu không UI và server nói hai
+	điều khác nhau: hoặc hàng hiện "FREE" rồi server vẫn trừ Wins, hoặc UI chặn "không đủ Wins"
+	trong khi server sẵn sàng cho đi miễn phí. Xem khối lý do dài ở phía server để hiểu vì sao
+	miễn phí KHÔNG được phủ mọi stage.
+
+	Nhận diện VIP qua `vipMultiplier` trong snapshot (server gửi 1.5 khi sở hữu pass) — không
+	có cờ boolean riêng, và cũng không cần: đó là con số server đã tính, client chỉ đọc.
+]]
+local function stageNumberOf(destination: DestinationConfig): number?
+	local text = destination.id:match("^stage_(%d+)$")
+	return if text then tonumber(text) else nil
+end
+
+local function isFreeForVip(destination: DestinationConfig): boolean
+	local snapshot = State.GetSnapshot()
+	if snapshot.vipMultiplier <= 1 then
+		return false
+	end
+	local stage = stageNumberOf(destination)
+	return stage == nil or stage <= snapshot.highestCompletedStage + 1
+end
+
 local function requestWithWins(destination: DestinationConfig): boolean
-	if State.GetSnapshot().totalWins < destination.priceWins then
+	if not isFreeForVip(destination) and State.GetSnapshot().totalWins < destination.priceWins then
 		Toast.Show("Not enough Wins")
 		return false
 	end
@@ -42,21 +71,10 @@ local function requestWithWins(destination: DestinationConfig): boolean
 	return true
 end
 
-local function promptWithRobux(destination: DestinationConfig): boolean
-	if destination.productId <= 0 then
-		Toast.Show("Set teleport product id before purchase")
-		return false
-	end
-
-	MarketplaceService:PromptProductPurchase(localPlayer, destination.productId)
-	return true
-end
-
 local function makeRow(destination: DestinationConfig)
 	local colorA = destination.accentColor
 	local colorB = colorA:Lerp(Color3.fromRGB(20, 30, 70), 0.5)
 	local winsHovered = Value(false)
-	local robuxHovered = Value(false)
 
 	return New("Frame")({
 		BackgroundColor3 = colorA,
@@ -93,86 +111,58 @@ local function makeRow(destination: DestinationConfig)
 				MaxTextSize = 20,
 				ZIndex = 46,
 			}),
-			-- Nút Wins (xanh lá)
-			New("TextButton")({
-				AutoButtonColor = false,
-				BackgroundColor3 = Color3.fromRGB(54, 200, 56),
-				Font = Enum.Font.GothamBlack,
+			-- Nút Wins (xanh lá) — nút mua DUY NHẤT, nở rộng lấp chỗ nút Robux cũ.
+			-- `MakeSurface` + `Zoom`: viền và chữ phóng cùng nhịp, nở đều 4 góc.
+			Theme.MakeSurface({
+				ClassName = "TextButton",
 				Position = UDim2.fromOffset(300, 19),
-				Size = UDim2.fromOffset(122, 60),
-				Text = "",
+				Size = UDim2.fromOffset(244, 60),
 				ZIndex = 47,
-				[OnEvent("Activated")] = function()
+				Radius = 12,
+				Border = 4,
+				Color = Color3.fromRGB(120, 240, 80),
+				ColorB = Color3.fromRGB(40, 160, 36),
+				GradientRotation = 0,
+				Zoom = { Hovered = winsHovered, Scale = 1.08 },
+				Activated = function()
 					if requestWithWins(destination) then
 						Manager.CloseTeleport()
 					end
 				end,
-				[OnEvent("MouseEnter")] = function()
+				MouseEnter = function()
 					winsHovered:set(true)
 				end,
-				[OnEvent("MouseLeave")] = function()
+				MouseLeave = function()
 					winsHovered:set(false)
 				end,
-				[Children] = {
-					Theme.MakeCorner(12),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-					Theme.MakeGradient(Color3.fromRGB(120, 240, 80), Color3.fromRGB(40, 160, 36), 0),
-					Theme.MakeStandardStuds(12, 47),
-					Theme.HoverZoom(winsHovered, 1.08),
-					New("ImageLabel")({
-						BackgroundTransparency = 1,
-						Image = Theme.UI_ASSETS.Trophy,
-						Position = UDim2.fromOffset(10, 14),
-						Size = UDim2.fromOffset(32, 32),
-						ZIndex = 49,
-					}),
-					Theme.MakeOutlineLabel({
-						Position = UDim2.fromOffset(44, 6),
-						Size = UDim2.fromOffset(72, 48),
-						Text = if destination.priceWins <= 0 then "FREE" else Theme.FormatInteger(destination.priceWins),
-						TextXAlignment = Enum.TextXAlignment.Center,
-						MaxTextSize = 28,
-						MinTextSize = 12,
-						ZIndex = 49,
-					}),
-				},
-			}),
-			-- Nút Robux (tím)
-			New("TextButton")({
-				AutoButtonColor = false,
-				BackgroundColor3 = Color3.fromRGB(150, 70, 240),
-				Font = Enum.Font.GothamBlack,
-				Position = UDim2.fromOffset(430, 19),
-				Size = UDim2.fromOffset(114, 60),
-				Text = "",
-				ZIndex = 47,
-				[OnEvent("Activated")] = function()
-					if promptWithRobux(destination) then
-						Manager.CloseTeleport()
-					end
+				Content = function(zoom)
+					return {
+						New("ImageLabel")({
+							BackgroundTransparency = 1,
+							Image = Theme.UI_ASSETS.Trophy,
+							Position = UDim2.fromOffset(36, 14),
+							Size = UDim2.fromOffset(32, 32),
+							ZIndex = 49,
+						}),
+						Theme.MakeOutlineLabel({
+							Position = UDim2.fromOffset(76, 6),
+							Size = UDim2.fromOffset(148, 48),
+							-- Computed chứ không phải chuỗi tĩnh: mua VIP giữa session thì mọi hàng
+							-- phải đổi sang "FREE" ngay, không đợi đóng mở lại modal.
+							Text = Computed(function()
+								if destination.priceWins <= 0 or isFreeForVip(destination) then
+									return "FREE"
+								end
+								return Theme.FormatInteger(destination.priceWins)
+							end),
+							TextXAlignment = Enum.TextXAlignment.Center,
+							Zoom = zoom,
+							MaxTextSize = 30,
+							MinTextSize = 12,
+							ZIndex = 49,
+						}),
+					}
 				end,
-				[OnEvent("MouseEnter")] = function()
-					robuxHovered:set(true)
-				end,
-				[OnEvent("MouseLeave")] = function()
-					robuxHovered:set(false)
-				end,
-				[Children] = {
-					Theme.MakeCorner(12),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-					Theme.MakeGradient(Color3.fromRGB(186, 110, 255), Color3.fromRGB(120, 40, 210), 0),
-					Theme.MakeStandardStuds(12, 47),
-					Theme.HoverZoom(robuxHovered, 1.08),
-					Theme.MakeOutlineLabel({
-						Position = UDim2.fromScale(0, 0),
-						Size = UDim2.fromScale(1, 1),
-						Text = if destination.productId <= 0 then "--" else `\u{E002} {Theme.FormatInteger(destination.priceRobux)}`,
-						TextXAlignment = Enum.TextXAlignment.Center,
-						MaxTextSize = 26,
-						MinTextSize = 12,
-						ZIndex = 49,
-					}),
-				},
 			}),
 		},
 	})
@@ -187,15 +177,21 @@ local function buildList()
 			table.insert(rows, makeRow(destination))
 		end
 	end
-	table.insert(rows, New("UIListLayout")({
-		Padding = UDim.new(0, 12),
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}))
-	table.insert(rows, New("UIPadding")({
-		PaddingTop = UDim.new(0, 6),
-		PaddingBottom = UDim.new(0, 6),
-	}))
+	table.insert(
+		rows,
+		New("UIListLayout")({
+			Padding = UDim.new(0, 12),
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		})
+	)
+	table.insert(
+		rows,
+		New("UIPadding")({
+			PaddingTop = UDim.new(0, 6),
+			PaddingBottom = UDim.new(0, 6),
+		})
+	)
 
 	return New("ScrollingFrame")({
 		Active = true,
@@ -212,90 +208,18 @@ local function buildList()
 end
 
 function TeleportModal.Build()
-	local closeHovered = State.teleportCloseHovered
-	return New("Frame")({
-		BackgroundTransparency = 1,
-		Position = UDim2.fromScale(0, 0),
-		Size = UDim2.fromOffset(Theme.DESIGN_WIDTH, Theme.DESIGN_HEIGHT),
-		Visible = State.teleportModalMounted,
-		ZIndex = 38,
-		[Children] = {
-			New("CanvasGroup")({
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Color3.fromRGB(12, 35, 90),
-				BackgroundTransparency = 0.3,
-				ClipsDescendants = true,
-				GroupTransparency = Computed(function()
-					return 1 - State.teleportModalAnimation:get()
-				end),
-				Position = Computed(function()
-					return UDim2.fromOffset(960, 492 - (18 * State.teleportModalAnimation:get()))
-				end),
-				Size = UDim2.fromOffset(632, 680),
-				ZIndex = 40,
-				[Children] = {
-					Theme.MakeCorner(18),
-					Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-					New("Frame")({
-						BackgroundColor3 = Color3.fromRGB(60, 150, 255),
-						Position = UDim2.fromOffset(0, 0),
-						Size = UDim2.fromOffset(632, 96),
-						ZIndex = 45,
-						[Children] = {
-							Theme.MakeCorner(18),
-							Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-							Theme.MakeGradient(Color3.fromRGB(94, 182, 255), Color3.fromRGB(28, 108, 226), 0),
-							Theme.MakeStandardStuds(18, 47),
-							New("ImageLabel")({
-								BackgroundTransparency = 1,
-								Image = Theme.UI_ASSETS.Teleport,
-								Position = UDim2.fromOffset(20, 11),
-								Size = UDim2.fromOffset(68, 68),
-								ZIndex = 47,
-							}),
-							Theme.MakeOutlineLabel({
-								Position = UDim2.fromOffset(100, 8),
-								Size = UDim2.fromOffset(430, 74),
-								Text = "Teleport",
-								TextXAlignment = Enum.TextXAlignment.Left,
-								MaxTextSize = 50,
-								ZIndex = 47,
-							}),
-							New("TextButton")({
-								BackgroundColor3 = Computed(function()
-									return if closeHovered:get() then Color3.fromRGB(255, 92, 84) else Color3.fromRGB(211, 39, 49)
-								end),
-								Font = Enum.Font.GothamBlack,
-								Position = UDim2.fromOffset(552, 12),
-								Size = UDim2.fromOffset(66, 66),
-								Text = "X",
-								TextColor3 = Color3.fromRGB(255, 255, 255),
-								TextScaled = true,
-								ZIndex = 48,
-								[OnEvent("Activated")] = Manager.CloseTeleport,
-								[OnEvent("MouseEnter")] = function()
-									closeHovered:set(true)
-								end,
-								[OnEvent("MouseLeave")] = function()
-									closeHovered:set(false)
-								end,
-								[Children] = {
-									Theme.MakeCorner(10),
-									Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
-									Theme.HoverZoom(closeHovered, 1.1),
-									New("UIStroke")({
-										Color = Color3.fromRGB(0, 0, 0),
-										Thickness = 3,
-										ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
-									}),
-								},
-							}),
-						},
-					}),
-					buildList(),
-				},
-			}),
-		},
+	return ModalShell.Build({
+		Id = "teleport",
+		Width = PANEL_WIDTH,
+		Height = PANEL_HEIGHT,
+		PanelColor = Color3.fromRGB(12, 35, 90),
+		HeaderColor = Color3.fromRGB(94, 182, 255),
+		HeaderColorB = Color3.fromRGB(28, 108, 226),
+		Icon = Theme.UI_ASSETS.Teleport,
+		Title = "Teleport",
+		TitleMaxTextSize = 50,
+		OnClose = Manager.CloseTeleport,
+		Content = { buildList() },
 	})
 end
 

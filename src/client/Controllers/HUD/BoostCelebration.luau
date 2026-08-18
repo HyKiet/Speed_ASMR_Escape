@@ -2,19 +2,18 @@
 --[[
 	BoostCelebration.luau — hiệu ứng chúc mừng toàn server khi có người mua Server Boost:
 	  1. Tin nhắn hệ thống màu neon trong Chat Box.
-	  2. Banner lớn giữa màn hình (scale-pop + sunburst xoay).
+	  2. Banner lớn giữa màn hình (scale-pop + sunburst xoay) — dùng chung với Rebirth/mua hàng.
 	  3. Pháo hoa giấy (confetti) rơi đầy màn hình + âm thanh Victory.
 	Trigger(playerName, boostName) được HUDController gọi khi nhận packet boostCelebration.
 ]]
 
-local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
+local State = require(script.Parent.State)
 local Theme = require(script.Parent.Theme)
 
 local Children = Fusion.Children
@@ -34,12 +33,13 @@ local Value = Fusion.Value
 	file này nữa.
 ]]
 local REBIRTH_ICON = "rbxassetid://97340434418797"
-local FROZEN_BLOOM_ICON = "rbxassetid://100884545837490"
+local FROZEN_BLOOM_ICON = "rbxassetid://108748255826046"
 
 -- TÊN VIẾT HOA → icon. Dựng từ CHÍNH các nguồn đang bán món đó, không chép tay số nào:
 --   • `Theme.SHOP_CATALOG` — treadmill, VIP, Auto-Rebirth, Infinite Revives, gói Wins…
 --   • `Constants.TRAILS` / `AURAS` — field `icon` trong Config/Economy.
---   • `Theme.SPEED_PASS_TIERS` — pass x2/x4/x8 không có icon riêng, dùng icon giày tốc độ.
+--   • `Theme.SPEED_PASS_TIERS` — field `icon` riêng từng bậc x2/x4/x8 (giày có số bậc trên
+--     thân); tier nào chưa có icon thì rơi về icon giày chung.
 -- Nhờ vậy thêm món mới vào shop/config là banner tự có icon, không phải sửa file này.
 local ICON_BY_NAME: { [string]: string } = {}
 do
@@ -59,10 +59,19 @@ do
 	end
 	-- GamepassService gửi tên dạng "x2 SPEED GAMEPASS" (xem SPEED_PASS_NAMES phía server).
 	for _, tier in Theme.SPEED_PASS_TIERS do
-		ICON_BY_NAME[string.upper(tier.label) .. " GAMEPASS"] = Theme.UI_ASSETS.Shoe
+		ICON_BY_NAME[string.upper(tier.label) .. " GAMEPASS"] = tier.icon or Theme.UI_ASSETS.Shoe
 	end
 	-- Frozen Bloom chỉ rơi từ Roulette nên không nằm trong shop lẫn `icon` config.
 	ICON_BY_NAME["FROZEN BLOOM"] = FROZEN_BLOOM_ICON
+	-- Starter Pack bán bằng Developer Product nên KHÔNG có thẻ trong `SHOP_CATALOG` — không
+	-- khai ở đây thì nó rơi về icon tia sét chung (xem tên gửi đi ở StarterPackService).
+	ICON_BY_NAME["STARTER PACK"] = Theme.UI_ASSETS.StarterPack
+	-- ServerBoostService gửi tên theo BOOST_NAMES phía server, KHÔNG trùng tiêu đề shop
+	-- ("MEGA BOOST x2 ALL" vs "MEGA Boost (x2 Both)") nên phải khai báo thẳng, nếu không
+	-- MEGA rơi về icon tia sét chung.
+	ICON_BY_NAME["SERVER X2 SPEED"] = Theme.UI_ASSETS.BoostSpeed
+	ICON_BY_NAME["SERVER X2 WINS"] = Theme.UI_ASSETS.BoostWins
+	ICON_BY_NAME["MEGA BOOST X2 ALL"] = Theme.UI_ASSETS.BoostMega
 end
 
 local function iconForTitle(title: string): string
@@ -119,15 +128,18 @@ local function sendChatMessage(playerName: string, boostName: string)
 		local general = channels and channels:FindFirstChild("RBXGeneral")
 		if general and general:IsA("TextChannel") then
 			general:DisplaySystemMessage(
-				`<font color="#39FF88"><b>[BOOST]</b> Cảm ơn <font color="#FFDD33">{playerName}</font> đã kích hoạt <font color="#66DDFF">{boostName}</font> cho toàn máy chủ!</font>`
+				`<font color="#39FF88"><b>[BOOST]</b> Thanks <font color="#FFDD33">{playerName}</font> for activating <font color="#66DDFF">{boostName}</font> for the whole server!</font>`
 			)
 		end
 	end)
 end
 
+-- 2026-08-12: banner boost thường dùng CHUNG âm rebirth (Theme.UI_ASSETS.CelebrationSound).
+-- Tham số `isRebirth` giữ lại để phân biệt sắc thái (pitch), không còn đổi asset nữa.
 local function playVictorySound(isRebirth: boolean)
 	local sound = Instance.new("Sound")
-	sound.SoundId = if isRebirth then "rbxassetid://4612383790" else Theme.UI_ASSETS.LevelUpSound
+	sound.SoundId = Theme.UI_ASSETS.CelebrationSound
+	sound.PlaybackSpeed = if isRebirth then 1 else 1.08
 	sound.Volume = 0.85
 	sound.PlayOnRemove = false
 	sound.Parent = confettiLayer
@@ -191,386 +203,16 @@ local function goldenFlash()
 end
 
 -- ══════════════════════════════════════════════════════════════════════════
--- PHÁO HOA server boost: 10 quả (5 trái + 5 phải), rocket vút lên rồi nổ bung
+-- ĐÃ GỠ (2026-08-07, yêu cầu user): toàn bộ hệ chúc mừng Server Boost kiểu 3D —
+--   • 10 quả pháo hoa 3D bắn lên từ chân màn hình (launchFirework3D/fireworkBurst3D)
+--   • Màn hình SurfaceGui treo trên bầu trời tại Transition1To2 (showServerBoostInfo)
+--   • Folder ClientFireworksFX trong Workspace, PointLight, sound pop 3D
+-- Thay bằng ĐÚNG banner UI mà Rebirth/mua hàng đang dùng (showBanner) — chỉ khác là
+-- server phát cho MỌI client chứ không riêng người mua. Lý do đổi: hiệu ứng 3D chỉ nhìn
+-- thấy được khi người chơi đang ở Lobby và quay mặt đúng hướng cổng Zone 1; ai đang chạy
+-- obby ở zone xa thì không thấy gì cả (code còn tự cull ở 700 studs). Banner UI thì ai
+-- cũng thấy, ở bất kỳ đâu trong map.
 -- ══════════════════════════════════════════════════════════════════════════
-
--- Sound pop đã vet trong game (PopIt ProSoundEffects) — pitch thấp = tiếng nổ pháo hoa.
-local FIREWORK_POPS = { "rbxassetid://9117848644", "rbxassetid://9119669295", "rbxassetid://9117183955" }
-local FIREWORK_PALETTES = {
-	{ Color3.fromRGB(255, 224, 92), Color3.fromRGB(255, 160, 40), Color3.fromRGB(255, 255, 255) },
-	{ Color3.fromRGB(92, 220, 255), Color3.fromRGB(70, 120, 255), Color3.fromRGB(255, 255, 255) },
-	{ Color3.fromRGB(255, 96, 220), Color3.fromRGB(190, 70, 255), Color3.fromRGB(255, 255, 255) },
-	{ Color3.fromRGB(120, 255, 130), Color3.fromRGB(60, 220, 190), Color3.fromRGB(255, 255, 255) },
-	{ Color3.fromRGB(255, 110, 90), Color3.fromRGB(255, 200, 70), Color3.fromRGB(255, 255, 255) },
-}
-
-local lastPopAt = 0
--- Pop 3D positional: gắn vào part tại vị trí nổ — ai gần nghe to, xa nghe nhỏ.
--- 2 tầng: pop sáng + boom bass trầm chồng lên nhau → tiếng nổ "đã" như pháo hoa thật.
-local function playFireworkPop(parent: Instance)
-	local now = os.clock()
-	if now - lastPopAt < 0.08 then
-		return
-	end
-	lastPopAt = now
-	local sound = Instance.new("Sound")
-	sound.SoundId = FIREWORK_POPS[rng:NextInteger(1, #FIREWORK_POPS)]
-	sound.Volume = 1.35
-	sound.PlaybackSpeed = rng:NextNumber(0.62, 0.9)
-	sound.RollOffMode = Enum.RollOffMode.InverseTapered
-	sound.RollOffMinDistance = 45
-	sound.RollOffMaxDistance = 700
-	sound.Parent = parent
-	sound:Play()
-
-	local boom = Instance.new("Sound")
-	boom.SoundId = FIREWORK_POPS[rng:NextInteger(1, #FIREWORK_POPS)]
-	boom.Volume = 1.1
-	boom.PlaybackSpeed = rng:NextNumber(0.4, 0.52)
-	boom.RollOffMode = Enum.RollOffMode.InverseTapered
-	boom.RollOffMinDistance = 45
-	boom.RollOffMaxDistance = 700
-	boom.Parent = parent
-	boom:Play()
-end
-
-local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
-
--- Folder hiệu ứng CLIENT-LOCAL trong Workspace (client tự tạo → không replicate,
--- server không hề biết — nhưng MỌI client đều spawn tại CÙNG toạ độ thế giới).
-local fxFolder: Folder? = nil
-local function getFxFolder(): Folder
-	local existing = fxFolder
-	if existing and existing.Parent then
-		return existing
-	end
-	local folder = Instance.new("Folder")
-	folder.Name = "ClientFireworksFX"
-	folder.Parent = Workspace
-	fxFolder = folder
-	return folder
-end
-
--- Tâm bầu trời Lobby: đỉnh Baseplate (mọi client tính ra cùng một điểm).
-local function getLobbySkyCenter(): Vector3?
-	local lobby = Workspace:FindFirstChild("Lobby")
-	local baseplate = lobby and lobby:FindFirstChild("Baseplate")
-	if baseplate and baseplate:IsA("BasePart") then
-		return baseplate.Position + Vector3.new(0, baseplate.Size.Y / 2, 0)
-	end
-	return nil
-end
-
--- Nổ pháo hoa 3D tại toạ độ thế giới: 80 tia bung cầu + 40 kim tuyến rơi + chớp sáng thật.
-local function fireworkBurst3D(position: Vector3, palette: { Color3 })
-	local holder = Instance.new("Part")
-	holder.Anchored = true
-	holder.CanCollide = false
-	holder.CanQuery = false
-	holder.CanTouch = false
-	holder.CastShadow = false
-	holder.Transparency = 1
-	holder.Size = Vector3.one
-	holder.CFrame = CFrame.new(position)
-	holder.Parent = getFxFolder()
-
-	-- Quả cầu sáng NỞ BUNG khổng lồ ở tâm — nhìn thấy rực rỡ toàn máy chủ.
-	local core = Instance.new("Part")
-	core.Shape = Enum.PartType.Ball
-	core.Material = Enum.Material.Neon
-	core.Color = palette[1]
-	core.Size = Vector3.new(3.5, 3.5, 3.5)
-	core.Anchored = true
-	core.CanCollide = false
-	core.CanQuery = false
-	core.CanTouch = false
-	core.CastShadow = false
-	core.Transparency = 0.02
-	core.CFrame = CFrame.new(position)
-	core.Parent = holder
-	TweenService:Create(core, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(48, 48, 48),
-		Transparency = 1,
-	}):Play()
-
-	local burst = Instance.new("ParticleEmitter")
-	burst.Texture = SPARKLE_TEXTURE
-	burst.Color = ColorSequence.new(palette[1], palette[2])
-	burst.LightEmission = 1
-	burst.LightInfluence = 0
-	burst.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 8.2), NumberSequenceKeypoint.new(1, 0.6) })
-	burst.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0),
-		NumberSequenceKeypoint.new(0.7, 0.1),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	burst.Lifetime = NumberRange.new(2.5, 3.6)
-	burst.Speed = NumberRange.new(38, 64)
-	burst.SpreadAngle = Vector2.new(180, 180)
-	burst.Acceleration = Vector3.new(0, -28, 0)
-	burst.Drag = 1.4
-	burst.Rate = 0
-	burst.Parent = holder
-	burst:Emit(210)
-
-	local glitter = Instance.new("ParticleEmitter")
-	glitter.Texture = SPARKLE_TEXTURE
-	glitter.Color = ColorSequence.new(palette[3], palette[1])
-	glitter.LightEmission = 1
-	glitter.LightInfluence = 0
-	glitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3.8), NumberSequenceKeypoint.new(1, 0) })
-	glitter.Lifetime = NumberRange.new(3.0, 4.2)
-	glitter.Speed = NumberRange.new(14, 25)
-	glitter.SpreadAngle = Vector2.new(180, 180)
-	glitter.Acceleration = Vector3.new(0, -16, 0)
-	glitter.Drag = 1.1
-	glitter.Rate = 0
-	glitter.Parent = holder
-	-- Tầng 2 (0.5s sau): kim tuyến toả rơi chậm
-	task.delay(0.5, function()
-		if glitter.Parent then
-			glitter:Emit(130)
-		end
-	end)
-	-- Tầng 3 (1.0s sau): crackle trắng nhấp nháy — dư âm pháo hoa thật
-	task.delay(1.0, function()
-		if not holder.Parent then
-			return
-		end
-		local crackle = Instance.new("ParticleEmitter")
-		crackle.Texture = SPARKLE_TEXTURE
-		crackle.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), palette[3])
-		crackle.LightEmission = 1
-		crackle.LightInfluence = 0
-		crackle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.0), NumberSequenceKeypoint.new(1, 0) })
-		crackle.Lifetime = NumberRange.new(0.6, 1.4)
-		crackle.Speed = NumberRange.new(5, 12)
-		crackle.SpreadAngle = Vector2.new(180, 180)
-		crackle.Acceleration = Vector3.new(0, -12, 0)
-		crackle.Rate = 0
-		crackle.Parent = holder
-		crackle:Emit(60)
-	end)
-
-	local light = Instance.new("PointLight")
-	light.Brightness = 26
-	light.Range = 150
-	light.Color = palette[1]
-	light.Parent = holder
-	TweenService:Create(light, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Brightness = 0,
-	}):Play()
-
-
-	playFireworkPop(holder)
-	Debris:AddItem(holder, 7)
-end
-
--- Rocket 3D: part Neon vút lên từ CHÂN màn hình 3D (Transition1To2) rồi nổ bung
--- QUANH màn hình — pháo hoa và màn hình boost là MỘT sân khấu. fromLeft = bên trái màn hình.
-local function launchFirework3D(screenCFrame: CFrame, fromLeft: boolean)
-	local palette = FIREWORK_PALETTES[rng:NextInteger(1, #FIREWORK_PALETTES)]
-	local side = if fromLeft then -1 else 1
-	local right = screenCFrame.RightVector
-	local forward = screenCFrame.LookVector -- mặt màn hình quay về Lobby
-	-- Màn hình treo 74 studs trên mặt Transition → chân sân khấu ≈ mặt sàn.
-	local groundBase = screenCFrame.Position - Vector3.new(0, 66, 0)
-	local startPos = groundBase
-		+ right * (side * rng:NextInteger(26, 78))
-		+ forward * rng:NextInteger(6, 34)
-	local apex = startPos + Vector3.new(rng:NextInteger(-12, 12), rng:NextInteger(58, 108), rng:NextInteger(-12, 12))
-
-	local rocket = Instance.new("Part")
-	rocket.Material = Enum.Material.Neon
-	rocket.Color = palette[1]
-	rocket.Size = Vector3.new(1.6, 5.5, 1.6)
-	rocket.Anchored = true
-	rocket.CanCollide = false
-	rocket.CanQuery = false
-	rocket.CanTouch = false
-	rocket.CastShadow = false
-	-- Trục Y của part hướng theo đường bay (lookAt trỏ -Z → xoay X 90° đưa Y về hướng đó).
-	rocket.CFrame = CFrame.lookAt(startPos, apex) * CFrame.Angles(math.rad(90), 0, 0)
-	rocket.Parent = getFxFolder()
-
-	local tail = Instance.new("ParticleEmitter")
-	tail.Texture = SPARKLE_TEXTURE
-	tail.Color = ColorSequence.new(palette[1], palette[3])
-	tail.LightEmission = 1
-	tail.LightInfluence = 0
-	tail.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.85), NumberSequenceKeypoint.new(1, 0) })
-	tail.Lifetime = NumberRange.new(0.3, 0.55)
-	tail.Speed = NumberRange.new(4, 8)
-	tail.Rate = 110
-	tail.EmissionDirection = Enum.NormalId.Bottom
-	tail.Parent = rocket
-
-	-- Bay CHẬM rãi lên trời (theo yêu cầu) — Sine cho chuyển động đều, thư thái.
-	local ascend = TweenService:Create(rocket, TweenInfo.new(rng:NextNumber(1.7, 2.3), Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-		CFrame = CFrame.lookAt(apex, apex + (apex - startPos)) * CFrame.Angles(math.rad(90), 0, 0),
-	})
-	ascend.Completed:Once(function()
-		rocket:Destroy()
-		fireworkBurst3D(apex, palette)
-	end)
-	ascend:Play()
-end
-
--- ══════════════════════════════════════════════════════════════════════════
--- MÀN HÌNH 3D server boost: panel SurfaceGui treo trên bầu trời TẠI Transition1To2
--- (cổng vào Zone1) — mọi người trong Lobby nhìn thấy CÙNG một màn hình thế giới.
--- ══════════════════════════════════════════════════════════════════════════
-
-local infoToken = 0
-local activeInfo: BasePart? = nil
-
-local function boostAccent(boostName: string): (Color3, Color3)
-	local upper = string.upper(boostName)
-	if string.find(upper, "WINS") then
-		return Color3.fromRGB(130, 255, 140), Color3.fromRGB(40, 200, 120)
-	elseif string.find(upper, "MEGA") then
-		return Color3.fromRGB(255, 110, 235), Color3.fromRGB(170, 70, 255)
-	end
-	return Color3.fromRGB(255, 226, 92), Color3.fromRGB(255, 150, 40)
-end
-
--- Vị trí màn hình: trên bầu trời NGAY TRÊN Transition1To2, mặt quay về Lobby.
-local function getInfoScreenCFrame(): CFrame?
-	local transition = Workspace:FindFirstChild("Transition1To2", true)
-	local anchor: Vector3? = nil
-	if transition and transition:IsA("BasePart") then
-		anchor = transition.Position + Vector3.new(0, 74, 0)
-	else
-		local center = getLobbySkyCenter()
-		anchor = center and (center + Vector3.new(0, 90, 0)) or nil
-	end
-	if not anchor then
-		return nil
-	end
-	local lookTarget = getLobbySkyCenter() or (anchor - Vector3.new(0, 0, 300))
-	-- Mặt Front (-Z) quay về phía Lobby, giữ panel thẳng đứng.
-	return CFrame.lookAt(anchor :: Vector3, Vector3.new(lookTarget.X, (anchor :: Vector3).Y, lookTarget.Z))
-end
-
-local function makeScreenLabel(parent: Instance, text: string, yScale: number, heightScale: number, color: Color3, maxSize: number): TextLabel
-	local label = Instance.new("TextLabel")
-	label.AnchorPoint = Vector2.new(0.5, 0)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBlack
-	label.Position = UDim2.fromScale(0.5, yScale)
-	label.Size = UDim2.fromScale(0.94, heightScale)
-	label.Text = text
-	label.TextColor3 = color
-	label.TextScaled = true
-	label.Parent = parent
-	local constraint = Instance.new("UITextSizeConstraint")
-	constraint.MaxTextSize = maxSize
-	constraint.Parent = label
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 3
-	stroke.Color = Color3.fromRGB(14, 8, 30)
-	stroke.Parent = label
-	return label
-end
-
-local function showServerBoostInfo(playerName: string, boostName: string)
-	local screenCFrame = getInfoScreenCFrame()
-	if not screenCFrame then
-		return
-	end
-	infoToken += 1
-	local token = infoToken
-	if activeInfo then
-		activeInfo:Destroy()
-		activeInfo = nil
-	end
-
-	local accentA, accentB = boostAccent(boostName)
-	local FULL_SIZE = Vector3.new(84, 38, 1.4)
-
-	local panel = Instance.new("Part")
-	panel.Anchored = true
-	panel.CanCollide = false
-	panel.CanQuery = false
-	panel.CanTouch = false
-	panel.CastShadow = false
-	panel.Transparency = 1
-	panel.Size = Vector3.new(4, 2, 1.4)
-	panel.CFrame = screenCFrame
-	panel.Parent = getFxFolder()
-	activeInfo = panel
-
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 14
-	gui.LightInfluence = 0
-	gui.Brightness = 1.6
-	gui.MaxDistance = 1200
-	gui.Parent = panel
-
-	-- Nền kính tối bo góc + viền neon theo màu boost = "màn hình hologram".
-	local container = Instance.new("Frame")
-	container.BackgroundColor3 = Color3.fromRGB(16, 10, 36)
-	container.BackgroundTransparency = 0.22
-	container.BorderSizePixel = 0
-	container.Size = UDim2.fromScale(1, 1)
-	container.Parent = gui
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.06, 0)
-	corner.Parent = container
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = accentA
-	stroke.Thickness = 6
-	stroke.Transparency = 0.1
-	stroke.Parent = container
-
-	local title = makeScreenLabel(container, `⚡ {string.upper(boostName)} ⚡`, 0.07, 0.36, Color3.fromRGB(255, 255, 255), 130)
-	local titleGradient = Instance.new("UIGradient")
-	titleGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, accentA),
-		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-		ColorSequenceKeypoint.new(1, accentB),
-	})
-	titleGradient.Offset = Vector2.new(-1, 0)
-	titleGradient.Parent = title
-	TweenService:Create(titleGradient, TweenInfo.new(1.6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
-		Offset = Vector2.new(1, 0),
-	}):Play()
-
-	makeScreenLabel(container, `🎉 Activated by {playerName} — thank you! 🎉`, 0.5, 0.2, Color3.fromRGB(255, 255, 255), 64)
-	makeScreenLabel(container, "ACTIVE FOR THE WHOLE SERVER • 10 MINUTES", 0.75, 0.15, accentA, 46)
-
-	-- Vào: panel nở ra Back easing. Ở lại 10s (lơ lửng nhấp nhô nhẹ). Ra: thu nhỏ + biến mất.
-	TweenService:Create(panel, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size = FULL_SIZE,
-	}):Play()
-	local bob = TweenService:Create(panel, TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
-		CFrame = screenCFrame * CFrame.new(0, 2.4, 0),
-	})
-	task.delay(0.6, function()
-		if token == infoToken and panel.Parent then
-			bob:Play()
-		end
-	end)
-
-	task.delay(10, function()
-		if token ~= infoToken or not panel.Parent then
-			return
-		end
-		bob:Cancel()
-		local out = TweenService:Create(panel, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Size = Vector3.new(3, 1.5, 1.4),
-		})
-		out.Completed:Once(function()
-			if panel == activeInfo then
-				activeInfo = nil
-			end
-			panel:Destroy()
-		end)
-		out:Play()
-	end)
-end
 
 local function burstConfetti(isRebirth: boolean)
 	local layer = confettiLayer
@@ -587,12 +229,14 @@ local function burstConfetti(isRebirth: boolean)
 	end
 end
 
-local function showBanner(title: string, subtitle: string)
-	local isRebirth = string.find(string.upper(title), "REBIRTH") ~= nil
-	currentIsRebirth:set(isRebirth)
+-- `big` = màn ăn mừng cỡ lớn (rebirth / server boost): gấp đôi confetti, rơi dày gấp đôi,
+-- nhạc riêng. Mua hàng thường thì để nhỏ cho khỏi loãng.
+local function showBanner(title: string, subtitle: string, big: boolean?)
+	local isBig = big == true or string.find(string.upper(title), "REBIRTH") ~= nil
+	currentIsRebirth:set(isBig)
 
-	playVictorySound(isRebirth)
-	burstConfetti(isRebirth)
+	playVictorySound(isBig)
+	burstConfetti(isBig)
 
 	bannerTitle:set(title)
 	bannerSubtitle:set(subtitle)
@@ -614,41 +258,41 @@ local function showBanner(title: string, subtitle: string)
 	end)
 end
 
--- Server boost (3D world edition): hiện trên MỌI client —
---   1. Chớp vàng toàn màn hình (báo hiệu sự kiện lớn tức thì)
---   2. 10 QUẢ PHÁO HOA 3D bắn lên từ chân MÀN HÌNH 3D tại Transition1To2 (5 trái + 5 phải,
---      so le) và nổ bung QUANH màn hình: mỗi client tự spawn tại CÙNG toạ độ thế giới →
---      ai nhìn về cổng Zone 1 đều thấy cùng một sân khấu. Server không replicate gì.
---   3. Màn hình 3D thông tin boost tại cùng vị trí (xuất hiện 1.1s sau loạt pháo đầu)
---   4. Tin nhắn chat neon + nhạc chúc mừng
+--[[
+	SERVER BOOST (2026-08-07) — hiện trên MỌI client, dùng ĐÚNG banner UI của Rebirth:
+	  1. Chớp vàng toàn màn hình — báo "sự kiện lớn" tức thì, kể cả khi đang nhìn chỗ khác
+	  2. Banner giữa màn hình: icon món boost + sunburst xoay + tên người mua
+	  3. Confetti dày (cỡ `big`) + nhạc chúc mừng
+	  4. Tin nhắn chat neon cảm ơn người mua
+
+	Bản 3D cũ (pháo hoa + màn hình treo trên bầu trời tại Transition1To2) đã GỠ HẲN: nó chỉ
+	nhìn thấy được nếu người chơi đang ở Lobby VÀ quay đúng hướng cổng Zone 1, và còn tự cull
+	ở 700 studs — nghĩa là gần như cả server đang chạy obby thì không ai thấy gì.
+]]
 function BoostCelebration.Trigger(playerName: string, boostName: string)
 	sendChatMessage(playerName, boostName)
-	playVictorySound(false)
 	goldenFlash()
-
-	-- [OPT-25P] Chỉ spawn pháo hoa 3D khi camera trong ~700 studs quanh màn hình
-	-- (người đang ở zone xa không thấy được thì không tốn particle).
-	local screenCFrame = getInfoScreenCFrame()
-	local camera = Workspace.CurrentCamera
-	if screenCFrame and camera and (camera.CFrame.Position - screenCFrame.Position).Magnitude < 700 then
-		for index = 1, 5 do
-			task.delay((index - 1) * 0.55, function()
-				launchFirework3D(screenCFrame, true)
-			end)
-			task.delay((index - 1) * 0.55 + 0.27, function()
-				launchFirework3D(screenCFrame, false)
-			end)
-		end
-	end
-
-	task.delay(1.1, function()
-		showServerBoostInfo(playerName, boostName)
-	end)
+	-- `showBanner` tự phát nhạc; gọi playVictorySound ở đây nữa là chồng 2 tiếng vào cùng frame.
+	showBanner(boostName, `🎉 Activated by {playerName} — thanks! • WHOLE SERVER • 10 MINUTES`, true)
 end
 
 -- Mua gamepass/treadmill/rebirth thành công: chỉ hiện cho BUYER (kích thích lặp lại hành vi).
 function BoostCelebration.TriggerPurchase(itemName: string, subtitle: string?)
 	showBanner(itemName, subtitle or "Purchase successful — enjoy your power!")
+end
+
+--[[
+	PHẦN THƯỞNG RƠI RA cỡ lớn — chớp vàng toàn màn hình + banner `big` (confetti dày, nhạc trầm).
+
+	Hiện chưa có nơi gọi: đã dựng cho vòng quay rồi user chốt là chỉ Frozen Bloom mới được ăn
+	mừng, mà Frozen Bloom dùng `TriggerPurchase`. Giữ lại vì Daily/Group Chest là hai chỗ tiếp
+	theo có thể cần — nhưng ĐỪNG nối nó lại vào vòng quay (xem khối lý do trong RouletteModal).
+]]
+function BoostCelebration.TriggerReward(rewardName: string, subtitle: string, big: boolean?)
+	if big then
+		goldenFlash()
+	end
+	showBanner(rewardName, subtitle, big)
 end
 
 function BoostCelebration.Build()
@@ -662,24 +306,72 @@ function BoostCelebration.Build()
 	}) :: Frame
 	confettiLayer = layer
 
-	-- Cấu hình chuẩn Rebirth style (sạch sẽ, căn giữa, kích thước lớn rầm rộ) cho mọi màn ăn mừng
-	local bannerSize = UDim2.fromOffset(1150, 450)
-	local bannerPosition = UDim2.fromOffset(960, 360)
-	local bgTransparency = 1
+	--[[
+		══ THẺ CHÚC MỪNG — THIẾT KẾ LẠI 2026-08-14 ══════════════════════════════════════════
 
-	local lightningPosition = UDim2.fromOffset(575, 115)
-	local lightningSize = UDim2.fromOffset(210, 210)
+		Bản cũ: khối 1150×450 giữa màn hình, icon 210px + sunburst 380px, chữ căn giữa xếp dọc.
+		Ba vấn đề, và cả ba đều tệ hơn trên điện thoại:
+		  • Nó CHE TẦM NHÌN. 1150×450 là 60%% bề ngang và 42%% chiều cao canvas — người chơi đang
+		    chạy obby ở 200 WS bị bịt mắt 4.5 giây. Ở tốc độ đó, 4.5 giây là rơi.
+		  • Nó ĐÁNH NHAU với popup lên cấp. Đã phải thêm cơ chế tách làn (banner tụt xuống 640)
+		    chỉ để hai thứ không đè nhau — chữa triệu chứng, không chữa nguyên nhân là "cả hai
+		    đều quá to".
+		  • Sunburst 380px xoay liên tục + 92 mảnh confetti là chi phí vẽ thường trực.
 
-	local sunburstPosition = UDim2.fromOffset(575, 115)
-	local sunburstSize = UDim2.fromOffset(380, 380)
+		Bản mới — THẺ NGANG GỌN, neo ĐÁY-GIỮA, ngay trên thanh XP:
+		  620×132 (chưa bằng 1/6 diện tích cũ), icon 96px bên TRÁI, tiêu đề + dòng phụ xếp bên
+		  PHẢI theo chiều ngang — đúng dạng thẻ phần thưởng mà các simulator lớn dùng, và đọc
+		  được trong một cú liếc vì mắt quét ngang nhanh hơn quét dọc.
 
-	local titlePosition = UDim2.new(0, 0, 0, 250)
-	local titleSize = UDim2.new(1, 0, 0, 95)
-	local titleXAlign = Enum.TextXAlignment.Center
+		Vì sao ĐÁY chứ không phải giữa: giữa màn hình là nơi người chơi NHÌN ĐƯỜNG. Đáy đã là
+		vùng HUD (thanh XP, chỉ số Speed) nên mắt vốn đã liếc xuống đó, và nó không giao với
+		popup lên cấp ở trên — bỏ được luôn cơ chế tách làn.
 
-	local subtitlePosition = UDim2.new(0, 0, 0, 350)
-	local subtitleSize = UDim2.new(1, 0, 0, 65)
-	local subtitleXAlign = Enum.TextXAlignment.Center
+		Sunburst thu còn 190px và chỉ nằm sau icon (vẫn giữ được nhịp "toả sáng" mà không phủ
+		nền). Confetti + chớp vàng + nhạc giữ nguyên: đó mới là phần "đã tay", và chúng không
+		chiếm chỗ cố định trên màn hình.
+	]]
+	local CARD_WIDTH = 540
+	local bannerSize = UDim2.fromOffset(CARD_WIDTH, 124)
+
+	--[[
+		TRƯỢT VÀO TỪ GÓC PHẢI-TRÊN (user chốt 2026-08-14).
+
+		Đây là dạng "achievement toast" mà phần lớn game lớn dùng, và nó hợp ở đây vì hai lẽ:
+		  • Góc phải-trên KHÔNG phải nơi người chơi nhìn khi chạy — mắt bám đường ở giữa màn
+		    hình. Thẻ hiện ra trong tầm nhìn ngoại vi: thấy được mà không che lối.
+		  • CHUYỂN ĐỘNG NGANG tự nó là tín hiệu. Thẻ đứng yên ở góc dễ bị bỏ qua; thẻ trượt vào
+		    thì mắt bắt được ngay cả khi đang tập trung chỗ khác.
+
+		Trượt theo `bannerScale` (Tween sẵn có, Back/Out): scale 0 ⇒ thẻ nằm hẳn ngoài mép phải,
+		scale 1 ⇒ dừng cách mép 24px. Easing `Back` cho cú "va nhẹ rồi ổn định" ở cuối đường
+		trượt — cùng nhịp với mọi hoạt ảnh khác trong HUD.
+
+		Neo theo `GetVisibleDesignBounds` chứ không phải mép canvas 1920×1080: `top` đã trừ sẵn
+		topbar Roblox và `right` là mép THẬT của màn hình, nên trên máy tỉ lệ nào thẻ cũng nằm
+		đúng góc phải-trên nhìn thấy được.
+	]]
+	local bannerPosition = Computed(function()
+		local _, top, right = Theme.GetVisibleDesignBounds()
+		local slide = (1 - bannerScale:get()) * (CARD_WIDTH + 80)
+		return UDim2.fromOffset(right - 24 + slide, top + 20)
+	end)
+	local bgTransparency = 0.1
+
+	local lightningPosition = UDim2.fromOffset(66, 62)
+	local lightningSize = UDim2.fromOffset(88, 88)
+
+	local sunburstPosition = UDim2.fromOffset(66, 62)
+	local sunburstSize = UDim2.fromOffset(176, 176)
+
+	-- Chữ xếp bên PHẢI icon, căn trái — mắt đọc từ icon sang chữ thành một dòng liền.
+	local titlePosition = UDim2.new(0, 132, 0, 20)
+	local titleSize = UDim2.new(1, -156, 0, 50)
+	local titleXAlign = Enum.TextXAlignment.Left
+
+	local subtitlePosition = UDim2.new(0, 132, 0, 70)
+	local subtitleSize = UDim2.new(1, -156, 0, 36)
+	local subtitleXAlign = Enum.TextXAlignment.Left
 
 	local sunburstColor = Computed(function()
 		local t = string.upper(bannerTitle:get())
@@ -714,7 +406,6 @@ function BoostCelebration.Build()
 		ZIndex = 210,
 	})
 
-
 	local rotateTween = TweenService:Create(
 		sunburstLabel,
 		TweenInfo.new(8, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1),
@@ -723,8 +414,10 @@ function BoostCelebration.Build()
 	rotateTween:Play()
 
 	local banner = New("CanvasGroup")({
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(26, 6, 40),
+		-- Neo mép PHẢI-TRÊN của chính thẻ: `Position` trả về toạ độ góc phải-trên nên thẻ trượt
+		-- ra/vào theo trục X mà không phải bù nửa chiều rộng ở mọi phép tính.
+		AnchorPoint = Vector2.new(1, 0),
+		BackgroundColor3 = Color3.fromRGB(22, 14, 38),
 		BackgroundTransparency = bgTransparency,
 		GroupTransparency = Computed(function()
 			return 1 - bannerScale:get()
@@ -736,9 +429,13 @@ function BoostCelebration.Build()
 		[Children] = {
 			New("UIScale")({
 				Scale = Computed(function()
-					return 0.75 + 0.45 * bannerScale:get()
+					-- Chuyển động chính là TRƯỢT NGANG (xem `bannerPosition`), nên phần phóng to chỉ
+					-- còn là gia vị: 0.96 → 1.0. Pop mạnh cộng với trượt là hai chuyển động đánh nhau.
+					return 0.96 + 0.04 * bannerScale:get()
 				end),
 			}),
+			Theme.MakeCorner(20),
+			Theme.MakeStroke(Color3.fromRGB(0, 0, 0), 4),
 
 			sunburstLabel,
 
@@ -749,12 +446,10 @@ function BoostCelebration.Build()
 					return iconForTitle(bannerTitle:get())
 				end),
 
-
 				Position = lightningPosition,
 				Size = lightningSize,
 				ZIndex = 211,
 			}),
-
 
 			Theme.MakeOutlineLabel({
 				Position = titlePosition,
@@ -768,7 +463,7 @@ function BoostCelebration.Build()
 				end),
 				TextColor3 = Color3.fromRGB(255, 234, 100),
 				TextXAlignment = titleXAlign,
-				MaxTextSize = 72,
+				MaxTextSize = 40,
 				ZIndex = 211,
 			}),
 
@@ -778,13 +473,11 @@ function BoostCelebration.Build()
 				Text = bannerSubtitle,
 				TextColor3 = Color3.fromRGB(190, 255, 220),
 				TextXAlignment = subtitleXAlign,
-				MaxTextSize = 40,
+				MaxTextSize = 26,
 				ZIndex = 211,
 			}),
 		},
 	})
-
-
 
 	return New("Frame")({
 		BackgroundTransparency = 1,

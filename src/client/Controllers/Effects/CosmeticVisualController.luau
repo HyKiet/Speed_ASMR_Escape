@@ -28,10 +28,20 @@ local AURA_OBJECT = "SpeedEscapeEquippedAura"
 --   • AuraBasic.Torso        — rig aura standard (8 Beam + 13 ParticleEmitter + Full body aura)
 --   • PremiumTrails.<id>     — part gốc của 3 trail premium, đủ Trail lẫn ParticleEmitter
 -- Bản trong Workspace (Lobby.TrailBase / model user đặt tay) chỉ là fallback.
+local function getTemplateFolder(): Instance?
+	return ReplicatedStorage:FindFirstChild("CosmeticTemplates")
+end
+
 local function getTemplate(category: string, name: string): Instance?
-	local folder = ReplicatedStorage:FindFirstChild("CosmeticTemplates")
+	local folder = getTemplateFolder()
 	local group = folder and folder:FindFirstChild(category)
 	return group and group:FindFirstChild(name) or nil
+end
+
+-- Template nằm THẲNG dưới CosmeticTemplates (không thuộc nhóm nào) — vd rig `Aura_FrozenBloom`.
+local function getRootTemplate(name: string): Instance?
+	local folder = getTemplateFolder()
+	return folder and folder:FindFirstChild(name) or nil
 end
 
 type TrailVisual = {
@@ -43,6 +53,27 @@ type TrailVisual = {
 	lightEmission: number,
 }
 
+--[[
+	⚠️ `lightEmission` PHẢI THẤP — ĐỌC TRƯỚC KHI TĂNG (hạ toàn bộ 2026-08-11).
+
+	Bản cũ để 0.75–1.0 và người chơi báo "đẹp nhưng sáng quá, không rõ màu". Đây KHÔNG phải
+	chuyện độ sáng màn hình, mà là cách Roblox trộn màu:
+
+	  LightEmission đẩy `Trail` từ trộn alpha sang trộn CỘNG. Ở 1.0 thì mỗi lớp ribbon cộng
+	  thẳng giá trị màu vào cái đằng sau nó. Mà vệt trail thì TỰ CHỒNG LÊN CHÍNH NÓ liên tục:
+	  mỗi lần người chơi quay người, bẻ lái, nhảy — hai ba đoạn vệt nằm đè lên nhau. Ba lớp
+	  (0.9, 0.7, 0.5) của cùng một màu là mọi kênh vượt 1.0 và bão hoà thành TRẮNG. Người
+	  chơi chỉ còn thấy màu ở rìa vệt, đúng như ảnh họ gửi.
+
+	  Ở tốc độ của game này (100–250 WS) vệt còn dài và gấp khúc hơn nữa, nên nó trắng gần
+	  như thường trực chứ không chỉ lúc quay gấp.
+
+	Mức đang dùng: 0.28–0.35 cho trail thường (đủ để vẫn "phát sáng" trên nền tối mà màu
+	không bay), 0.45–0.55 cho nhóm cao cấp dùng texture sparkles — nhóm này texture đã là
+	đốm trắng nên cần thêm chút cộng sáng, nhưng vẫn phải dưới 0.6.
+
+	Muốn một trail NỔI hơn thì tăng `widthScale` hoặc làm màu đậm hơn, ĐỪNG tăng cái này.
+]]
 local TRAIL_VISUALS: { [string]: TrailVisual } = {
 	trail_green = {
 		color = ColorSequence.new(Color3.fromRGB(79, 255, 111), Color3.fromRGB(13, 171, 65)),
@@ -50,7 +81,7 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "",
 		textureLength = 1,
 		widthScale = 1,
-		lightEmission = 0.75,
+		lightEmission = 0.28,
 	},
 	trail_blue = {
 		color = ColorSequence.new(Color3.fromRGB(89, 207, 255), Color3.fromRGB(43, 91, 255)),
@@ -58,7 +89,7 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "",
 		textureLength = 1,
 		widthScale = 1,
-		lightEmission = 0.75,
+		lightEmission = 0.28,
 	},
 	trail_purple = {
 		color = ColorSequence.new(Color3.fromRGB(207, 112, 255), Color3.fromRGB(98, 45, 255)),
@@ -66,7 +97,7 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "",
 		textureLength = 1,
 		widthScale = 1,
-		lightEmission = 0.78,
+		lightEmission = 0.3,
 	},
 	trail_red = {
 		color = ColorSequence.new(Color3.fromRGB(255, 95, 76), Color3.fromRGB(210, 24, 40)),
@@ -74,7 +105,94 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "",
 		textureLength = 1,
 		widthScale = 1,
-		lightEmission = 0.78,
+		lightEmission = 0.3,
+	},
+	--[[
+		Rookie Rocket (Starter Pack) — PHỐI MÀU "ROCKET SUNSET" (2026-08-11).
+
+		Bản đầu là lửa cream→cam→đỏ thuần. Vấn đề: đặt cạnh `trail_red` và `aura_fire` thì
+		không ai phân biệt được — món ĐỘC QUYỀN của gói 99 R$ lại trông y như trail rẻ nhất
+		shop, mất sạch giá trị khoe.
+
+		Bản này giữ ĐẦU vệt là lửa thật (cream nóng → hổ phách) nhưng ĐUÔI chuyển sang đúng
+		hai màu của thẻ Starter Pack (coral → raspberry) rồi tắt vào tím. Ba cái lợi:
+		  • Nhìn vệt là nhận ra cái thẻ mình vừa mua — trail và banner bán hàng cùng một bảng màu.
+		  • Warm-head + pink/violet-tail KHÔNG trùng trail nào: nebula và galaxy đều đi từ
+		    lạnh (teal/blue) sang tím, không có đoạn lửa ở đầu.
+		  • Tím ở cuối làm nền cho phần cam sáng nhất bật lên — vệt đọc được cả trên trời sáng
+		    của Lobby lẫn nền tối trong zone.
+
+		Tên màu (dùng chung cho icon — xem docs khi vẽ):
+		  Ivory Flash 255,246,214 · Sunburst Amber 255,178,52 · Coral Flame 255,122,64
+		  · Raspberry Pop 226,40,96 · Violet Dusk 124,60,235
+	]]
+	trail_rookie = {
+		color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 246, 214)), -- Ivory Flash
+			ColorSequenceKeypoint.new(0.22, Color3.fromRGB(255, 178, 52)), -- Sunburst Amber
+			ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 122, 64)), -- Coral Flame
+			ColorSequenceKeypoint.new(0.72, Color3.fromRGB(226, 40, 96)), -- Raspberry Pop
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(124, 60, 235)), -- Violet Dusk
+		}),
+		-- Dài hơn bản cũ (0.72 → 0.85) vì phối 5 chặng: vệt ngắn thì bốn màu sau dồn vào vài
+		-- studs cuối và nhoè thành một mảng nâu.
+		lifetime = 0.85,
+		texture = "",
+		textureLength = 1,
+		widthScale = 1.25,
+		-- Cao hơn trail thường một nhịp: đây là lửa tên lửa, cần chút cộng sáng ở lõi. Nhưng
+		-- vẫn phải thấp, nếu không đúng cái phối 5 màu ở trên là thứ đầu tiên bay mất.
+		lightEmission = 0.35,
+	},
+	--[[
+		VIP GOLD — ⚠️ ĐÂY CHỈ LÀ BẢN DỰ PHÒNG (2026-08-12).
+
+		Hình dạng THẬT của trail VIP là bộ 5 ribbon trong
+		`ReplicatedStorage.CosmeticTemplates.PremiumTrails.trail_vip` — cùng bộ hoạ tiết mà
+		Mystic Violet và Crimson Fury đang dùng, chỉ khác bảng màu (đó đúng là cách dòng trail
+		cao cấp phân biệt nhau). `applyTrail` tìm template đó TRƯỚC; bảng dưới đây chỉ chạy khi
+		kho template chưa có.
+
+		Vì sao bỏ hẳn hướng "một ribbon + texture sparkles": texture đốm với `textureLength`
+		nhỏ lặp lại dọc vệt, mà vệt thì co giãn theo tốc độ chạy ⇒ các đốm tách rời nhau và
+		vệt nhìn ĐỨT QUÃNG (user báo 2026-08-12). Ribbon liền không có bệnh đó. Bản dự phòng
+		dưới đây vì thế cũng để `texture = ""`.
+
+		Phối màu "VÀNG RÒNG NUNG CHẢY":
+
+		Đây là trail của món đắt nhất shop nên nó phải đọc ra là KIM LOẠI QUÝ, không phải
+		"một vệt lửa nữa". Ba quyết định làm nên chất đó:
+
+		  • ĐẦU vệt là ivory ngả xanh cực nhạt (255,252,236) chứ không phải trắng thuần. Vàng
+		    thật luôn có một điểm loé lạnh ở chỗ phản chiếu mạnh nhất; trắng thuần cho ra
+		    cảm giác "đèn pin", ivory ấm cho ra cảm giác "bề mặt bóng".
+		  • THÂN đi champagne → vàng ròng → hổ phách, các chặng SÁT NHAU (0.16/0.34/0.55).
+		    Vàng là một dải hẹp: kéo giãn ra thì nó tãi thành vàng chanh nhạt và mất chất kim
+		    loại ngay.
+		  • ĐUÔI tắt vào đồng nung rồi bronze sẫm (74,32,8) — KHÔNG tắt vào đen. Bronze giữ
+		    hơi ấm ở cuối vệt nên toàn dải vẫn đọc ra một khối kim loại liền mạch, còn đen thì
+		    cắt vệt làm hai khúc.
+
+		KHÔNG trùng món nào đang có: `trail_rookie` cũng khởi đầu bằng lửa nhưng rẽ sang
+		coral → raspberry → violet ở nửa sau; VIP ở lại trọn vẹn trong trục vàng–cam–đồng.
+
+		`lightEmission` 0.34 — vàng bão hoà sẵn kênh R+G, chỉ còn B để chịu cộng chồng, nên
+		đẩy cao là lõi vệt trắng ra và đúng cái dải vàng hẹp ở trên bay mất trước tiên.
+	]]
+	trail_vip = {
+		color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 252, 236)), -- Ivory Gleam
+			ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 233, 156)), -- Champagne
+			ColorSequenceKeypoint.new(0.34, Color3.fromRGB(255, 199, 48)), -- Royal Gold
+			ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255, 150, 26)), -- Amber Blaze
+			ColorSequenceKeypoint.new(0.8, Color3.fromRGB(212, 82, 14)), -- Copper Ember
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(74, 32, 8)), -- Deep Bronze
+		}),
+		lifetime = 0.95,
+		texture = "",
+		textureLength = 1,
+		widthScale = 1.8,
+		lightEmission = 0.34,
 	},
 	trail_rainbow = {
 		color = ColorSequence.new({
@@ -89,7 +207,9 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "",
 		textureLength = 1,
 		widthScale = 1.15,
-		lightEmission = 0.9,
+		-- Thấp nhất nhóm: cầu vồng là trail DUY NHẤT mà giá trị nằm ở chỗ phân biệt được
+		-- từng dải màu. Cộng sáng cao là sáu dải nhoè vào nhau thành một vệt trắng hồng.
+		lightEmission = 0.26,
 	},
 	-- Galaxy: lõi trắng rực → xanh thiên hà → tím → magenta → rìa space tối; kèm bụi sao (applyTrail).
 	trail_galaxy = {
@@ -105,7 +225,59 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "",
 		textureLength = 1,
 		widthScale = 1.2,
-		lightEmission = 0.9,
+		lightEmission = 0.34,
+	},
+	--[[
+		STREAK AURORA (thưởng điểm danh Ngày 7) — vẽ lại theo CỰC QUANG THẬT, 2026-08-14.
+
+		Bản trước là ba màu: trắng → xanh ngọc → lục → tím. Nó "xanh lá đẹp" nhưng không ai
+		nhìn ra cực quang, và tệ hơn: đoạn lục (64,220,130) đặt cạnh `trail_green` (79,255,111)
+		gần như trùng nhau, nên phần thưởng của chuỗi 7 ngày trông giống trail rẻ nhất shop —
+		đúng cái bẫy mà Rookie Rocket đã phải thoát ra.
+
+		Bản này đi theo QUANG PHỔ THẬT của cực quang, và đó cũng là thứ làm nó không đụng hàng:
+		  • 557.7nm — lục ánh ngọc, dải sáng nhất và là màu ai cũng nhớ khi nghe "aurora".
+		  • 630nm — đỏ thẫm ngả hồng ở rìa trên, chỉ hiện ở bão từ mạnh; đây là màu KHÔNG trail
+		    nào khác trong game có ở vị trí đuôi vệt.
+		  • Giữa hai đầu là lam-tím (427.8nm, nitơ ion hoá) nối chúng lại.
+		Đọc từ đầu vệt ra đuôi: lõi trắng lạnh → lục ngọc → ngọc lam → lam đêm → tím → hồng
+		đỏ. Sáu chặng nghe như nhiều, nhưng vệt ở tốc độ 100–250 WS dài tới mức mỗi chặng vẫn
+		chiếm cả mét — đứng yên mới thấy chúng chen nhau.
+
+		Vì sao KHÔNG đụng hàng: crystal là xanh dương đơn sắc, nebula đi ngọc→tím→hồng nhưng
+		KHÔNG có đoạn lục, galaxy tối dần về đuôi. Aurora là trail duy nhất mang cả lục LẪN
+		hồng, và là trail duy nhất SÁNG DẦN chứ không tối dần ở đuôi.
+
+		── VỆT LIỀN, KHÔNG TEXTURE (sửa 2026-08-14, user: "trail không được đứt quãng") ──────
+		Bản trước dùng `sparkles_main.dds` với `textureLength` 0.4 như nhóm crystal/nebula. Texture
+		đó là một đốm sáng có viền trong suốt, lát lại mỗi 0.4 stud theo chiều dài vệt — nên vệt
+		không phải một dải liền mà là một CHUỖI ĐỐM RỜI, và khe hở giữa các đốm nhìn rõ thành sọc
+		đứt quãng.
+
+		Giờ đi theo ĐÚNG cấu trúc của nhóm trail base (`trail_green`/`blue`/`purple`/`rainbow`/
+		`galaxy`): `texture = ""`, `textureLength = 1` — một dải ribbon đặc, liền mạch, và
+		`ColorSequence` là thứ DUY NHẤT phân biệt nó với các trail khác. Đúng như vậy thì dải màu
+		cực quang mới đọc được thành một dải chuyển sắc thay vì bị texture băm nhỏ.
+
+		`lightEmission` hạ 0.45 → 0.32: mức 0.45–0.55 là dành riêng cho nhóm dùng texture sparkle
+		(texture vốn là đốm trắng nên cần bù sáng). Ribbon đặc mà để 0.45 là màu bắt đầu bay —
+		xem cảnh báo dài ở đầu bảng. `widthScale` 1.6 (dày hơn nhóm base 1.0–1.2 để xứng với phần
+		thưởng 7 ngày, nhưng dưới nhóm sparkle 2.15–2.65 vì ribbon đặc trông dày hơn cùng con số).
+	]]
+	trail_streak_aurora = {
+		color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(232, 255, 246)), -- lõi trắng lạnh
+			ColorSequenceKeypoint.new(0.16, Color3.fromRGB(138, 255, 176)), -- lục ngọc 557.7nm
+			ColorSequenceKeypoint.new(0.36, Color3.fromRGB(52, 236, 214)), -- ngọc lam
+			ColorSequenceKeypoint.new(0.56, Color3.fromRGB(58, 158, 255)), -- lam đêm
+			ColorSequenceKeypoint.new(0.78, Color3.fromRGB(146, 104, 255)), -- tím 427.8nm
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 96, 186)), -- hồng đỏ 630nm
+		}),
+		lifetime = 0.95,
+		texture = "",
+		textureLength = 1,
+		widthScale = 1.6,
+		lightEmission = 0.32,
 	},
 	trail_crystal = {
 		color = ColorSequence.new(Color3.fromRGB(137, 245, 255), Color3.fromRGB(58, 148, 255)),
@@ -113,7 +285,8 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "rbxasset://textures/particles/sparkles_main.dds",
 		textureLength = 0.45,
 		widthScale = 2.15,
-		lightEmission = 1,
+		-- Xanh băng vốn đã rất nhạt: đây là trail dễ bay màu nhất, để thấp nhất nhóm sparkle.
+		lightEmission = 0.45,
 	},
 	trail_nebula = {
 		color = ColorSequence.new({
@@ -125,7 +298,7 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "rbxasset://textures/particles/sparkles_main.dds",
 		textureLength = 0.38,
 		widthScale = 2.35,
-		lightEmission = 1,
+		lightEmission = 0.5,
 	},
 	trail_singularity = {
 		color = ColorSequence.new({
@@ -138,7 +311,9 @@ local TRAIL_VISUALS: { [string]: TrailVisual } = {
 		texture = "rbxasset://textures/particles/sparkles_main.dds",
 		textureLength = 0.32,
 		widthScale = 2.65,
-		lightEmission = 1,
+		-- Cao nhất toàn bộ: trail đắt nhất game, và dải màu của nó có đoạn ĐEN (22,22,40) làm
+		-- nền nên phần sáng không có gì để cộng chồng lên — nó chịu được mức này mà không bay.
+		lightEmission = 0.55,
 	},
 }
 
@@ -631,6 +806,22 @@ local STANDARD_AURA_COLORS: { [string]: AuraColorConfig } = {
 	},
 }
 
+--[[
+	Aura có RIG VFX RIÊNG → tên model trong `ReplicatedStorage.CosmeticTemplates`.
+
+	Những aura này KHÔNG đi qua template chung `AuraBasic.Torso` và KHÔNG được nhuộm màu:
+	toàn bộ hiệu ứng nằm sẵn trong rig. `STANDARD_AURA_COLORS` cố tình không có mục cho
+	chúng — có mục là mở đường cho cái bẫy fallback mô tả ở nhánh dùng bảng này.
+
+	Thêm aura rig mới thì thêm ĐÚNG một dòng ở đây; đừng chép lại cả nhánh.
+]]
+local RIG_AURAS: { [string]: string } = {
+	aura_frozen_bloom = "Aura_FrozenBloom",
+	aura_glitch = "Aura_FrozenBloom",
+	-- VIP Gold Aura (độc quyền VIP Membership): lửa vàng–cam, rig 15 part khớp tên bộ phận R15.
+	aura_vip = "Aura_Vip",
+}
+
 -- ĐỔI MÀU GIỮ CHIỀU SÂU (2026-07-29).
 -- Rig gốc (StandardAuras) là aura XANH DƯƠNG, và bên trong nó các lớp có độ sáng khác nhau
 -- (beam nền tối 0,38,85 · lõi sáng 0,123,255 · beam nhấn 0,255,111). Nếu ép TẤT CẢ về một
@@ -700,13 +891,33 @@ local function applyAura(player: Player)
 		return
 	end
 
-	-- 0. Đặc biệt: Check model riêng cho Frozen Bloom (aura_frozen_bloom / Workspace.Aura_FrozenBloom)
-	if auraId == "aura_frozen_bloom" or auraId == "aura_glitch" then
-		local frozenBloomModel = workspace:FindFirstChild("Aura_FrozenBloom", true)
-		if frozenBloomModel and frozenBloomModel:IsA("Model") then
+	--[[
+		0. Aura có rig VFX RIÊNG (`RIG_AURAS`: Frozen Bloom, VIP Gold) — KHÔNG đi qua template chung.
+
+		⚠️ LỖI ĐÃ SỬA 2026-08-08 (user báo "Frozen Bloom bị sao aura"): rig này trước nằm ở
+		`Workspace.Aura_FrozenBloom` — sai chỗ theo đúng hai cách cùng lúc:
+		  • 16 part đều KHÔNG neo và chỉ có 2 joint ⇒ vào game là rig rã ra rơi tự do, kéo
+		    theo mọi ParticleEmitter gắn trên nó.
+		  • `ModelStreamingMode = Default` + StreamingEnabled, mà nó đứng cách Spawn 125
+		    studs ⇒ client ở xa không nhìn thấy model, `FindFirstChild` trả nil.
+		Cả hai đường đều dẫn tới việc rơi xuống nhánh 2 phía dưới, tức aura standard nhuộm
+		tông cyan của `STANDARD_AURA_COLORS.aura_frozen_bloom` — đúng cái quầng trắng-xanh
+		khổng lồ trùm kín nhân vật trong ảnh user gửi, chẳng liên quan gì tới hoa băng.
+
+		Giờ rig nằm trong `ReplicatedStorage.CosmeticTemplates` (đã neo part): luôn có mặt
+		trên mọi client, không bị streaming dỡ, không bị physics đụng tới.
+
+		Và khi aura ĐÃ nằm trong `RIG_AURAS` thì `return` LUÔN dù tìm thấy rig hay không —
+		thà không có aura còn hơn hiện nhầm sang aura của món khác. Luật này áp cho MỌI rig
+		trong bảng, không riêng Frozen Bloom.
+	]]
+	local rigName = RIG_AURAS[auraId]
+	if rigName then
+		local rigModel = getRootTemplate(rigName) or workspace:FindFirstChild(rigName, true)
+		if rigModel and rigModel:IsA("Model") then
 			local character = player.Character
 			if character then
-				for _, partInModel in frozenBloomModel:GetChildren() do
+				for _, partInModel in rigModel:GetChildren() do
 					if partInModel:IsA("BasePart") then
 						local targetPart = character:FindFirstChild(partInModel.Name)
 							or (if string.find(partInModel.Name, "Torso")
@@ -736,8 +947,10 @@ local function applyAura(player: Player)
 					end
 				end
 			end
-			return
+		else
+			warn(`[CosmeticVisual] Không tìm thấy rig {rigName} (ReplicatedStorage.CosmeticTemplates)`)
 		end
+		return
 	end
 
 	-- 1. Ưu tiên: Premium Auras có folder riêng trong Workspace.AuraBase (Dark, Flame, RedHeart)

@@ -48,7 +48,9 @@ local function playHover()
 	lastHoverAt = now
 	if hoverSound then
 		hoverSound.TimePosition = 0
-		hoverSound.PlaybackSpeed = 1.45 + (math.random(-5, 5) / 100)
+		-- 1.45 là di sản của thời hover dùng CHUNG mẫu với click (phải đẩy pitch lên mới
+		-- phân biệt được). Giờ hover có mẫu riêng nên phát ở tốc độ gốc, chỉ rung nhẹ.
+		hoverSound.PlaybackSpeed = 1.0 + (math.random(-6, 6) / 100)
 		hoverSound:Play()
 	end
 end
@@ -60,7 +62,7 @@ local function pressEffect(button: GuiButton)
 		scale.Name = "ClickScale"
 		scale.Parent = button
 	end
-	;(scale :: UIScale).Scale = 0.9
+	(scale :: UIScale).Scale = 0.9
 	TweenService:Create(scale :: UIScale, PRESS_TWEEN, { Scale = 1 }):Play()
 end
 
@@ -73,16 +75,32 @@ local function hook(obj: Instance)
 		playClick()
 		pressEffect(obj)
 	end)
+	obj.MouseEnter:Connect(playHover)
 end
 
 function ButtonSFXController.Init() end
 
 function ButtonSFXController.Start()
 	clickSound = makeSound(Theme.UI_ASSETS.ClickSound, 0.5)
+	-- Hover kêu suốt trong lúc rê chuột qua menu nên phải NHỎ hơn click rõ rệt,
+	-- nếu không mỗi lần đi ngang 5 nút menu là 5 tiếng bấm giả.
+	hoverSound = makeSound(Theme.UI_ASSETS.HoverSound, 0.22)
 	task.spawn(function()
 		pcall(function()
-			ContentProvider:PreloadAsync({ clickSound })
+			ContentProvider:PreloadAsync({ clickSound, hoverSound })
 		end)
+		-- Play câm 1 lượt: PreloadAsync chỉ tải bytes, lần Play đầu vẫn phải decode
+		-- (cùng lý do đã ghi trong ASMR/Engine/SoundPool).
+		for _, s in { clickSound, hoverSound } do
+			if s then
+				local vol = s.Volume
+				s.Volume = 0
+				s:Play()
+				task.wait(0.05)
+				s:Stop()
+				s.Volume = vol
+			end
+		end
 	end)
 
 	local playerGui = localPlayer:WaitForChild("PlayerGui")
@@ -91,6 +109,5 @@ function ButtonSFXController.Start()
 	end
 	playerGui.DescendantAdded:Connect(hook)
 end
-
 
 return ButtonSFXController
