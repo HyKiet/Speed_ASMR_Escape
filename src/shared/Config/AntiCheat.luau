@@ -7,6 +7,31 @@
 -- speed hack / teleport hack / fly hack theo phương ngang.
 
 local AntiCheatConfig = {
+	--[[
+		BẬT LẠI 2026-08-18 sau khi QA xác minh được exploit thật: client tự đặt
+		`Humanoid.WalkSpeed = 5000` và giữ nguyên sau 6 giây — server không hề kéo về.
+
+		(Trước đó tắt từ 2026-08-03 để test di chuyển.)
+
+		── ĐỐI CHIẾU NGƯỠNG TRƯỚC KHI BẬT (làm 2026-08-18) ────────────────────────────────
+		Trần WalkSpeed hợp lệ = 250 (`Formulas.GetMaxWalkSpeed` kẹp cứng), nên mức cho phép
+		cao nhất = 250 × 1.75 = 437 studs/s, cộng allowance riêng của zone. Đối chiếu với mọi
+		cơ chế đẩy hợp lệ đang có:
+		  • Slide `InitialSpeedMultiplier` = 1.45  < SPEED_HEADROOM 1.75 ✓
+		  • Wall run 60, slide sàn 28             < MIN_ALLOWED_SPEED 65 ✓
+		  • Zone 12 `WIND_VELOCITY` = 170         < allowance 220 ✓
+		  • Zone 14 gió 30 + 130 = 160            < allowance 210 ✓
+		  • Zone 13 lò xo                          → allowance 280 ✓
+		Không tìm thấy băng chuyền / `AssemblyLinearVelocity` bề mặt nào trong repo, nên không
+		có nguồn dịch chuyển "không do WalkSpeed" nào khác cần nới.
+
+		⚠️ CÒN PHẢI NGHIỆM THU BẰNG PLAYTEST: Zone 15 KHÔNG có entry trong
+		`STAGE_EXTRA_ALLOWANCE`. Nó chỉ an toàn nếu SplitFloor/ShiftBridge là sàn dịch chuyển
+		bằng CFrame chậm. Chạy thật qua Zone 15 và soi log `[AntiCheat]` trước khi publish —
+		nếu thấy giật ngược oan thì thêm `[15] = <studs/s của sàn> + 60`.
+	]]
+	ENABLED = true,
+
 	-- Chu kỳ kiểm tra vị trí mỗi player (giây). 0.4s × 25 player = chi phí không đáng kể.
 	CHECK_INTERVAL = 0.4,
 
