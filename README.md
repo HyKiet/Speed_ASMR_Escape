@@ -27,9 +27,58 @@ Speed Simulator + Obby Hybrid game trên Roblox.
 - Rojo CLI 7.7.0+
 - Node.js (cho tooling)
 
+### ⚠️ Nguồn chân lý của THẾ GIỚI GAME (đọc trước tiên)
+
+Repo này chứa **code**, không chứa **thế giới**. Hai thứ đó sống ở hai nơi khác nhau:
+
+| Thứ | Nguồn chân lý | Ai đồng bộ |
+|---|---|---|
+| Script (`src/`) | **Git** | Rojo, một chiều VSCode → Studio |
+| Thế giới: 15 zone, Lobby, treadmill, sàn ASMR, terrain, lighting | **Place trên Roblox Cloud** | Con người, thủ công |
+
+Snapshot thế giới nằm ở **`SpeedEscape.rbxl`** (68.228 instance, ~1.3 MB — chụp 2026-08-18).
+File `.rbxlx` cũ chỉ là vỏ 153 instance, **không phải** thế giới; mở nó ra là thấy đủ script
+và một bản đồ trống rỗng.
+
+**Vì vậy, trước khi làm bất cứ việc gì đụng tới map:**
+
+1. Mở place từ Roblox (Home → My Games), **không** mở file `.rbxlx` trong repo.
+2. Hai PlaceId hợp lệ — **luôn kiểm tra bạn đang ở đâu** trước khi sửa:
+   - QA `76318425379626` — nơi thử nghiệm.
+   - Live `94107323826144` — **người chơi thật đang ở đây**.
+   Kiểm nhanh trong Command Bar: `print(game.PlaceId)`.
+3. Sửa map xong thì **Publish** (File → Publish to Roblox) — đó mới là lưu thật.
+
+**Sao lưu thế giới ra git (nên làm mỗi khi map đổi đáng kể):**
+
+```
+Studio → File → Download a Copy → lưu vào thư mục repo, đè SpeedEscape.rbxl (kiểu .rbxl)
+git add -f SpeedEscape.rbxl && git commit -m "Snapshot world <ngày>"
+```
+
+> Place mở từ cloud thì menu **không có** "Save to File As…" — Studio thay bằng
+> **"Download a Copy"**. Chọn kiểu **`.rbxl`** (binary), đừng chọn `.rbxlx`: XML sẽ phình lên
+> hàng trăm MB và đụng trần 100 MB/file của GitHub, còn binary chỉ ~1.3 MB.
+>
+> Kiểm nhanh file vừa tải có đúng là thế giới không (không cần mở Studio) — header khai sẵn
+> số instance ở offset 20:
+> ```bash
+> od -An -tu4 -j20 -N4 SpeedEscape.rbxl    # ~68.000 = đúng; vài trăm = mới chỉ có code
+> ```
+
+Không có bước này thì thế giới chỉ tồn tại trên máy bạn và trên Roblox Cloud — mất tài khoản
+hoặc lỡ tay ghi đè là chỉ còn khôi phục được qua Version History trên Creator Dashboard.
+CI có cổng `Place snapshot` cảnh báo khi file trong repo vẫn còn là vỏ rỗng.
+
+---
+
 ### Khởi động
 
-**1. Mở Roblox Studio** và load file `.rbxl` trong thư mục gốc
+**1. Mở Roblox Studio** → **Open from Roblox** → chọn **`[QA] SpeedEscape`**
+
+> Mở từ cloud, KHÔNG mở `SpeedEscape.rbxl` trong repo — file đó là *bản sao lưu*, sửa vào nó
+> thì không ai thấy. Xác nhận đúng place trước khi làm gì: `print(game.PlaceId)` →
+> `76318425379626` (QA). Ra `94107323826144` là bạn đang ở **Live**.
 
 **2. Start Rojo sync** trong VSCode terminal:
 ```bash

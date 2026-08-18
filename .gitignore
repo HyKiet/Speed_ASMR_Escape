@@ -2,6 +2,10 @@
 build-test.rbxlx
 build-ci.rbxl
 *.rbxl
+# ⚠️ NGOẠI LỆ: snapshot THẾ GIỚI GAME (File → Download a Copy trong Studio).
+# Đây là bản sao lưu duy nhất của map nằm trong version control — mọi thứ .rbxl khác
+# đều là sản phẩm build nên vẫn bị loại ở dòng trên. Xem README → "Nguồn chân lý".
+!SpeedEscape.rbxl
 sourcemap.json
 sourcemap-check.json
 lsp-out.txt
