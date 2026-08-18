@@ -1,23 +1,150 @@
--- Keyboard — port KeyboardASMRClient v5: lún lò xo sâu, click cơ ProSoundEffects
--- + pitch random, sao bùng nổ khi dậm (qua ParticlePool).
+--!strict
+-- Keyboard — sàn phím ThockyKey: lún lò xo sâu, sao bùng nổ khi dậm (qua ParticlePool).
 -- RGB GLOW ĐÃ XOÁ theo yêu cầu user 2026-07-24 (phím không đổi màu nữa).
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local SoundIds = require(ReplicatedStorage.Shared.Config.SoundIds)
 
 local Keyboard = {}
 
--- BÀN PHÍM CƠ v2 (2026-07-27): bộ mẫu "creamy/thocky" — mỗi file là MỘT cú nhấn đơn
--- 0.15–0.23s, gọn và đầy, thay bộ Rapid Typing cũ (0.24–0.73s, có đuôi ring dài nên khi
--- chạy nhanh các tiếng chồng lên nhau thành rào rào thay vì lộp cộp rời rạc).
-local CLICK_IDS = {
-	102855535543930, -- Creamy Keyboard 0.18s
-	113108830240353, -- Cream keyboard 0.21s
-	72826565018765, -- Keyboard Clicked ASMR 0.15s
-	125615721658437, -- keyboard b 0.20s
-	125027148509088, -- Keyboard g 0.21s
-	88838553648526, -- Keyboard h 0.19s
-	125236580407249, -- Keyboard j 0.23s
-	132465969238702, -- Keyboard button 0.21s
+-- ÂM PHÍM CƠ v3 (2026-08-05) — PHỐI 3 LỚP thay vì phát 1 mẫu duy nhất.
+-- Một cú gõ switch cơ ngoài đời gồm 3 sự kiện tách bạch, tai nghe ra ngay cả khi
+-- không phân tích được: (1) thân "thock" trầm của keycap chạm đáy, (2) cái "tick"
+-- sắc của lá đồng bật ngay đầu hành trình, (3) tiếng nhả khi lò xo đẩy keycap lên.
+-- Bản cũ chỉ có (1) ⇒ nghe như gõ nhựa. Chồng đủ 3 lớp mới ra chất ASMR.
+--
+-- Nguồn lớp TICK/UP: ProSoundEffects (thư viện thương mại Roblox phát hành sẵn,
+-- không phải upload cá nhân ⇒ không sợ bị gỡ). Đã đo 2026-08-05: 25/25 ID load OK.
+--
+-- ⚠️ 2026-08-07: đợt hoàn nguyên "hệ âm cũ" cho sàn ASMR (Clay Zone 2, SlimeJelly Zone 4 —
+-- xem ghi chú trong hai file đó) KHÔNG áp dụng cho sàn phím. User nghe thử cả hai rồi chốt
+-- RIÊNG sàn phím giữ bản v3 này. Đừng gộp sàn phím vào lần hoàn nguyên nào nữa.
+--
+-- CẢ 3 LỚP ĐỀU CỐ ĐỊNH cho mọi phím — xem khối hằng số ngay dưới.
+
+-- MỌI ThockyKey PHÁT ĐÚNG MỘT TIẾNG NHƯ NHAU (chốt 2026-08-05 theo yêu cầu user).
+-- Trước đây mỗi lần dẫm lại bốc ngẫu nhiên 1 trong 8 mẫu + rung cao độ, và có giai đoạn
+-- còn gán nốt riêng theo vị trí phím. Bàn phím cơ thật thì mọi phím là cùng một switch
+-- ⇒ cùng một tiếng. KHÔNG thêm biến thể nào vào đây nữa.
+local BODY_ID = 127105730240202 -- Keyboard Click 0.277s (user chọn 2026-08-05)
+-- ⚠️ TICK/RELEASE lấy từ `Config.SoundIds`, KHÔNG khai số ở đây: hai ID này dùng chung với
+-- `Effects/KeyCapperSFXController` (tiếng gõ phím của HUD). Khai hai nơi thì sửa một chỗ
+-- quên chỗ kia là hai âm lệch nhau mà không có lỗi nào báo.
+local TICK_ID = SoundIds.KEYBOARD_TICK
+local RELEASE_ID = SoundIds.KEYBOARD_RELEASE
+-- Thay BODY_ID bằng một trong các mẫu đã đo (2026-08-05, tất cả load OK) nếu muốn đổi chất.
+-- ĐỌC `Keyboard.voices` bên dưới trước khi đổi: mẫu càng DÀI càng cần nhiều giọng.
+--   102855535543930 Creamy Keyboard 0.18s  113108830240353 Cream keyboard 0.21s
+--   72826565018765  Keyboard Clicked 0.15s 125615721658437 keyboard b 0.20s
+--   125027148509088 Keyboard g 0.21s       88838553648526  Keyboard h 0.19s
+--   125236580407249 Keyboard j 0.23s       132465969238702 Keyboard button 0.21s
+
+-- ===== CHẠY CÀNG NHANH NGHE CÀNG ĐÃ TAI (2026-08-05) =====
+--
+-- VẤN ĐỀ ĐO ĐƯỢC: mô phỏng `touchKeysAt` trên bàn thật cho ra nhịp gõ theo tốc độ —
+--   WS  50 →  21 nhịp/giây      WS 150 →  65        WS 250 → 105
+-- Tai người ngừng nghe ra SỰ KIỆN RỜI RẠC ở khoảng 30 nhịp/giây; trên mức đó các cú gõ
+-- hoà vào nhau thành một tiếng rè có cao độ. Ở 250 WS ta đang bắn 105 nhịp/giây, gấp 3
+-- lần ngưỡng ⇒ càng nhanh càng NHIỀU tiếng nhưng nghe càng ra tiếng ồn, không phải tiếng
+-- gõ. Đây là lý do "walkspeed cao chạy trên sàn nghe không ASMR lắm".
+--
+-- CÁCH CHỮA: đổi hướng — chạy nhanh thì gõ ÍT hơn nhưng mỗi tiếng NẶNG hơn.
+--   1) Chặn nhịp ở CLICK_RATE_* (tăng dần theo tốc độ). Ở tốc độ thấp nhịp tự nhiên đã
+--      dưới ngưỡng nên không lọc gì cả — cảm giác "từng phím một" giữ nguyên.
+--   2) Lấy chỗ trống đó bù vào chất tiếng: càng nhanh thì thân càng TRẦM và càng TO,
+--      còn tick/nhả càng nhỏ lại (dày đặc tiếng treble là thứ gây chói và mệt tai).
+-- Kết quả: 250 WS nghe thành một tràng thock trầm, nặng, có nhịp — thay vì tiếng rè.
+--
+-- KHÔNG nút nào ở đây phá tính đồng bộ: mọi phím vẫn dùng chung một mẫu và cùng một
+-- công thức. Cái thay đổi là TỐC ĐỘ CỦA NGƯỜI CHƠI, không phải phím nào được gõ.
+
+-- Nhịp gõ tối đa (tiếng/giây), TĂNG THEO TỐC ĐỘ.
+--
+-- CÁCH LÀM: token bucket, KHÔNG phải cổng "cách lần trước ≥ X giây".
+-- Đã thử cổng thời gian trước và đo ra hỏng: nó bị lượng tử hoá theo khung hình (ở 60fps
+-- chỉ ra được 60/n nhịp/giây) nên kết quả nhảy loạn và NGƯỢC — 250 WS ra 15.5 nhịp/giây
+-- trong khi 180 WS được 21.5. Chạy nhanh hơn mà nghe thưa hơn là hỏng đúng thứ cần sửa.
+-- Bucket cộng tín dụng theo THỜI GIAN THẬT nên nhịp trung bình đúng bằng ngưỡng, không
+-- phụ thuộc fps hay việc mấy phím rơi chung một frame.
+--
+-- Trần tín dụng CLICK_BURST = 3, chọn bằng ĐO chứ không đoán. Trần thấp thì frame nào
+-- chạm nhiều phím cùng lúc sẽ tiêu hết tín dụng rồi bỏ đói mấy frame kế, và nhịp thật
+-- tụt xuống dưới ngưỡng rất xa. Đo bằng vòng Heartbeat, 4 giây mỗi mức (nhịp/giây):
+--
+--   WS   thô   BURST=1   BURST=2   BURST=3
+--   50    26      9.8      18.7      19.8
+--   100   49     18.9      23.0      24.1
+--   150   67     15.4      25.9      26.2
+--   200   85     19.3      27.9      28.1
+--   250   78     15.1      22.3      26.4
+--
+-- BURST=3 là cấu hình duy nhất bám sát đường ngưỡng 20 → 30 và tăng đều theo tốc độ.
+-- (Cột "thô" ở 250 thấp hơn 200 là do fps của chính máy đo tụt, không phải thuật toán.)
+--
+-- Ở tốc độ thấp nhịp tự nhiên đã gần ngưỡng nên bucket gần như không lọc gì —
+-- cảm giác "từng phím một" giữ nguyên.
+-- Đặt cả hai rất cao (999) là tắt hẳn cơ chế lọc.
+local CLICK_RATE_SLOW, CLICK_RATE_FAST = 20, 30
+local CLICK_BURST = 3
+
+-- Chất tiếng nội suy theo `speedRatio` (0 = đứng yên, 1 = 250 WS, cap cứng của game).
+-- Thân TRẦM dần: bàn phím được khen "thocky/creamy" là bàn có trọng âm thấp, đục.
+local BODY_PITCH_SLOW, BODY_PITCH_FAST = 0.96, 0.86
+-- Thân TO dần. Vượt 1.0 là hợp lệ (Sound.Volume tới 10) — chạy hết tốc phải nghe đầm.
+local BODY_VOL_SLOW, BODY_VOL_FAST = 0.5, 1.15
+-- Tick NHỎ dần: ở tốc độ thấp nó là cái đầu sắc làm tiếng gõ rõ; ở tốc độ cao hàng chục
+-- transient treble/giây chồng lên nhau chỉ còn là tiếng xì chói.
+local TICK_VOL_SLOW, TICK_VOL_FAST = 0.38, 0.18
+local TICK_PITCH = 1.44
+-- Nhả cũng nhỏ dần: chạy nhanh thì cú nhả của phím này đè lên cú nhấn của phím kế và
+-- chỉ làm đục thêm. Ở tốc độ thấp thì đây mới là chi tiết đặc sản của ASMR bàn phím.
+local RELEASE_VOL_SLOW, RELEASE_VOL_FAST = 0.3, 0.14
+local RELEASE_PITCH = 1.78
+
+local function lerp(a: number, b: number, t: number): number
+	return a + (b - a) * t
+end
+-- Rung cao độ mỗi lần gõ. ĐỂ 0 = đồng bộ tuyệt đối, mọi phím y hệt nhau — đây là thứ
+-- user muốn. Nâng lên 0.02–0.03 nếu nghe thấy máy móc quá, nhưng cao hơn nữa là quay
+-- lại đúng cái bug "mỗi phím một tiếng".
+local PITCH_JITTER = 0.0
+-- Nhả phím rẻ hơn nhấn (không hạt, không lò xo) nhưng chạy nhanh vẫn nhả hàng chục
+-- phím/frame; giữ trần riêng để lớp này luôn là lớp mỏng phía sau, không thành ồn.
+local MAX_RELEASE_PER_FRAME = 3
+
+Keyboard.soundIds = { BODY_ID, TICK_ID, RELEASE_ID }
+
+-- SỐ GIỌNG (bug "chạy nhanh gần như không nghe thấy tiếng", đo 2026-08-05).
+-- Mặc định SoundPool là 4 giọng/id. Hồi còn bốc ngẫu nhiên 8 mẫu thì lớp thân có thật
+-- 8 × 4 = 32 giọng nên không sao; rút về MỘT mẫu là tụt còn 4. Đo trên bàn thật:
+--   WS 100 → 43 lượt nhấn/s ⇒ 4 giọng bị cướp lại mỗi 93ms, mẫu chỉ kêu được nửa đầu
+--   WS 250 → 105 lượt/s     ⇒ cướp lại mỗi 38ms — mất hẳn thân thock
+--
+-- CÔNG THỨC: số giọng cần = nhịp-gõ/giây × độ-dài-mẫu-KHI-PHÁT.
+-- Nhịp gõ giờ bị chặn ở CLICK_RATE_FAST (30) chứ không còn là 76-105 của 250 WS nữa.
+-- Thân: 0.277s ở cao độ thấp nhất 0.86 ⇒ kêu 0.322s ⇒ 30 × 0.322 = 10. Để 24 lấy biên.
+-- ĐỔI BODY_ID sang mẫu dài hơn, hạ BODY_PITCH_FAST, hay nâng CLICK_RATE_FAST
+-- đều phải tính lại con số này.
+--
+-- Đây KHÔNG phải thêm biến thể: mọi giọng trong một bank đều giữ cùng một SoundId.
+Keyboard.voices = {
+	[BODY_ID] = 24, -- lớp chính, phải nguyên vẹn (0.322s ở cao độ thấp nhất)
+	[TICK_ID] = 12, -- chỉ là đầu transient, lại nhỏ dần khi chạy nhanh
+	[RELEASE_ID] = 8, -- đã bị chặn 3/frame, lại là lớp nhỏ nhất
 }
-Keyboard.soundIds = CLICK_IDS
+
+-- Bên tai luân phiên như bản gốc (binaural bước chân). Giữ ở SCOPE MODULE để chuỗi
+-- trái-phải liền mạch khi bước từ bàn này sang bàn kế. 3 lớp của CÙNG một cú gõ phải
+-- dùng CHUNG một pan — gọi playStep 3 lần sẽ ném thân sang trái, tick sang phải và xé
+-- đôi tiếng gõ, nên ở đây tự quản pan rồi gọi playPanned.
+local earSide = false
+
+-- Bucket cũng ở SCOPE MODULE: Zone 15 lát 56 bàn liền nhau, bucket riêng từng bàn thì
+-- lúc bước qua ranh giới hai bàn cùng nhả một tiếng và nhịp vọt gấp đôi đúng chỗ người
+-- chơi đang chạy nhanh nhất.
+local clickCredit = CLICK_BURST
+local lastCreditAt = os.clock()
 
 -- VIBE (2026-07-28) — Zone 15 chia 3 đoạn Fire / Water / Lightning bằng attribute `Vibe`
 -- trên MODEL bàn (do `tools/zone15_vibes.luau` gán). Bàn không có attribute (các zone khác)
@@ -29,15 +156,14 @@ local VIBE_FX = {
 }
 local DEFAULT_FX = "stars"
 
--- Cao độ theo HÀNG phím: chạy ngang bàn phím là ra một chuỗi nốt đi lên/xuống thay vì
--- tiếng lộp cộp ngẫu nhiên — đây là thứ làm sàn phím "nghe muốn đi lại mãi".
--- Ngũ cung (không có nốt nghịch tai) trải trên 5 hàng, lặp lại nếu bàn phím nhiều hàng hơn.
-local ROW_PITCH = { 0.94, 1.06, 1.19, 1.33, 1.5 }
-
 local CELL = 3
 local KEY_REACH = 1.9
 local FOOT_DROP = 3.05
 local Y_TOLERANCE = 2.8
+-- Độ lún DỰ PHÒNG, chỉ dùng khi không dò ra mặt đất (lobby, sàn bắc qua vực).
+-- Trong 15 zone, độ lún thật do `GroundLimit` quyết định lúc attach — xem khối tính
+-- `pressDepth` bên dưới. Đây từng là hằng số duy nhất, hợp lý khi người chơi còn đứng
+-- trên WalkSurface (lưng chừng thân phím, chỉ còn 0.97 stud phím nhô trên mũi chân).
 local PRESS_DEPTH = 0.9
 local PULSE = 0.14
 local SAMPLE_STEP = 1.4
@@ -58,6 +184,8 @@ function Keyboard.attach(model, engine)
 
 	local keys, grid, region
 	local activeKeys = {} -- set phím đang animate lò xo
+	-- Chốt lại lúc attach theo mặt đất thật dưới bàn — xem khối tính ở cuối task.spawn.
+	local pressDepth = PRESS_DEPTH
 
 	-- đọc 1 lần lúc attach: vibe không đổi trong đời một bàn
 	local fx = VIBE_FX[tostring(model:GetAttribute("Vibe"))] or DEFAULT_FX
@@ -123,36 +251,90 @@ function Keyboard.attach(model, engine)
 		end
 		region = { x0 = x0 - 10, x1 = x1 + 10, z0 = z0 - 10, z1 = z1 + 10 }
 
-		-- Gán nốt cho từng phím theo HÀNG (trục ngắn của bàn = hướng có ít hàng hơn).
-		-- Tính MỘT LẦN lúc attach; runtime chỉ đọc rec.pitch, không tốn gì thêm.
-		local spanX, spanZ = x1 - x0, z1 - z0
-		local rowAlongZ = spanZ <= spanX
-		local rowSpan = math.max(if rowAlongZ then spanZ else spanX, 1e-3)
-		local rowBase = if rowAlongZ then z0 else x0
-		local rowCount = math.max(math.floor(rowSpan / CELL + 0.5), 1)
-		for _, rec in keys do
-			local along = (if rowAlongZ then rec.z else rec.x) - rowBase
-			local row = math.floor(along / rowSpan * rowCount + 0.5)
-			rec.pitch = ROW_PITCH[row % #ROW_PITCH + 1]
+		-- KHÔNG còn gán nốt/mẫu riêng cho từng phím: mọi phím dùng chung BODY_ID + TICK_ID
+		-- ở đầu file. Vị trí phím vẫn là thứ phân biệt tiếng này với tiếng kia, nhưng bằng
+		-- KHÔNG GIAN (tai nghe từ nhân vật + rolloff gần) chứ không bằng cao độ.
+
+		-- ĐỘ LÚN THEO MẶT ĐẤT (2026-08-04). Người chơi giờ đứng trên Ground thật, không
+		-- còn trên WalkSurface cắt ngang thân phím: phím cao 2.0 stud nhô trọn quanh chân.
+		-- Giữ nguyên 0.9 thì phím dưới chân vẫn cao hơn mũi chân 1.07 stud ⇒ nhân vật lún
+		-- vào bàn phím tới đầu gối. Lún tới sát đất (còn hở 0.15) mới ra đúng cảm giác
+		-- "bàn phím rẽ ra dưới chân" mà vẫn không có phím nào biến mất xuống dưới nền.
+		--
+		-- Đo tại phím GIỮA bàn: một bàn nằm trọn trên một mảng nền, không cần dò từng phím
+		-- (19k phím ⇒ 19k raycast lúc load). Bàn nào không dò ra nền (lobby, bàn bắc qua
+		-- vực) thì GroundLimit trả nil và bàn đó giữ nguyên 0.9 như trước.
+		local mid = keys[math.max(#keys // 2, 1)]
+		if mid then
+			local groundTop = engine.GroundLimit.topUnder(model, mid.part.Position, mid.topY - mid.part.Size.Y)
+			pressDepth = engine.GroundLimit.maxSink(mid.topY, groundTop) or PRESS_DEPTH
 		end
 
 		self.ready = true
-		print(("[ASMR Keyboard] sẵn sàng — %d phím, %d hàng nốt"):format(#keys, rowCount + 1))
+		print(("[ASMR Keyboard] sẵn sàng — %d phím, lún %.2f"):format(#keys, pressDepth))
 	end)
 
 	local function playKey(rec, speedRatio, volScale)
 		if not FxBudget.fxOK(rec.part.Position, 80) then
 			return
 		end
+		-- Hạt VẪN nổ cho mọi phím (hình ảnh không được thưa đi), chỉ TIẾNG mới bị chặn nhịp.
 		ParticlePool.emit(fx, Vector3.new(rec.x, rec.topY + 0.2, rec.z), fxCount)
-		SoundPool.playStep(
-			CLICK_IDS[math.random(#CLICK_IDS)],
+
+		-- Chất tiếng theo tốc độ: nhanh = trầm hơn, to hơn, ít treble hơn, gõ thưa hơn.
+		local t = math.clamp(speedRatio, 0, 1)
+
+		-- TOKEN BUCKET — xem khối CLICK_RATE_* ở đầu file. Phím bị chặn vẫn lún, vẫn nổ
+		-- hạt, chỉ là không góp thêm một tiếng vào đám đã quá dày.
+		local now = os.clock()
+		clickCredit =
+			math.min(clickCredit + (now - lastCreditAt) * lerp(CLICK_RATE_SLOW, CLICK_RATE_FAST, t), CLICK_BURST)
+		lastCreditAt = now
+		if clickCredit < 1 then
+			return
+		end
+		clickCredit -= 1
+		rec.sounded = true -- để lớp nhả biết cú nhấn này CÓ kêu
+
+		earSide = not earSide
+		local pan = if earSide then 0.85 else -0.85
+		rec.pan = pan -- lớp nhả phải ra đúng bên tai đã nhấn
+
+		local pos = rec.part.Position
+		local pitch = if PITCH_JITTER > 0 then 1 + (math.random() * 2 - 1) * PITCH_JITTER else 1
+
+		local bodyVol = lerp(BODY_VOL_SLOW, BODY_VOL_FAST, t) * volScale
+		local bodyPitch = lerp(BODY_PITCH_SLOW, BODY_PITCH_FAST, t)
+		rec.relVol = lerp(RELEASE_VOL_SLOW, RELEASE_VOL_FAST, t)
+
+		-- lớp 1: thân thock — cao độ thấp dần kéo cả phổ xuống cho đục và có trọng lượng
+		SoundPool.playPanned(BODY_ID, pos, bodyVol, pitch * bodyPitch, pan, 70)
+		-- lớp 2: tick lá đồng — cùng vị trí, cùng tai, cùng frame ⇒ tai gộp thành MỘT
+		-- tiếng gõ có đầu sắc, không nghe ra là hai mẫu.
+		SoundPool.playPanned(TICK_ID, pos, bodyVol * lerp(TICK_VOL_SLOW, TICK_VOL_FAST, t), pitch * TICK_PITCH, pan, 70)
+	end
+
+	local function playRelease(rec)
+		-- Cú nhấn bị cổng chặn nhịp lọc đi thì cú nhả cũng phải im. Nếu không, phím "câm"
+		-- vẫn kêu lúc bật lên và ta chỉ đổi tiếng rè này lấy tiếng rè khác.
+		if not rec.sounded then
+			return
+		end
+		rec.sounded = false
+		-- `nearCamera` chứ KHÔNG `fxOK`: lớp nhả là lớp phụ của một cú nhấn ĐÃ được ngân
+		-- sách duyệt, không phải hiệu ứng mới. Tính nó vào ngân sách 20-sound/0.1s là ăn
+		-- gấp đôi suất, và ở tốc độ cao chính lớp nhả lại đá văng lớp thân của phím kế.
+		if not FxBudget.nearCamera(rec.part.Position, 80) then
+			return
+		end
+		-- 55 < 70 của thân: tiếng nhả là chi tiết dưới chân, không cần vọng xa
+		SoundPool.playPanned(
+			RELEASE_ID,
 			rec.part.Position,
-			(0.5 + speedRatio * 0.45) * volScale,
-			-- nốt của HÀNG (cố định theo phím) + rung nhẹ ngẫu nhiên cho khỏi máy móc.
-			-- KHÔNG cộng speedRatio nữa: chạy nhanh mà pitch trôi lên thì mất luôn giai điệu.
-			(rec.pitch or 1) * (0.97 + math.random() * 0.06),
-			70
+			rec.relVol or RELEASE_VOL_SLOW,
+			RELEASE_PITCH,
+			rec.pan or 0,
+			55
 		)
 	end
 
@@ -251,6 +433,7 @@ function Keyboard.attach(model, engine)
 
 		-- 3) SPRING ANIMATOR: tích phân lò xo cho mọi phím đang sống
 		local step = math.min(dt, 1 / 30)
+		local releasedThisFrame = 0
 		for rec in activeKeys do
 			local pressed = now < rec.pulseUntil
 			if not pressed and rec.down then
@@ -275,17 +458,24 @@ function Keyboard.attach(model, engine)
 				rec.depth = 1
 				rec.vel = 0
 				rec.settled = true
-				rec.part.CFrame = rec.rest * CFrame.new(0, -PRESS_DEPTH, 0)
+				rec.part.CFrame = rec.rest * CFrame.new(0, -pressDepth, 0)
 			elseif not pressed and math.abs(rec.depth) < 0.004 and math.abs(rec.vel) < 0.05 then
 				rec.depth = 0
 				rec.vel = 0
 				rec.settled = false
 				rec.part.CFrame = rec.rest
 				activeKeys[rec] = nil
+				-- LỚP 3 phát ĐÚNG lúc keycap chạm lại vị trí nghỉ, không phải lúc nhấc chân:
+				-- tiếng nhả khớp với hình ảnh phím bật lên thì não mới nghe ra là "lò xo",
+				-- lệch vài chục ms là thành tiếng gõ thừa.
+				if releasedThisFrame < MAX_RELEASE_PER_FRAME then
+					releasedThisFrame += 1
+					playRelease(rec)
+				end
 			else
 				rec.settled = false
 				local depth = math.clamp(rec.depth, -0.12, 1.08) -- cho phép nảy quá đà nhẹ
-				rec.part.CFrame = rec.rest * CFrame.new(0, -PRESS_DEPTH * depth, 0)
+				rec.part.CFrame = rec.rest * CFrame.new(0, -pressDepth * depth, 0)
 			end
 		end
 	end

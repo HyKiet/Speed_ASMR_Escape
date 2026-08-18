@@ -19,16 +19,26 @@ local SoundPool = {}
 
 -- Số giọng/1 id: đủ cho các tiếng chồng nhau khi chạy nhanh (lát sàn dày ⇒ nhiều phím
 -- cùng nhấn trong 1 frame) mà không cắt đuôi tiếng trước.
+--
+-- 4 chỉ đủ khi sàn có NHIỀU id luân phiên (8 id × 4 = 32 giọng thật). Sàn nào rút về
+-- một mẫu duy nhất thì 4 giọng là quá ít: giọng bị cướp lại trước khi mẫu kêu xong nên
+-- người chơi chỉ nghe được phần đầu. Đo trên sàn phím (mẫu 0.18s): ở 300 WS có 120
+-- lượt nhấn/giây, 4 giọng ⇒ mỗi mẫu chỉ kêu được 19% rồi bị cắt — nghe như mất tiếng.
+-- Sàn như vậy khai báo `Floor.voices = { [id] = n }`, xem SoundPool.init.
 local VOICES_PER_ID = 4
 local EAR_OFFSET = 4.5 -- studs lệch sang bên tai theo RightVector camera (binaural pan)
 
 type Voice = { sound: Sound, anchor: Attachment }
-type Bank = { voices: { Voice }, cursor: number }
+type Bank = { voices: { Voice }, cursor: number, size: number }
+-- Gain dB cho EqualizerSoundEffect gắn CỐ ĐỊNH lên từng giọng của một id.
+-- Dùng cho mẫu bị chói ở dải cao (nốt piano pitch-shift lên là ví dụ kinh điển):
+-- hạ HighGain nghe mềm hẳn, đúng chất ASMR, mà không cần đổi file audio.
+export type VoiceFx = { low: number?, mid: number?, high: number? }
 
 local banks: { [number]: Bank } = {}
 local fallback: Bank? = nil -- id lạ (không khai báo trong floor.soundIds) vẫn phát được
 
-local function newVoice(id: number, container: Instance): Voice
+local function newVoice(id: number, container: Instance, fx: VoiceFx?): Voice
 	local anchor = Instance.new("Attachment")
 	anchor.Name = "ASMRVoiceAnchor"
 	anchor.Parent = workspace.Terrain
@@ -44,21 +54,37 @@ local function newVoice(id: number, container: Instance): Voice
 	s.Volume = 0
 	s.Parent = anchor
 
+	if fx then
+		local eq = Instance.new("EqualizerSoundEffect")
+		eq.LowGain = fx.low or 0
+		eq.MidGain = fx.mid or 0
+		eq.HighGain = fx.high or 0
+		eq.Parent = s
+	end
+
 	return { sound = s, anchor = anchor }
 end
 
-local function newBank(id: number, container: Instance): Bank
-	local bank: Bank = { voices = table.create(VOICES_PER_ID), cursor = 0 }
-	for _ = 1, VOICES_PER_ID do
-		table.insert(bank.voices, newVoice(id, container))
+local function newBank(id: number, container: Instance, size: number?, fx: VoiceFx?): Bank
+	local n = size or VOICES_PER_ID
+	local bank: Bank = { voices = table.create(n), cursor = 0, size = n }
+	for _ = 1, n do
+		table.insert(bank.voices, newVoice(id, container, fx))
 	end
 	return bank
 end
 
-function SoundPool.init(container: Instance, allIds: { number })
+-- `voiceCounts` (tuỳ chọn): id -> số giọng, cho sàn cần nhiều giọng hơn mặc định.
+-- `voiceFx` (tuỳ chọn): id -> gain EQ, cho mẫu cần làm mềm dải cao.
+function SoundPool.init(
+	container: Instance,
+	allIds: { number },
+	voiceCounts: { [number]: number }?,
+	voiceFx: { [number]: VoiceFx }?
+)
 	for _, id in allIds do
 		if not banks[id] then
-			banks[id] = newBank(id, container)
+			banks[id] = newBank(id, container, voiceCounts and voiceCounts[id], voiceFx and voiceFx[id])
 		end
 	end
 	fallback = newBank(0, container)
@@ -98,7 +124,7 @@ local function takeVoice(id: number): Voice?
 		if not bank then
 			return nil
 		end
-		bank.cursor = bank.cursor % VOICES_PER_ID + 1
+		bank.cursor = bank.cursor % bank.size + 1
 		local v = bank.voices[bank.cursor]
 		local url = "rbxassetid://" .. id
 		if v.sound.SoundId ~= url then
@@ -106,7 +132,7 @@ local function takeVoice(id: number): Voice?
 		end
 		return v
 	end
-	bank.cursor = bank.cursor % VOICES_PER_ID + 1
+	bank.cursor = bank.cursor % bank.size + 1
 	return bank.voices[bank.cursor]
 end
 
@@ -128,14 +154,24 @@ function SoundPool.play(id: number, parent: Instance, volume: number, speed: num
 	if not v then
 		return
 	end
-	local pos = if parent:IsA("BasePart") then parent.Position elseif parent:IsA("Attachment") then parent.WorldPosition else Vector3.zero
+	local pos = if parent:IsA("BasePart")
+		then parent.Position
+		elseif parent:IsA("Attachment") then parent.WorldPosition
+		else Vector3.zero
 	fire(v, pos, volume, speed, maxDist)
 end
 
 -- Binaural footstep "Clean Your Brain": phát sound tại basePos lệch sang bên tai
 -- pan ∈ [-1, 1] (âm = tai Trái, dương = tai Phải) theo RightVector của camera —
 -- audio engine 3D của Roblox tự đảo kênh stereo, không cần EQ/plugin.
-function SoundPool.playPanned(id: number, basePos: Vector3, volume: number, speed: number, pan: number, maxDist: number?)
+function SoundPool.playPanned(
+	id: number,
+	basePos: Vector3,
+	volume: number,
+	speed: number,
+	pan: number,
+	maxDist: number?
+)
 	local v = takeVoice(id)
 	if not v then
 		return

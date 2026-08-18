@@ -1,3 +1,4 @@
+--!strict
 -- Orbeez — 🫧 Hồ Hạt Nước (water beads): thảm sphere mesh bóng ướt nhiều màu pastel
 -- (ProgramSquidMeshPackV2, mesh 119645107654187, chìm nửa thân). Chân dậm hạt LÚN 45%,
 -- phình mọng 40%, nảy rung tắt dần như gel — kèm SÁNG BỪNG trắng rồi nguội dần.

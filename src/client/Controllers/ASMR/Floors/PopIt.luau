@@ -1,3 +1,4 @@
+--!strict
 -- PopIt — port nguyên vẹn PopItClient: bước lên bong bóng -> lõm xuống + pop lách tách,
 -- tự phồng lại 2.2–4.4s với tiếng trầm nhỏ. Sound qua SoundPool (hết Instance.new + Debris).
 

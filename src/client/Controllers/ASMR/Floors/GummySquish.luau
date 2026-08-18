@@ -1,3 +1,4 @@
+--!strict
 -- GummySquish — 🍬 SÀN KẸO DẺO SÓNG LAN (thế hệ mới, Zone 14).
 --
 -- Khác hẳn SlimeSquish cũ (EditableMesh, mô phỏng từng vertex — nặng và chỉ lõm cục bộ):
@@ -27,8 +28,34 @@
 
 local GummySquish = {}
 
--- Palette gummy/slime đã vet (random mỗi bước → không lặp máy móc), binaural qua SoundPool
-local STEP_SOUNDS = { 133222321566847, 76169806288463, 9114631918, 9114520014 }
+--[[
+	BỘ ÂM "SquishHand" — 6 mẫu CÙNG MỘT BỘ THU (sillycutiebun), thay bộ cũ 2026-08-12.
+
+	Vì sao đổi (user: "nghe không ASMR, không tương đồng"): bộ cũ
+	{133222321566847, 76169806288463, 9114631918, 9114520014} có hai vấn đề cộng lại —
+
+	  1. NÓ LÀ BỘ ĐI MƯỢN. Bốn ID đó chính là bộ của `SlimeSquish`, và ba trong số đó còn dùng
+	     lại ở `Clay`/`SlimeJelly`. Sàn kẹo dẻo của Zone 14 không có tiếng riêng nào cả.
+	  2. ĐỘ DÀI LỆCH NHAU TỚI 3 LẦN: 0.60s · 1.14s · 1.58s · 1.65s (đã đo). Bốc ngẫu nhiên
+	     giữa chúng nghĩa là mỗi bước chân dài ngắn khác hẳn nhau — tai nghe ra ngay là "bốc
+	     mẫu lung tung" chứ không phải một chất liệu. Tệ hơn: ở nhịp chạy 14 bước/giây, một
+	     mẫu 1.65s chồng lên hơn 20 bước sau nó ⇒ nhoè thành tiếng ồn ướt liên tục.
+
+	Bộ mới: 6 mẫu **0.17–0.22s**, chênh nhau đúng 0.05s, cùng chất "bóp kẹo dẻo bằng tay" —
+	ngắn nên mỗi bước là một tiếng dứt khoát, đều nhau nên nghe ra CÙNG MỘT chất liệu, mà vẫn
+	đủ 6 biến thể để không lặp máy móc (yêu cầu này đã chốt: KHÔNG dùng một mẫu duy nhất).
+
+	Cố ý CHỪA `SquishHand5` (133081811995754): sàn Clay đang dùng làm mẫu chính, để lại thì
+	hai zone vẫn phân biệt được.
+]]
+local STEP_SOUNDS = {
+	105798502378436, -- SquishHand1 · 0.20s
+	126425746730419, -- SquishHand2 · 0.22s
+	131103233341950, -- SquishHand3 · 0.22s
+	106681131400540, -- SquishHand4 · 0.19s
+	132382300663275, -- SquishHand7 · 0.18s
+	90277559933635, -- SquishHand9 · 0.17s
+}
 GummySquish.soundIds = STEP_SOUNDS
 
 -- ── mạng lò xo ──

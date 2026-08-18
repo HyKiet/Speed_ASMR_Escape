@@ -1,3 +1,4 @@
+--!strict
 -- SqueakyDuck — 🦆 Sàn Vịt Cao Su Chít Chít: đĩa cao su vàng bóng lún sâu 55% + phình 25%,
 -- nảy lại nhanh như bóp đồ chơi. Mỗi bước = tiếng squeeze toy CHÍT CHÍT (ProSoundEffects
 -- Squeaks) pitch đảo 0.9–1.12 — trigger gây nghiện kinh điển, binaural đảo tai L/R
@@ -9,7 +10,12 @@ return SquishFloor.make({
 	name = "SqueakyDuck",
 	-- Squeeze Toy Squeaky Rubber Noisemaker Hits 2/10/11/12/13 + Doll Squeaks 7
 	-- Mix ASMR: 5 squeeze toy + doll squeak + mouth pop/suction pop — cao su đa chất liệu phê tai
-	soundIds = { 9125994313, 9125994570, 9125994773, 9125994778, 9125994785, 9114123168, 9117848644, 9119669295 },
+	-- Trả về hệ âm CŨ (bốc ngẫu nhiên nhiều mẫu) theo yêu cầu user 2026-08-05, NHƯNG
+	-- vẫn giữ việc bỏ mẫu 08 `9119669295` "Suction Pop 2" — đó là yêu cầu riêng, không
+	-- nằm trong phần hoàn nguyên.
+	-- 2026-08-10: bỏ tiếp mẫu 07 `9117848644` (user nghe Zone 8 + 11). Còn 6 mẫu.
+	-- ⚠️ ID đó vẫn được BubbleWrap/PopIt/Zone5Fx dùng — chỉ gỡ khỏi sàn vịt, đừng xoá chỗ khác.
+	soundIds = { 9125994313, 9125994570, 9125994773, 9125994778, 9125994785, 9114123168 },
 	radius = 4.4, -- bán kính sát chân hơn (mặc định 5.6)
 	radiusRef = 3.9, -- 4.4 được chỉnh cho đĩa cỡ 3.9 → tự giãn khi vịt to lên (Z8/Z11 = 6.2)
 	maxSquish = 0.62,

@@ -1,3 +1,4 @@
+--!strict
 -- ASMR Floor Engine — bộ điều khiển DUY NHẤT cho toàn bộ sàn ASMR trên map.
 -- Kiến trúc: docs/asmr-engine-architecture.md. Thay thế 9 script inline cũ trong ASMR_Test.
 --
@@ -20,6 +21,7 @@ local ParticlePool = require(script.Engine.ParticlePool)
 local SpatialGrid = require(script.Engine.SpatialGrid)
 local Bounds = require(script.Engine.Bounds)
 local Await = require(script.Engine.Await)
+local GroundLimit = require(script.Engine.GroundLimit)
 
 local Floors = {}
 for _, mod in script.Floors:GetChildren() do
@@ -35,6 +37,7 @@ local engine = {
 	SpatialGrid = SpatialGrid,
 	Bounds = Bounds,
 	Await = Await,
+	GroundLimit = GroundLimit,
 }
 
 -- container runtime (sound pool + particle anchors) — local, không replicate
@@ -44,6 +47,13 @@ runtime.Parent = workspace
 
 -- preload + WARM toàn bộ sound của MỌI loại sàn đúng 1 lần lúc load
 local allIds, seen = {}, {}
+-- Sàn nào rút về ít mẫu (sàn phím: 1 mẫu/lớp) phải khai `Floor.voices = { [id] = n }`,
+-- nếu không giọng bị cướp lại giữa chừng khi chạy nhanh và mẫu gần như không kịp kêu.
+-- Nhiều sàn cùng khai một id thì lấy số LỚN NHẤT.
+local voiceCounts = {}
+-- `Floor.voiceFx = { [id] = { low=, mid=, high= } }` (dB): gắn EqualizerSoundEffect cố định
+-- lên giọng của id đó. Dùng khi mẫu bị chói (nốt piano pitch-shift) — hạ `high` là đủ mềm.
+local voiceFx = {}
 for _, floor in Floors do
 	for _, id in floor.soundIds or {} do
 		if not seen[id] then
@@ -51,8 +61,16 @@ for _, floor in Floors do
 			table.insert(allIds, id)
 		end
 	end
+	for id, n in floor.voices or {} do
+		if not voiceCounts[id] or n > voiceCounts[id] then
+			voiceCounts[id] = n
+		end
+	end
+	for id, fx in floor.voiceFx or {} do
+		voiceFx[id] = fx
+	end
 end
-SoundPool.init(runtime, allIds)
+SoundPool.init(runtime, allIds, voiceCounts, voiceFx)
 ParticlePool.init(runtime)
 
 -- ===== registry: tag -> adapter instance =====
@@ -159,4 +177,6 @@ local floorCount = 0
 for _ in Floors do
 	floorCount += 1
 end
-print(("[ASMR Engine] sẵn sàng — %d loại sàn, %d sound preload, tag '%s'"):format(floorCount, #allIds, FLOOR_TAG))
+print(
+	("[ASMR Engine] sẵn sàng — %d loại sàn, %d sound preload, tag '%s'"):format(floorCount, #allIds, FLOOR_TAG)
+)

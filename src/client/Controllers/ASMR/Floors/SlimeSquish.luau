@@ -1,3 +1,4 @@
+--!strict
 -- SlimeSquish — 🟢 KHỐI JELLY TRONG SUỐT + SOFT BODY (Zone 14, theo ảnh mẫu user).
 --
 -- Look bắt buộc (ảnh mẫu): khối jelly Glass trong suốt, mặt trên PHẲNG TUYỆT ĐỐI (không sóng
@@ -249,7 +250,14 @@ function SlimeSquish.attach(model, engine)
 
 		self.ready = build() and box ~= nil
 		if self.ready then
-			print(("[ASMR SlimeSquish] khối jelly sẵn sàng — lưới %dx%d, lõm R%.1f sâu %.2f"):format(nx, nz, dentR, dentDepth))
+			print(
+				("[ASMR SlimeSquish] khối jelly sẵn sàng — lưới %dx%d, lõm R%.1f sâu %.2f"):format(
+					nx,
+					nz,
+					dentR,
+					dentDepth
+				)
+			)
 		end
 	end)
 

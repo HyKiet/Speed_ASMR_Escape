@@ -1,3 +1,4 @@
+--!strict
 -- Jelly — port nguyên vẹn JellyClient: khối thạch wobble lò xo tắt dần exp(-2.6t)·sin(13t),
 -- nghiêng ngẫu nhiên, tiếng wobble board. Nhảy lên = rung mạnh, đi bộ = rung nhẹ liên tục.
 

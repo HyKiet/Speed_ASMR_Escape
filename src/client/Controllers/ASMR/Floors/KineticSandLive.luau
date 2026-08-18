@@ -1,3 +1,4 @@
+--!strict
 -- KineticSandLive — port CRATER v3 (Lobby.ASMR.Live full-floor 5180 ô) sang engine ASMR chung.
 -- Giữ NGUYÊN chức năng bản KineticSandClient v3:
 --   • Vết CRATER: tâm lún + viền phồng (RIM), sẫm màu cát ướt.
@@ -10,11 +11,16 @@
 -- vì sao đây là bản riêng chứ không tái dùng KineticSand.luau: sàn 144-ô ASMR_Test dùng bản
 -- lún phẳng đơn giản; sàn Live cần crater+rim+so le nên tách module để không đổi sàn kia.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local SoundIds = require(ReplicatedStorage.Shared.Config.SoundIds)
+
 local KineticSandLive = {}
 
-local CRUNCH = { 72043022297629, 139933585379767, 123627945803927, 81253534133158 }
-local DIRT = 9114087861
-KineticSandLive.soundIds = { 72043022297629, 139933585379767, 123627945803927, 81253534133158, DIRT }
+-- ⚠️ Âm cát lấy từ `Config.SoundIds` — dùng chung với `KineticSand`. Xem lý do ở đó.
+local CRUNCH = SoundIds.SAND_CRUNCH
+local DIRT = SoundIds.SAND_DIRT
+KineticSandLive.soundIds = { CRUNCH[1], CRUNCH[2], CRUNCH[3], CRUNCH[4], DIRT }
 
 local CELL = 3
 local DEPTH = 0.5

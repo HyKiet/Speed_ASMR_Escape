@@ -1,3 +1,4 @@
+--!strict
 -- AquaRun — port nguyên vẹn AquaRunClient: splash pitch/volume theo VẬN TỐC THẬT,
 -- vòng sóng lan (animate thủ công) + giọt nước bắn.
 -- Nâng cấp so bản cũ: vòng sóng dùng POOL 40 part tái sử dụng (không Instance.new/Destroy
@@ -15,7 +16,8 @@ local FOOT_DROP = 3.2
 local Y_TOL = 2.6
 
 function AquaRun.attach(model, engine)
-	local FxBudget, SoundPool, ParticlePool, Bounds = engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
+	local FxBudget, SoundPool, ParticlePool, Bounds =
+		engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
 	local self = { ready = false }
 
 	local box, waterY

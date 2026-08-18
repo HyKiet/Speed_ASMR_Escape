@@ -1,3 +1,4 @@
+--!strict
 -- SquishFloor — lõi dùng chung cho họ sàn squish thuần toán học Part.Size + Position
 -- (Honeycomb / IceFracture / SlimeJelly): lún theo khoảng cách chân, phình ngang,
 -- hồi phục exponential — KHÔNG EditableMesh, KHÔNG Bone, không tạo vertex mới.
@@ -43,8 +44,26 @@ function SquishFloor.make(cfg)
 	-- rung dư chấn khi chân rời ô: {amp, freq, decay} — ô nảy sin tắt dần quanh đường hồi phục
 	local JIG = cfg.jiggle
 
+	-- ===== ĐỒNG BỘ + THEO TỐC ĐỘ (2026-08-05, tuỳ chọn) =====
+	-- Cùng học thuyết đã chốt cho sàn phím: mọi ô phát ĐÚNG một tiếng như nhau (không bốc
+	-- ngẫu nhiên mẫu, không rung cao độ), và chất tiếng đổi theo TỐC ĐỘ người chơi chứ
+	-- không theo ô nào bị dẫm.
+	--   uniformSound = true  → luôn dùng SOUND_IDS[1], bỏ random mẫu + random pitch
+	--   speedMix = { volFast, pitchSlow, pitchFast } → càng nhanh càng to và càng trầm
+	-- Cả hai MẶC ĐỊNH TẮT: engine này còn chạy CrystalDrop / SqueakyDuck / Orbeez, các sàn
+	-- đó chưa được yêu cầu đổi nên phải giữ nguyên hành vi cũ.
+	local UNIFORM = cfg.uniformSound == true
+	local SPEED_MIX = cfg.speedMix
+
 	local floor = {}
 	floor.soundIds = SOUND_IDS
+	-- Rút về 1 mẫu là số giọng thật tụt 4 lần (xem ASMR/Engine/SoundPool). Sàn nào bật
+	-- uniformSound BẮT BUỘC khai `voices`, nếu không giọng bị cướp giữa chừng khi chạy nhanh.
+	floor.voices = cfg.voices
+
+	local function lerp(a, b, t)
+		return a + (b - a) * t
+	end
 
 	function floor.attach(model, engine)
 		local FxBudget, SoundPool, Bounds = engine.FxBudget, engine.SoundPool, engine.Bounds
@@ -142,8 +161,9 @@ function SquishFloor.make(cfg)
 		local lastStepT = 0
 		local anyActive = false
 
-		-- Mỗi bước rút ngẫu nhiên 1 âm trong palette ASMR trộn của sàn (đa chất liệu
-		-- cho phê tai), binaural đảo tai L↔R qua SoundPool.playStep.
+		-- Chế độ CŨ: mỗi bước rút ngẫu nhiên 1 âm trong palette trộn của sàn, pitch random.
+		-- Chế độ UNIFORM: một mẫu duy nhất, cao độ do TỐC ĐỘ quyết định (xem khối cấu hình).
+		-- Cả hai đều binaural đảo tai L↔R qua SoundPool.playStep.
 		local function playStep(foot, now, volume)
 			if now - lastStepT < 1 / MAX_STEP_RATE then
 				return
@@ -152,13 +172,25 @@ function SquishFloor.make(cfg)
 			if not FxBudget.fxOK(foot.pos) then
 				return
 			end
-			SoundPool.playStep(
-				SOUND_IDS[math.random(#SOUND_IDS)],
-				foot.pos,
-				volume,
-				PITCH_MIN + math.random() * (PITCH_MAX - PITCH_MIN),
-				80
-			)
+
+			if not UNIFORM then
+				SoundPool.playStep(
+					SOUND_IDS[math.random(#SOUND_IDS)],
+					foot.pos,
+					volume,
+					PITCH_MIN + math.random() * (PITCH_MAX - PITCH_MIN),
+					80
+				)
+				return
+			end
+
+			local t = math.clamp(foot.ratio or 0, 0, 1)
+			local pitch, vol = 1, volume
+			if SPEED_MIX then
+				pitch = lerp(SPEED_MIX.pitchSlow, SPEED_MIX.pitchFast, t)
+				vol = volume * lerp(1, SPEED_MIX.volFast, t)
+			end
+			SoundPool.playStep(SOUND_IDS[1], foot.pos, vol, pitch, 80)
 		end
 
 		function self.update(dt, now, foot)

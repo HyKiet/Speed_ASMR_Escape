@@ -1,12 +1,21 @@
+--!strict
 -- Clay — port nguyên vẹn ClayClient v2: ô bo góc squishy lún + phình ngang dưới chân,
 -- hồi phục chậm (clay memory), âm nặn đất mịn.
 
 local Clay = {}
 
+-- ÂM THANH: HOÀN NGUYÊN HỆ CŨ (2026-08-07, yêu cầu user).
+-- Bản 2026-08-05 rút về MỘT mẫu duy nhất + cao độ/âm lượng chạy theo tốc độ (cùng học
+-- thuyết với sàn phím v3). User đối chiếu với các sàn còn giữ hệ cũ (Zone 5 PopIt,
+-- Zone 7 Jelly, Zone 8 SqueakyDuck, Zone 9 AquaRun) và chốt hệ CŨ hay hơn hẳn:
+-- bốc ngẫu nhiên trong một palette + rung cao độ mỗi bước.
+--
 -- Mix ASMR ÊM DỊU (user chê bản squelch/pop sắc quá): clay chính + Gooshy Grab mềm
--- + Slime 2 ướt trầm — không âm percussive
+-- + Slime 2 ướt trầm — không âm percussive.
 local SQUISH_SOUNDS = { 133081811995754, 9114631918, 76169806288463 }
 Clay.soundIds = SQUISH_SOUNDS
+-- KHÔNG khai `Clay.voices`: 3 mẫu × 4 giọng mặc định = 12 giọng thật, đủ cho nhịp bước
+-- dày nhất. (`voices` chỉ cần khi sàn rút về một mẫu duy nhất — xem Engine/SoundPool.)
 
 -- v3 (2026-07-26, feedback user): "0.75 lún quá sâu" → thiết kế lại cho PHÊ + GÂY NGHIỆN:
 --   • Lún vừa (0.48 ≈ ô còn hé trên sàn) nhưng NHÚN NHANH — cảm giác đàn hồi tức thì.

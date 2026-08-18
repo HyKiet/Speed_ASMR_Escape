@@ -1,12 +1,18 @@
+--!strict
 -- KineticSand — port nguyên vẹn KineticSandClient (bản ASMR_Test): vết chân khắc vào cát
 -- (lún 0.42 + sẫm màu cát nén), giữ 3.5–6s rồi đầy lại; swept stamping; crunch + bụi cát.
 -- Bụi qua ParticlePool preset "dust" (bản cũ đã dùng 1 emitter chung — giữ nguyên hành vi).
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local SoundIds = require(ReplicatedStorage.Shared.Config.SoundIds)
+
 local KineticSand = {}
 
-local CRUNCH = { 72043022297629, 139933585379767, 123627945803927, 81253534133158 }
-local DIRT = 9114087861
-KineticSand.soundIds = { 72043022297629, 139933585379767, 123627945803927, 81253534133158, DIRT }
+-- ⚠️ Âm cát lấy từ `Config.SoundIds` — dùng chung với `KineticSandLive`. Xem lý do ở đó.
+local CRUNCH = SoundIds.SAND_CRUNCH
+local DIRT = SoundIds.SAND_DIRT
+KineticSand.soundIds = { CRUNCH[1], CRUNCH[2], CRUNCH[3], CRUNCH[4], DIRT }
 
 local CELL = 3
 local DEPTH = 0.42
@@ -18,7 +24,8 @@ local FOOT_DROP = 3.2
 local Y_TOL = 2.8
 
 function KineticSand.attach(model, engine)
-	local FxBudget, SoundPool, ParticlePool, Bounds = engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
+	local FxBudget, SoundPool, ParticlePool, Bounds =
+		engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
 	local self = { ready = false }
 
 	local grid
@@ -62,7 +69,13 @@ function KineticSand.attach(model, engine)
 			return
 		end
 		local id = math.random() < 0.25 and DIRT or CRUNCH[math.random(#CRUNCH)]
-		SoundPool.playStep(id, parent.Position, 0.4 + ratio * 0.3, 0.9 + ratio * 0.3 + (math.random() * 0.14 - 0.07), 70)
+		SoundPool.playStep(
+			id,
+			parent.Position,
+			0.4 + ratio * 0.3,
+			0.9 + ratio * 0.3 + (math.random() * 0.14 - 0.07),
+			70
+		)
 	end
 
 	local function stampAt(px, pz, now)

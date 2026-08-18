@@ -1,3 +1,4 @@
+--!strict
 -- BubbleWrap — port nguyên vẹn BubbleWrapClient v2: bóng nổ LÌ (bẹp + mờ), VFX khí trắng
 -- + tia lấp lánh (giờ qua ParticlePool thay emitter lazy-create per-bóng), crinkle theo bước,
 -- hết bóng/15s -> sóng tái phồng chạy từng hàng.
@@ -6,7 +7,6 @@ local TweenService = game:GetService("TweenService")
 
 local BubbleWrap = {}
 
--- Mix ASMR: pop/suction/pacifier + 2 Mouth Pop PSE mới (đa chất liệu phê tai)
 local POP_SOUNDS = { 9117848644, 9119669295, 9117183955, 9117019901, 9117020299 }
 local CRINKLE = 9125723913
 BubbleWrap.soundIds = { 9117848644, 9119669295, 9117183955, 9117019901, 9117020299, CRINKLE }
@@ -18,11 +18,16 @@ local FOOT_DROP = 3.2
 local POP_R_FACTOR = 0.82
 local POP_R_MIN = 2.1
 
+-- Bóng xẹp còn 10% chiều cao (POP_SCALE_Y) và tụt xuống ngần này.
+local POP_DROP = 0.75
+local POP_SCALE_Y = 0.1
+
 local POP_TI = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local INFLATE_TI = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 function BubbleWrap.attach(model, engine)
-	local FxBudget, SoundPool, ParticlePool, Bounds = engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
+	local FxBudget, SoundPool, ParticlePool, Bounds =
+		engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
 	local self = { ready = false }
 	-- Bản zone không có Base → box.topY = đỉnh bóng, cần tolerance rộng hơn (builder set YTol=4.2)
 	local Y_TOL = model:GetAttribute("YTol") or 2.6
@@ -30,6 +35,8 @@ function BubbleWrap.attach(model, engine)
 	local bubbles = {}
 	local box
 	local popR2 = POP_R_MIN * POP_R_MIN
+	-- Bóng nổ tụt xuống bao nhiêu. Chốt lại theo mặt đất lúc attach (xem khối tính dưới).
+	local popDrop = POP_DROP
 	local poppedCount = 0
 	local firstPopAt = nil
 	local resetting = false
@@ -64,8 +71,25 @@ function BubbleWrap.attach(model, engine)
 			local r = math.max(POP_R_MIN, bubbles[1].part.Size.X * POP_R_FACTOR)
 			popR2 = r * r
 		end
+		-- ĐỘ TỤT KHI NỔ THEO MẶT ĐẤT (2026-08-04). Bóng là chỏm cầu chôn nửa dưới: tâm
+		-- chỉ cao hơn mặt đất ~0.15 stud. Tụt cứng 0.75 rồi xẹp còn 10% chiều cao thì cả
+		-- quả bóng nằm HẲN dưới nền — nổ xong bóng biến mất thay vì để lại vệt xẹp lép.
+		-- Chuyện này vốn đã sai từ trước, nay người chơi đứng ngay trên nền nên nhìn rõ.
+		-- Kẹp lại cho đỉnh bóng xẹp vẫn nhô 0.15 trên mặt đất; phần "nổ" do cú xẹp mesh
+		-- đảm nhiệm chứ không phải cú tụt, nên hiệu ứng không mất gì.
+		local b1 = bubbles[1]
+		if b1 then
+			local half = b1.part.Size.Y / 2
+			local groundTop = engine.GroundLimit.topUnder(model, b1.restPos, b1.restPos.Y - half)
+			-- đỉnh SAU khi xẹp = tâm + half·POP_SCALE_Y, phải còn trên mốc CLEARANCE
+			local limit = engine.GroundLimit.maxSink(b1.restPos.Y + half * POP_SCALE_Y, groundTop)
+			if limit then
+				popDrop = math.min(POP_DROP, limit)
+			end
+		end
+
 		self.ready = box ~= nil and #bubbles > 0
-		print("[ASMR BubbleWrap] sẵn sàng —", #bubbles, "bóng khí + pop VFX")
+		print(("[ASMR BubbleWrap] sẵn sàng — %d bóng khí + pop VFX, tụt %.2f"):format(#bubbles, popDrop))
 	end)
 
 	local function sound(parent, id, vol, spMin, spMax)
@@ -83,12 +107,12 @@ function BubbleWrap.attach(model, engine)
 		ParticlePool.emit("puff", top, 5)
 		ParticlePool.emit("sparks", top, 9)
 		TweenService:Create(b.part, POP_TI, {
-			Position = b.restPos - Vector3.new(0, 0.75, 0),
+			Position = b.restPos - Vector3.new(0, popDrop, 0),
 			Transparency = 0.72,
 			Color = Color3.fromRGB(210, 214, 222),
 		}):Play()
 		if b.mesh then
-			TweenService:Create(b.mesh, POP_TI, { Scale = Vector3.new(1.06, 0.1, 1.06) }):Play()
+			TweenService:Create(b.mesh, POP_TI, { Scale = Vector3.new(1.06, POP_SCALE_Y, 1.06) }):Play()
 		end
 		sound(b.part, POP_SOUNDS[math.random(#POP_SOUNDS)], 0.42, 1.2, 1.6)
 	end
@@ -131,10 +155,7 @@ function BubbleWrap.attach(model, engine)
 		end
 		if foot then
 			local pos = foot.pos
-			if
-				engine.Bounds.contains(box, pos)
-				and math.abs((pos.Y - FOOT_DROP) - box.topY) <= Y_TOL
-			then
+			if engine.Bounds.contains(box, pos) and math.abs((pos.Y - FOOT_DROP) - box.topY) <= Y_TOL then
 				if not resetting then
 					for _, b in bubbles do
 						if not b.popped then
@@ -163,7 +184,10 @@ function BubbleWrap.attach(model, engine)
 			stepLast = nil
 			stepDist = 0
 		end
-		if not resetting and (poppedCount >= #bubbles or (firstPopAt and os.clock() - firstPopAt > 15 and poppedCount > 0)) then
+		if
+			not resetting
+			and (poppedCount >= #bubbles or (firstPopAt and os.clock() - firstPopAt > 15 and poppedCount > 0))
+		then
 			resetWave()
 		end
 	end

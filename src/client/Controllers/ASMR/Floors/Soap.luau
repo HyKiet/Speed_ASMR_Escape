@@ -1,3 +1,4 @@
+--!strict
 -- Soap — port nguyên vẹn SoapCutClient: mỗi nhịp chạy trên bánh xà phòng tạo LÁT CẮT
 -- (rãnh sẫm màu fade 3.2s + 4 dăm xà phòng văng xoay rồi tan). Giữ nguyên POOL 30 dăm
 -- + 24 rãnh của bản gốc; template dăm = ReplicatedStorage.RoundCubeMesh.

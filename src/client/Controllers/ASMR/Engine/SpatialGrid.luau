@@ -1,3 +1,4 @@
+--!strict
 -- Băm không gian 2D (cell vuông) — tra cứu O(1) quanh một điểm.
 -- Hot path (Keyboard 720+ phím) truy cập thẳng `grid.map`/`grid.cell` và tự loop 3x3
 -- như v5 để không tốn closure; các sàn khác dùng query() cho gọn.
