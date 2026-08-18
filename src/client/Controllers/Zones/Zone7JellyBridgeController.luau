@@ -1,3 +1,4 @@
+--!strict
 --[[
 	Zone7JellyBridgeController — VISUAL cầu sập jelly Zone 7 (100% client, 0 network/frame).
 

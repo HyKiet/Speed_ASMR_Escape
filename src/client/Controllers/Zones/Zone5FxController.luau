@@ -72,7 +72,8 @@ end
 
 local function spawnVictoryFireworks(position: Vector3)
 	local victorySound = Instance.new("Sound")
-	victorySound.SoundId = "rbxassetid://89481514209130" -- Level Up (group, xem Theme.UI_ASSETS.LevelUpSound)
+	-- 2026-08-12: dùng âm chúc mừng chung (âm rebirth) — xem Theme.UI_ASSETS.CelebrationSound.
+	victorySound.SoundId = "rbxassetid://4612383790"
 	victorySound.Volume = 0.6
 	victorySound.Parent = localPlayer:WaitForChild("PlayerGui", 5) or Workspace
 	victorySound:Play()

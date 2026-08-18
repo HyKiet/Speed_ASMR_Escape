@@ -27,13 +27,14 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Zone15Traps = require(ReplicatedStorage.Shared.Config.Zones.Zone15Traps)
+local ZoneLod = require(script.Parent.ZoneLod)
 
 local SW = Zone15Traps.Sweep
 local SH = Zone15Traps.Shuttle
 local F = Zone15Traps.SplitFloor
 
+-- Bán kính SÀN. Tầm thức thật do `ZoneLod.RadiusSq` quyết định theo WalkSpeed — xem ZoneLod.
 local RENDER_RADIUS = 380
-local RENDER_RADIUS_SQ = RENDER_RADIUS * RENDER_RADIUS
 local RESOLVE_INTERVAL = 0.5
 
 local Zone15TrapController = {}
@@ -231,6 +232,8 @@ end
 
 -- Trạng thái thức/ngủ của từng cụm (đổi trạng thái mới ghi part, mỗi khung hình không đụng gì).
 local beamAwake, padAwake, doorAwake = false, false, false
+-- Mốc nhịp hạ tần riêng từng cụm (xem ZoneLod.ShouldStepFar).
+local beamFar, padFar, doorFar = 0, 0, 0
 
 local function step()
 	local character = player.Character
@@ -241,29 +244,43 @@ local function step()
 
 	local pos = root.Position
 	local now = Workspace:GetServerTimeNow()
+	local radiusSq = ZoneLod.RadiusSq(RENDER_RADIUS)
+	local shouldStep: boolean
 
 	local dx, dz = pos.X - beamCenter.X, pos.Z - beamCenter.Z
-	local near = dx * dx + dz * dz <= RENDER_RADIUS_SQ and alive(beamViews)
+	local distSq = dx * dx + dz * dz
+	local near = distSq <= radiusSq and alive(beamViews)
 	if near then
-		renderBeams(now)
+		shouldStep, beamFar = ZoneLod.ShouldStepFar(distSq, now, beamFar)
+		if shouldStep then
+			renderBeams(now)
+		end
 	elseif beamAwake and alive(beamViews) then
 		sleepMoving(beamViews)
 	end
 	beamAwake = near
 
 	dx, dz = pos.X - padCenter.X, pos.Z - padCenter.Z
-	near = dx * dx + dz * dz <= RENDER_RADIUS_SQ and alive(padViews)
+	distSq = dx * dx + dz * dz
+	near = distSq <= radiusSq and alive(padViews)
 	if near then
-		renderPads(now)
+		shouldStep, padFar = ZoneLod.ShouldStepFar(distSq, now, padFar)
+		if shouldStep then
+			renderPads(now)
+		end
 	elseif padAwake and alive(padViews) then
 		sleepMoving(padViews)
 	end
 	padAwake = near
 
 	dx, dz = pos.X - doorCenter.X, pos.Z - doorCenter.Z
-	near = dx * dx + dz * dz <= RENDER_RADIUS_SQ and alive(doorViews)
+	distSq = dx * dx + dz * dz
+	near = distSq <= radiusSq and alive(doorViews)
 	if near then
-		renderDoors(now)
+		shouldStep, doorFar = ZoneLod.ShouldStepFar(distSq, now, doorFar)
+		if shouldStep then
+			renderDoors(now)
+		end
 	elseif doorAwake and alive(doorViews) then
 		sleepDoors()
 	end

@@ -16,16 +16,29 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Zone2Lasers = require(ReplicatedStorage.Shared.Config.Zones.Zone2Lasers)
+local ZoneLod = require(script.Parent.ZoneLod)
 
+-- Bán kính SÀN. Tầm thức thật do `ZoneLod.RadiusSq` quyết định theo WalkSpeed — xem ZoneLod.
+-- 240 là con số tệ nhất trong cả game: dải Stage 2 dài ~270 studs nên ở 250 WS người chơi
+-- nhìn thấy cả ba laser đứng chết cứng suốt hành lang rồi mới bật lên lúc sát mặt.
 local RENDER_RADIUS = 240
-local RENDER_RADIUS_SQ = RENDER_RADIUS * RENDER_RADIUS
 local RESOLVE_INTERVAL = 0.5
 
 local Zone2LaserController = {}
 
 local player = Players.LocalPlayer
 
-type Laser = { pivot: BasePart, base: CFrame, rpm: number, dir: number, cx: number, cz: number, awake: boolean }
+type Laser = {
+	pivot: BasePart,
+	base: CFrame,
+	rpm: number,
+	dir: number,
+	cx: number,
+	cz: number,
+	awake: boolean,
+	-- Mốc thời gian cho nhịp hạ tần khi laser này ở xa (xem ZoneLod.ShouldStepFar).
+	nextFar: number,
+}
 
 local lasers: { Laser } = {}
 local connection: RBXScriptConnection? = nil
@@ -65,6 +78,7 @@ local function resolve()
 					cx = baseCF.Position.X,
 					cz = baseCF.Position.Z,
 					awake = false,
+					nextFar = 0,
 				})
 			end
 		end
@@ -110,13 +124,22 @@ local function step()
 
 	local pos = root.Position
 	local now = Workspace:GetServerTimeNow()
+	-- Tra bảng một lần cho cả vòng lặp — bán kính chung cho mọi laser trong zone.
+	local radiusSq = ZoneLod.RadiusSq(RENDER_RADIUS)
 
 	for i = 1, #lasers do
 		local laser = lasers[i]
 		local dx, dz = pos.X - laser.cx, pos.Z - laser.cz
-		if dx * dx + dz * dz <= RENDER_RADIUS_SQ then
-			local angle = math.rad(Zone2Lasers.AngleDeg(now, laser.rpm, laser.dir))
-			laser.pivot.CFrame = laser.base * CFrame.Angles(0, angle, 0)
+		local distSq = dx * dx + dz * dz
+		if distSq <= radiusSq then
+			-- Laser ở xa hạ nhịp riêng từng cái (mốc `nextFar` nằm trong bản ghi laser):
+			-- người chơi thường đứng gần MỘT laser và xa hai cái kia.
+			local shouldStep: boolean
+			shouldStep, laser.nextFar = ZoneLod.ShouldStepFar(distSq, now, laser.nextFar)
+			if shouldStep then
+				local angle = math.rad(Zone2Lasers.AngleDeg(now, laser.rpm, laser.dir))
+				laser.pivot.CFrame = laser.base * CFrame.Angles(0, angle, 0)
+			end
 			laser.awake = true
 		elseif laser.awake then
 			-- ngủ: đưa về góc gốc đúng một lần

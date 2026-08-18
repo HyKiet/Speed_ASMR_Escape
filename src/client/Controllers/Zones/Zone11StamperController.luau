@@ -26,8 +26,10 @@ local Workspace = game:GetService("Workspace")
 local DEFAULT_IMPACT_SOUND = "rbxassetid://9116684884"
 local SPARK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 
+local ZoneLod = require(script.Parent.ZoneLod)
+
+-- Bán kính SÀN. Tầm thức thật do `ZoneLod.RadiusSq` quyết định theo WalkSpeed — xem ZoneLod.
 local RENDER_RADIUS = 420
-local RENDER_RADIUS_SQ = RENDER_RADIUS * RENDER_RADIUS
 
 -- v4 (2026-07-26): khói Cyber đã bỏ; HazardFace GIỮ MÀU người dựng map đặt (controller không
 -- ghi .Color nữa). LED_ALERT giờ chỉ còn dùng cho laser chỉ giới + tia lửa lúc va chạm.
@@ -44,6 +46,7 @@ local rightCrusher: BasePart? = nil
 local leftHazard: BasePart? = nil
 local rightHazard: BasePart? = nil
 
+local nextFarStep = 0
 local cycle, telegraphAt, stampAt, holdAt, retractAt = 1, 0, 0, 0, 0
 local retractDuration = 0.55
 local openLeftZ, pressLeftZ, openRightZ, pressRightZ = 0, 0, 0, 0
@@ -197,11 +200,19 @@ local function step()
 
 	local dx = root.Position.X - centerX
 	local dz = root.Position.Z - centerZ
-	if dx * dx + dz * dz > RENDER_RADIUS_SQ then
+	local distSq = dx * dx + dz * dz
+	if distSq > ZoneLod.RadiusSq(RENDER_RADIUS) then
 		return -- SLEEP
 	end
 
-	local t = Workspace:GetServerTimeNow() % cycle
+	local now = Workspace:GetServerTimeNow()
+	local shouldStep: boolean
+	shouldStep, nextFarStep = ZoneLod.ShouldStepFar(distSq, now, nextFarStep)
+	if not shouldStep then
+		return
+	end
+
+	local t = now % cycle
 	local alpha = closeAlphaAt(t)
 
 	local leftZ = openLeftZ + (pressLeftZ - openLeftZ) * alpha

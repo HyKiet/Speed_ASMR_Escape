@@ -2,7 +2,7 @@
 --[[
 	Zone5SlideController — cổng "BẮT BUỘC SLIDE" Zone 5 phía CLIENT.
 
-	Vì sao client: HipHeight do ParkourSlide hạ nằm ở phía CLIENT và KHÔNG replicate
+	Vì sao client: HipHeight do MovementSlide hạ nằm ở phía CLIENT và KHÔNG replicate
 	lên server (đã kiểm chứng: server luôn đọc 2.0). Nên server không thể biết player có
 	slide hay không → phải phát hiện ngay tại client (nơi biết chính xác HipHeight của mình).
 

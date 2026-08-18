@@ -14,8 +14,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
+local ZoneLod = require(script.Parent.ZoneLod)
+
+-- Bán kính SÀN. Tầm thức thật do `ZoneLod.RadiusSq` quyết định theo WalkSpeed — xem ZoneLod.
 local RENDER_RADIUS = 320
-local RENDER_RADIUS_SQ = RENDER_RADIUS * RENDER_RADIUS
 
 local Zone8SweeperController = {}
 
@@ -25,6 +27,7 @@ local center = Vector3.zero
 local baseRot = CFrame.identity
 local radPerSec = 0
 local ready = false
+local nextFarStep = 0
 local connection: RBXScriptConnection? = nil
 
 local function resolve(): boolean
@@ -67,11 +70,19 @@ local function step()
 
 	local dx = root.Position.X - center.X
 	local dz = root.Position.Z - center.Z
-	if dx * dx + dz * dz > RENDER_RADIUS_SQ then
+	local distSq = dx * dx + dz * dz
+	if distSq > ZoneLod.RadiusSq(RENDER_RADIUS) then
 		return -- SLEEP: quá xa, không cần render
 	end
 
-	local angle = -(Workspace:GetServerTimeNow() * radPerSec) % (math.pi * 2)
+	local now = Workspace:GetServerTimeNow()
+	local shouldStep: boolean
+	shouldStep, nextFarStep = ZoneLod.ShouldStepFar(distSq, now, nextFarStep)
+	if not shouldStep then
+		return
+	end
+
+	local angle = -(now * radPerSec) % (math.pi * 2)
 	part.CFrame = CFrame.new(center) * CFrame.Angles(0, angle, 0) * baseRot
 end
 
