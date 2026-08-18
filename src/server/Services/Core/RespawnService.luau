@@ -5,7 +5,8 @@
 --
 -- HƯỚNG NHÌN LÚC SPAWN
 -- ====================
--- `Workspace.Lobby.Spawn.SpawnLocation` có LookVector = (0,0,-1) trong khi toàn bộ zone
+-- `Workspace.Spawn.SpawnLocation` (NGOÀI Lobby — xem PathResolver.FindLobbySpawn) có
+-- LookVector = (0,0,-1) trong khi toàn bộ zone
 -- nằm về phía +Z ⇒ Roblox đặt nhân vật QUAY LƯNG vào các zone mỗi lần vào game và mỗi
 -- lần chết đi sống lại. Xoay part trong Studio cũng sửa được, nhưng đó là place data
 -- (Rojo không quản) nên dễ mất — chốt hướng bằng code ở đây.

@@ -15,15 +15,33 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
+-- Bộ quét RIÊNG của Zone 2. Không dùng chung với bẫy khác: mỗi bẫy đều reset() những
+-- player ngoài vùng của nó mỗi frame, chung bảng là xoá dấu vết của nhau (xem TrapSweep).
+local sweep = require(ReplicatedStorage.Shared.Util.TrapSweep).new("Zone2Laser")
 local Zone2Lasers = require(ReplicatedStorage.Shared.Config.Zones.Zone2Lasers)
 
 local Zone2LaserService = {}
 
-local TICK_RATE = 1 / 20
+-- ĐỘ CHÍNH XÁC (2026-08-07) — user: "walkspeed cao hoặc gắn aura/trail thì laser không giết".
+-- Nguyên nhân đo được: bản cũ phán xử ở 20Hz và chỉ thử ĐIỂM tại vị trí hiện tại. Ở 250 WS
+-- người chơi đi 12.5 studs giữa hai lần thử, trong khi beam chỉ dày ~3 studs (halfThick +
+-- BODY_HALF_WIDTH) ⇒ chưa chạm ở lần thử này, đã qua hẳn ở lần sau: không lần nào thấy trùng.
+-- Aura/trail render client-side nên server không thấy thêm part nào; cái chúng làm là hạ FPS
+-- của client — mà client là network owner của nhân vật — nên mỗi bước vị trí replicate về
+-- server dài hơn, tức đúng lỗi trên nhưng nặng hơn.
+--
+-- Chữa bằng 2 việc, KHÔNG đụng tới hình học/nhịp quay nên độ khó của zone không đổi:
+--   1) Chạy trên Heartbeat thay vì 20Hz.
+--   2) Quét cả ĐOẠN đường player vừa đi trong frame (TrapSweep), và tại mỗi mẫu dựng lại
+--      góc laser ĐÚNG thời điểm đó — beam cũng đang quay, so với góc cuối frame là lệch.
 local KILL_COOLDOWN = 0.85
+-- Bước rải mẫu: nửa bề dày mỏng nhất của một beam. Beam mỏng nhất trong Zone 2 dày 1.4
+-- studs (halfThick 0.7) + thân người 1.5 ⇒ cửa sổ 2.2; lấy 1.0 cho chắc tay.
+local SWEEP_STEP = 1.0
 local BODY_HALF_HEIGHT = 2.5 -- nửa thân người
 local BODY_HALF_WIDTH = 1.5
 local WAKE_PAD = 40
@@ -136,7 +154,7 @@ local function hitByLaser(laser: Laser, pos: Vector3, now: number): boolean
 	return false
 end
 
-local function tick()
+local function tick(dt: number)
 	if not ready or #lasers == 0 then
 		return
 	end
@@ -146,22 +164,37 @@ local function tick()
 	end
 
 	local now = Workspace:GetServerTimeNow()
+	-- Đầu frame: mẫu ở alpha=0 phải dùng góc laser của ĐẦU frame, không phải góc bây giờ.
+	local prevT = now - dt
+
 	for _, player in Players:GetPlayers() do
 		local root = CharacterUtil.GetAliveRoot(player)
 		if root and inWakeBox(root.Position) then
-			for i = 1, #lasers do
-				if hitByLaser(lasers[i], root.Position, now) then
-					local last = lastKill[player] or 0
-					if now - last >= KILL_COOLDOWN then
-						lastKill[player] = now
-						local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-						if humanoid then
-							humanoid.Health = 0
-						end
+			-- Quét cả đoạn player vừa đi; mỗi mẫu so với laser tại ĐÚNG thời điểm của mẫu đó.
+			local hit = sweep.forEachStep(player, root.Position, SWEEP_STEP, function(pos, alpha)
+				local tAt = prevT + (now - prevT) * alpha
+				for i = 1, #lasers do
+					if hitByLaser(lasers[i], pos, tAt) then
+						return true
 					end
-					break
+				end
+				return false
+			end)
+			if hit then
+				local last = lastKill[player] or 0
+				if now - last >= KILL_COOLDOWN then
+					lastKill[player] = now
+					local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+					if humanoid then
+						humanoid.Health = 0
+					end
+					-- chết rồi thì đoạn kế tiếp không được nối từ chỗ chết sang chỗ respawn
+					sweep.reset(player)
 				end
 			end
+		else
+			-- ra khỏi vùng laser: cắt dấu vết để lần vào lại không quét một đoạn dài vô nghĩa
+			sweep.reset(player)
 		end
 	end
 end
@@ -174,12 +207,8 @@ function Zone2LaserService.Start()
 			task.wait(1)
 		end
 		ready = true
-		print(`[Zone2LaserService] {#lasers} laser — render client, phán xử server 20Hz`)
-
-		while true do
-			task.wait(TICK_RATE)
-			tick()
-		end
+		print(`[Zone2LaserService] {#lasers} laser — render client, phán xử server swept/Heartbeat`)
+		RunService.Heartbeat:Connect(tick)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

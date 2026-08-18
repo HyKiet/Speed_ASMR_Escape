@@ -65,13 +65,20 @@ local minStageTime: { [number]: number } = {}
 -- Purchase tracking tables cho 3 pad cuối zone (Win / x2 Win / Skip)
 local pendingDoubleWins: { [Player]: number } = {}
 local pendingSkipStage: { [Player]: number } = {}
-local lastPadTouchTime: { [Player]: number } = {}
+-- Throttle chạm pad — khoá theo TỪNG PAD, không phải theo player.
+-- BUG cũ (user: "bệ nhận win lâu lâu không hoạt động"): bảng này từng là {[Player]: number}
+-- dùng chung cho cả 3 pad. Ba pad nằm sát nhau trên cùng bệ Transition, nên chỉ cần lướt
+-- qua x2Pad hay SkipStagePad là WinCollectionPad bị khoá 2 giây — bấm vào không ra gì, không
+-- báo lỗi. Đúng kiểu "lúc được lúc không".
+local lastPadTouchTime: { [Player]: { [string]: number } } = {}
+-- Throttle riêng cho thông báo TỪ CHỐI, để không spam khi người chơi đứng lì trên pad.
+local lastPadDenyAt: { [Player]: number } = {}
 
-local function sendToast(player: Player, message: string, kind: string?)
+local function sendToast(player: Player, message: string, kind: string?, amount: number?)
 	GamePackets.toast.sendTo({
 		kind = kind or "stage",
 		message = message,
-		amount = 0,
+		amount = amount or 0,
 	}, player)
 end
 
@@ -157,11 +164,19 @@ local function syncStageAttributes(player: Player)
 	end
 end
 
+-- BUG 2026-08-07 (user báo: "ăn Wins ở WinCollectionPad/DoubleWinCollectionPad xong không
+-- teleport về lobby"). Hàm này tra cứng `Workspace.Lobby.Spawn.SpawnLocation`, nhưng trong map
+-- SpawnLocation nằm ở `Workspace.Spawn.SpawnLocation` — NGOÀI Lobby. PathResolver trả nil và
+-- `return` ngay ⇒ Wins vẫn được trao, toast vẫn hiện, chỉ mỗi teleport là không xảy ra, và
+-- KHÔNG có một dòng log nào. Giờ dò qua PathResolver.FindLobbySpawn (nhiều phương án + quét
+-- SpawnLocation làm chốt chặn) và warn to nếu trượt hết.
 local function teleportPlayerToLobby(player: Player)
-	local targetCFrame = getTargetCFrame("Workspace.Lobby.Spawn.SpawnLocation")
-	if not targetCFrame then
+	local spawnPart = PathResolver.FindLobbySpawn()
+	if not spawnPart then
+		warn("[StageCheckpointService] KHÔNG tìm thấy SpawnLocation nào — không thể đưa về Lobby")
 		return
 	end
+	local targetCFrame = spawnPart.CFrame + Vector3.new(0, 4, 0)
 	-- Về sảnh luôn quay mặt về cổng Zone 1 — độc lập với orientation của SpawnLocation.
 	targetCFrame = StageFacing.Orient(targetCFrame.Position, 1, targetCFrame)
 	if not placePlayer(player, targetCFrame) then
@@ -182,12 +197,24 @@ local function isTouchNearPart(player: Player, part: BasePart): boolean
 	return (root.Position - part.Position).Magnitude <= STAGE_TOUCH_DISTANCE
 end
 
--- Trình tự hợp lệ để ăn Finish/WinPad của stage N:
---   1. ActiveStage == N (đã chạm Start hoặc teleport hợp lệ vào stage N).
---   2. Đã ở trong stage tối thiểu minStageTime[N] giây (không thể tele-hack Start→Finish tức thì).
+--[[
+	Trình tự hợp lệ để ăn WinPad/x2/Skip của stage N:
+	  1. ActiveStage == N (đã chạm Start hoặc teleport vào stage N), HOẶC N+1 — xem dưới.
+	  2. Đã ở trong stage tối thiểu minStageTime[N] giây (không tele-hack Start→Finish tức thì).
+
+	Vì sao chấp nhận cả N+1: bộ 3 pad của zone N nằm TRÊN bệ Transition N→N+1, mà đó cũng
+	chính là chỗ teleport tới stage N+1 thả người chơi xuống (StageLanding.GetEntryCFrame).
+	Teleport đặt ActiveStage = N+1 nên nếu chỉ nhận đúng N thì vừa đáp xuống là cả 3 pad
+	dưới chân đều câm — người chơi tưởng game hỏng.
+
+	ĐÁNH ĐỔI ĐÃ BIẾT (user chốt 2026-08-03): mở như vậy nghĩa là mua teleport tới stage N+1
+	là nhận được Wins của stage N mà không phải chạy. Cân bằng nằm ở GIÁ teleport, không
+	nằm ở đây — giá Wins của destination stage N+1 phải > Constants.STAGE_WINS[N], nếu không
+	người chơi lặp teleport để farm Wins vô hạn.
+]]
 local function isFinishSequenceValid(player: Player, stage: number): boolean
 	local activeStage = player:GetAttribute("ActiveStage")
-	if activeStage ~= stage then
+	if activeStage ~= stage and activeStage ~= stage + 1 then
 		return false
 	end
 
@@ -226,16 +253,19 @@ local function onStageStartTouched(stage: number, startPart: BasePart, hit: Base
 	end
 end
 
-local function completeStage(player: Player, stage: number): boolean
+-- Trả về (thành công, SỐ WINS thực nhận). Số này dùng cho màn ăn mừng ở client — trước đây
+-- chỗ gọi tự đọc `Constants.STAGE_WINS[stage]` nên ở stage 15 báo thiếu phần thưởng
+-- STAGE_15_FIRST_CLEAR_BONUS mà chính hàm này vừa cộng thêm.
+local function completeStage(player: Player, stage: number): (boolean, number)
 	local data = DataService.GetData(player)
 	if not data then
 		sendToast(player, "Data still loading")
-		return false
+		return false, 0
 	end
 
 	local dataTable = data :: any
 	local previousHighest = math.floor(dataTable.HighestCompletedStage or 0)
-	
+
 	-- Save progression
 	dataTable.HighestCompletedStage = math.max(previousHighest, stage)
 	player:SetAttribute("HighestCompletedStage", dataTable.HighestCompletedStage)
@@ -247,8 +277,11 @@ local function completeStage(player: Player, stage: number): boolean
 	if stage == 15 then
 		rewardWins += Constants.STAGE_15_FIRST_CLEAR_BONUS
 	end
+	-- Con số trả về là số SAU hệ số (x2 Wins Boost, buff group, event) — đó mới là số được
+	-- phép hiện lên thẻ ăn mừng. Xem ghi chú ở `ProgressionService.AwardWins`.
 	if rewardWins > 0 then
-		ProgressionService.AwardWins(player, rewardWins, "stage")
+		local _, finalWins = ProgressionService.AwardWins(player, rewardWins, "stage")
+		rewardWins = finalWins
 	else
 		ProgressionService.SendSnapshot(player)
 	end
@@ -261,12 +294,17 @@ local function completeStage(player: Player, stage: number): boolean
 		end
 	end
 
-	return true
+	return true, rewardWins
 end
 
 local function collectNormalWins(player: Player, stage: number)
-	completeStage(player, stage)
-	sendToast(player, `Collected {Constants.STAGE_WINS[stage]} Wins!`, "stage")
+	local ok, awarded = completeStage(player, stage)
+	if not ok then
+		return
+	end
+	-- kind "wins_collected" → client chạy WinsFlight (thẻ giữa màn hình bay về huy hiệu Wins)
+	-- thay cho toast thường. Xem HUDController.
+	sendToast(player, "Wins", "wins_collected", awarded)
 	teleportPlayerToLobby(player)
 end
 
@@ -359,70 +397,151 @@ local StageCheckpointService = {}
 ]]
 
 local PAD_TOUCH_COOLDOWN_SECONDS = 2.0
+local PAD_DENY_TOAST_COOLDOWN = 3.0
 
-local function isPadTouchThrottled(player: Player): boolean
+-- `padId` = định danh RIÊNG của từng pad ("win:3", "x2:3", …). Xem ghi chú ở `lastPadTouchTime`.
+local function isPadTouchThrottled(player: Player, padId: string): boolean
 	local now = os.clock()
-	if now - (lastPadTouchTime[player] or 0) < PAD_TOUCH_COOLDOWN_SECONDS then
+	local perPad = lastPadTouchTime[player]
+	if not perPad then
+		perPad = {}
+		lastPadTouchTime[player] = perPad
+	end
+	if now - (perPad[padId] or 0) < PAD_TOUCH_COOLDOWN_SECONDS then
 		return true
 	end
-	lastPadTouchTime[player] = now
+	perPad[padId] = now
 	return false
 end
 
--- Pad Handler: gắn Touched vào các part đã dựng sẵn trong Studio (không tạo mới ở đây).
+-- Từ chối pad thì PHẢI nói vì sao. Bản cũ `return` lặng lẽ ở cả 3 cửa kiểm tra, nên người
+-- chơi đứng trên bệ bấm mãi không ra gì và kết luận là game hỏng — đúng như user mô tả.
+local function denyPad(player: Player, reason: string)
+	local now = os.clock()
+	if now - (lastPadDenyAt[player] or 0) < PAD_DENY_TOAST_COOLDOWN then
+		return
+	end
+	lastPadDenyAt[player] = now
+	sendToast(player, reason)
+end
+
+--[[
+	ĐĂNG KÝ PAD + DÒ THEO VỊ TRÍ (2026-08-07).
+
+	Bản cũ chỉ dựa vào `Touched`. Ở walkspeed cao bước physics nhảy qua hẳn tấm pad nên
+	Touched không nổ — cùng họ lỗi với bẫy zone (xem shared/Util/TrapSweep). Giờ mọi pad
+	được ghi vào registry và một vòng dò 30Hz kiểm tra người chơi có ĐANG ĐỨNG TRÊN pad
+	không; `Touched` vẫn giữ để bắt các pad bị xoay/hình lạ mà phép so hộp bỏ sót.
+
+	30Hz chọn theo số đo: ở 250 WS người chơi đi 8.3 studs mỗi tick, còn cửa sổ của một pad
+	(nửa bề rộng ~4 + nới mép 3, tính cả hai bên) là ~14 studs ⇒ không thể lọt qua.
+]]
+type PadKind = "win" | "x2" | "skip"
+type PadEntry = { part: BasePart, kind: PadKind, stage: number, id: string }
+
+local padRegistry: { PadEntry } = {}
+local startRegistry: { { part: BasePart, stage: number } } = {}
+
+local PAD_EDGE_SLACK = 3.0
+local PAD_ABOVE = 9.0
+local PAD_BELOW = 4.0
+
+local function isStandingOnPad(root: BasePart, pad: BasePart): boolean
+	local p = root.Position
+	local half = pad.Size * 0.5
+	local dy = p.Y - (pad.Position.Y + half.Y)
+	return math.abs(p.X - pad.Position.X) <= half.X + PAD_EDGE_SLACK
+		and math.abs(p.Z - pad.Position.Z) <= half.Z + PAD_EDGE_SLACK
+		and dy <= PAD_ABOVE
+		and dy >= -PAD_BELOW
+end
+
+--[[
+	Một người chơi kích hoạt pad. Dùng CHUNG cho cả `Touched` lẫn vòng dò vị trí, nên hai
+	đường vào không thể lệch luật nhau.
+]]
+local function activatePad(player: Player, entry: PadEntry)
+	local stage = entry.stage
+
+	if entry.kind == "skip" then
+		-- Phải đang thực sự ở zone này (chống chạm pad từ xa / sau khi teleport đi nơi khác).
+		-- Nhận cả stage+1 vì pad nằm trên bệ Transition — chỗ teleport tới stage kế thả
+		-- người chơi xuống (cùng lý do với isFinishSequenceValid).
+		local activeStage = player:GetAttribute("ActiveStage")
+		if activeStage ~= stage and activeStage ~= stage + 1 then
+			denyPad(player, "Finish this stage first")
+			return
+		end
+		if stage + 1 > Constants.MAX_CONFIGURED_STAGE then
+			denyPad(player, "No stage left to skip")
+			return
+		end
+		if isPadTouchThrottled(player, entry.id) then
+			return
+		end
+		pendingSkipStage[player] = stage
+		MarketplaceService:PromptProductPurchase(player, Constants.SKIP_STAGE_PRODUCT_ID)
+		return
+	end
+
+	-- win + x2 dùng chung hàng rào chống gian lận: chưa vượt stage hợp lệ thì không được
+	-- nhận Wins, cũng không được mở prompt mua x2.
+	if not isFinishSequenceValid(player, stage) then
+		local activeStage = player:GetAttribute("ActiveStage")
+		if activeStage ~= stage and activeStage ~= stage + 1 then
+			denyPad(player, `Run Stage {stage} first`)
+		else
+			denyPad(player, "Too fast — run the stage properly")
+		end
+		return
+	end
+	if isPadTouchThrottled(player, entry.id) then
+		return
+	end
+
+	if entry.kind == "win" then
+		collectNormalWins(player, stage)
+	else
+		pendingDoubleWins[player] = stage
+		MarketplaceService:PromptProductPurchase(player, Constants.DOUBLE_WINS_PRODUCT_ID)
+	end
+end
+
+-- Pad Handler: gắn Touched + ghi registry cho vòng dò vị trí (part đã dựng sẵn trong Studio).
 local function setupSpecialPads(stage: number)
 	local zonesFolder = Workspace:FindFirstChild("Zones")
 	local zone = zonesFolder and zonesFolder:FindFirstChild(`Zone{stage}`)
-	if not zone then return end
+	if not zone then
+		return
+	end
 	local mechanics = zone:FindFirstChild("Mechanics")
-	if not mechanics then return end
-
-	-- 1. Nhận Wins thường
-	local winPad = mechanics:FindFirstChild("WinCollectionPad")
-	if winPad and winPad:IsA("BasePart") then
-		winPad.Touched:Connect(function(hit)
-			local player = CharacterUtil.GetPlayerFromHit(hit)
-			if not player then return end
-			if not isTouchNearPart(player, winPad) then return end
-			if not isFinishSequenceValid(player, stage) then return end
-			if isPadTouchThrottled(player) then return end
-
-			collectNormalWins(player, stage)
-		end)
+	if not mechanics then
+		return
 	end
 
-	-- 2. Nhận x2 Wins (trả Robux)
-	local x2Pad = mechanics:FindFirstChild("DoubleWinCollectionPad")
-	if x2Pad and x2Pad:IsA("BasePart") then
-		x2Pad.Touched:Connect(function(hit)
-			local player = CharacterUtil.GetPlayerFromHit(hit)
-			if not player then return end
-			if not isTouchNearPart(player, x2Pad) then return end
-			-- Cùng một hàng rào chống gian lận với pad Wins thường: chưa vượt stage
-			-- một cách hợp lệ thì không được mở prompt để lấy x2 Wins.
-			if not isFinishSequenceValid(player, stage) then return end
-			if isPadTouchThrottled(player) then return end
+	local pads: { { name: string, kind: PadKind } } = {
+		{ name = "WinCollectionPad", kind = "win" :: PadKind },
+		{ name = "DoubleWinCollectionPad", kind = "x2" :: PadKind },
+		{ name = "SkipStagePad", kind = "skip" :: PadKind },
+	}
 
-			pendingDoubleWins[player] = stage
-			MarketplaceService:PromptProductPurchase(player, Constants.DOUBLE_WINS_PRODUCT_ID)
-		end)
-	end
-
-	-- 3. Bỏ qua stage kế tiếp (trả Robux)
-	local skipPad = mechanics:FindFirstChild("SkipStagePad")
-	if skipPad and skipPad:IsA("BasePart") then
-		skipPad.Touched:Connect(function(hit)
-			local player = CharacterUtil.GetPlayerFromHit(hit)
-			if not player then return end
-			if not isTouchNearPart(player, skipPad) then return end
-			-- Phải đang thực sự ở zone này (chống chạm pad từ xa / sau khi teleport đi nơi khác).
-			if player:GetAttribute("ActiveStage") ~= stage then return end
-			if stage + 1 > Constants.MAX_CONFIGURED_STAGE then return end
-			if isPadTouchThrottled(player) then return end
-
-			pendingSkipStage[player] = stage
-			MarketplaceService:PromptProductPurchase(player, Constants.SKIP_STAGE_PRODUCT_ID)
-		end)
+	for _, spec in pads do
+		local part = mechanics:FindFirstChild(spec.name)
+		if part and part:IsA("BasePart") then
+			local entry: PadEntry = {
+				part = part,
+				kind = spec.kind,
+				stage = stage,
+				id = `{spec.kind}:{stage}`,
+			}
+			table.insert(padRegistry, entry)
+			part.Touched:Connect(function(hit)
+				local player = CharacterUtil.GetPlayerFromHit(hit)
+				if player and isTouchNearPart(player, part) then
+					activatePad(player, entry)
+				end
+			end)
+		end
 	end
 end
 
@@ -447,7 +566,7 @@ function StageCheckpointService.ProcessReceipt(receiptInfo: { [string]: any }): 
 		local stage = pendingDoubleWins[player] or player:GetAttribute("ActiveStage") or 1
 		local rewardWins = Constants.STAGE_WINS[stage] or 1
 		local doubleWins = rewardWins * 2
-		
+
 		local data = DataService.GetData(player)
 		if data then
 			local dataTable = data :: any
@@ -455,13 +574,14 @@ function StageCheckpointService.ProcessReceipt(receiptInfo: { [string]: any }): 
 			player:SetAttribute("HighestCompletedStage", dataTable.HighestCompletedStage)
 			player:SetAttribute("CompletedStage", dataTable.HighestCompletedStage)
 		end
-		
-		ProgressionService.AwardWins(player, doubleWins, "stage_x2")
+
+		-- Cùng lý do như `completeStage`: thẻ ăn mừng phải đọc số SAU hệ số, không phải số gốc.
+		local _, finalWins = ProgressionService.AwardWins(player, doubleWins, "stage_x2")
 		DataService.UpdateLeaderstats(player)
-		
-		sendToast(player, `Collected x2 Wins: +{doubleWins}!`, "stage")
+
+		sendToast(player, "Wins", "wins_collected", finalWins)
 		teleportPlayerToLobby(player)
-		
+
 		pendingDoubleWins[player] = nil
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	elseif productId == Constants.SKIP_STAGE_PRODUCT_ID then
@@ -542,6 +662,7 @@ function StageCheckpointService.Start()
 			warn(`[StageCheckpointService] Missing Stage{stage}Start`)
 		end
 		for _, startPart in startParts do
+			table.insert(startRegistry, { part = startPart, stage = stage })
 			connectTouched(startPart, function(hit: BasePart)
 				onStageStartTouched(stage, startPart, hit)
 			end)
@@ -551,6 +672,53 @@ function StageCheckpointService.Start()
 			warn(`[StageCheckpointService] Missing Stage{stage}Finish`)
 		end
 	end
+
+	--[[
+		VÒNG DÒ VỊ TRÍ 30Hz — chữa tận gốc "bệ nhận win lâu lâu không hoạt động".
+
+		Ba nguyên nhân độc lập của bug đó, cái nào cũng IM LẶNG:
+		  1. Throttle pad dùng chung cho cả 3 pad ⇒ lướt qua pad này là khoá pad kia 2 giây.
+		     (đã sửa: khoá theo từng pad — xem `lastPadTouchTime`)
+		  2. `Touched` của chính pad bị bước physics nhảy qua khi chạy nhanh.
+		  3. NẶNG NHẤT: `Stage{N}Start.Touched` bị nhảy qua ⇒ `ActiveStage` không bao giờ
+		     thành N ⇒ `isFinishSequenceValid` từ chối, và người chơi vừa chạy hết cả zone
+		     xong đứng trên bệ bấm mãi không ra gì. Chạy càng nhanh càng chắc dính.
+
+		Vòng này chữa (2) và (3) bằng cách hỏi VỊ TRÍ thay vì chờ sự kiện va chạm — cùng
+		học thuyết đã dùng cho bẫy zone (xem shared/Util/TrapSweep). `Touched` vẫn giữ
+		nguyên để bắt các pad bị xoay mà phép so hộp AABB bỏ sót.
+
+		Chi phí: 30Hz × người chơi × (~15 vạch Start + ~45 pad). Toàn phép so số vô hướng,
+		không raycast, không cấp phát — không đáng kể.
+	]]
+	task.spawn(function()
+		while true do
+			task.wait(1 / 30)
+			for _, player in Players:GetPlayers() do
+				local root = CharacterUtil.GetAliveRoot(player)
+				if not root then
+					continue
+				end
+				local pos = root.Position
+
+				-- Vạch Start: bán kính rộng như `isTouchNearPart` (40 studs). Ở 250 WS người
+				-- chơi đi 8.3 studs/tick nên không thể xuyên qua vùng này mà không bị thấy.
+				for _, entry in startRegistry do
+					if (entry.part.Position - pos).Magnitude <= STAGE_TOUCH_DISTANCE then
+						if player:GetAttribute("ActiveStage") ~= entry.stage then
+							onStageStartTouched(entry.stage, entry.part, root)
+						end
+					end
+				end
+
+				for _, entry in padRegistry do
+					if isStandingOnPad(root, entry.part) then
+						activatePad(player, entry)
+					end
+				end
+			end
+		end
+	end)
 
 	GamePackets.requestRevive.listen(function(request, player: Player)
 		if typeof(request.method) ~= "string" then
@@ -613,6 +781,7 @@ function StageCheckpointService.Start()
 		pendingDoubleWins[player] = nil
 		pendingSkipStage[player] = nil
 		lastPadTouchTime[player] = nil
+		lastPadDenyAt[player] = nil
 		stageEnteredAt[player] = nil
 	end)
 end

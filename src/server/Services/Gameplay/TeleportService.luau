@@ -51,6 +51,13 @@ local function getDestinationCFrame(destination: DestinationConfig): CFrame?
 
 	local target = PathResolver.Resolve(destination.targetPath)
 	if not target then
+		-- KHÔNG được im lặng. Đường dẫn viết cứng vào map là thứ hỏng khi map được sắp lại, và
+		-- lần trước nó hỏng đúng kiểu này: `targetPath` của Lobby trỏ vào Workspace.Lobby.Spawn
+		-- trong khi SpawnLocation nằm ở Workspace.Spawn ⇒ nút Lobby câm, không log gì
+		-- (bug 2026-08-07). Một dòng warn ở đây là đủ để lần sau thấy ngay.
+		warn(
+			`[TeleportService] Điểm đến "{destination.id}" trỏ vào path không tồn tại: {destination.targetPath}`
+		)
 		return nil
 	end
 
@@ -131,7 +138,30 @@ local function tryPayWins(player: Player, destination: DestinationConfig): boole
 		return false
 	end
 
-	local priceWins = math.max(0, destination.priceWins)
+	--[[
+		VIP Membership: teleport MIỄN PHÍ — nhưng CHỈ TỚI CHỖ ĐÃ TỪNG ĐẾN (sửa 2026-08-12).
+
+		⚠️ LỖI CỦA BẢN ĐẦU, phải đọc trước khi nới lại: bản đầu cho VIP `priceWins = 0` cho MỌI
+		điểm đến. Mà trong game này giá Wins CHÍNH LÀ cổng khoá duy nhất — xem dòng đầu file:
+		"Player được TỰ DO teleport: không còn chặn theo Level/WalkSpeed". Bỏ giá cho VIP tức là
+		bỏ luôn cánh cổng: mua pass xong là nhảy thẳng tới Stage 15 mà chưa chạy stage nào.
+		Toàn bộ 15 màn obby — tức toàn bộ nội dung của game — bị bỏ qua trong một cú bấm.
+
+		Luật đúng: miễn phí trong phạm vi NGƯỜI CHƠI ĐÃ TỰ ĐI TỚI, ngoài phạm vi đó trả giá như
+		mọi người. VIP mua sự tiện lợi (khỏi trả Wins để quay lại chỗ cũ), không mua quyền bỏ
+		qua nội dung.
+
+		Mốc chọn là `HighestCompletedStage + 1`, không phải `HighestCompletedStage`: về đích
+		stage N là người chơi đứng ngay đầu stage N+1: chỗ đó họ ĐÃ đến rồi, bắt trả tiền để
+		quay lại là vô lý. Nhưng N+2 trở đi thì chưa từng đặt chân — đó là ranh giới.
+
+		Điểm không phải stage (Lobby / Training) vốn `priceWins = 0` nên không bị ảnh hưởng.
+	]]
+	local isVip = player:GetAttribute("IsVIP") == true
+	local stageNumber = getStageNumber(destination)
+	local reached = math.floor(tonumber((data :: any).HighestCompletedStage) or 0)
+	local vipFree = isVip and (stageNumber == nil or stageNumber <= reached + 1)
+	local priceWins = if vipFree then 0 else math.max(0, destination.priceWins)
 	if data.TotalWins < priceWins then
 		GamePackets.toast.sendTo({
 			kind = "teleport",
@@ -143,10 +173,22 @@ local function tryPayWins(player: Player, destination: DestinationConfig): boole
 
 	data.TotalWins -= priceWins
 	DataService.UpdateLeaderstats(player)
+	-- Đẩy snapshot ngay: huy hiệu Wins trên HUD đọc từ `State.snapshot`, KHÔNG đọc
+	-- leaderstats. Trước 2026-08-09 mọi giá đều bằng 0 nên không ai thấy; giờ trừ Wins
+	-- thật mà quên bước này thì con số trên HUD đứng yên tới lần snapshot kế tiếp và
+	-- người chơi tưởng teleport miễn phí (rồi hoảng khi số tụt "vô cớ" lúc sau).
+	if priceWins > 0 then
+		local progressionService = ServiceLocator.Find("ProgressionService")
+		if progressionService then
+			progressionService.SendSnapshot(player)
+		end
+	end
 	return true
 end
 
-function TeleportService.ProcessReceipt(receiptInfo: { PlayerId: number, ProductId: number }): Enum.ProductPurchaseDecision
+function TeleportService.ProcessReceipt(
+	receiptInfo: { PlayerId: number, ProductId: number }
+): Enum.ProductPurchaseDecision
 	local destination = destinationByProductId[receiptInfo.ProductId]
 	if not destination then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -197,10 +239,12 @@ function TeleportService.Start()
 			return
 		end
 
+		-- Từ 2026-08-09 teleport CHỈ bán bằng Wins (UI đã gỡ nút Robux). Nhánh này giờ chỉ
+		-- còn bắt gói tin dị dạng, nên báo đúng sự thật thay vì mời chọn Robux.
 		if request.paymentKind ~= "wins" then
 			GamePackets.toast.sendTo({
 				kind = "teleport",
-				message = "Choose Wins or Robux",
+				message = "Teleports are bought with Wins",
 				amount = 0,
 			}, player)
 			return

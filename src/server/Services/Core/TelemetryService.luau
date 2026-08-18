@@ -149,7 +149,12 @@ function TelemetryService.Start()
 					table.insert(lines, `  {count}× {key}`)
 				end
 				table.sort(lines)
-				warn(`[Telemetry] {errorTotal} lỗi trong {ERROR_REPORT_INTERVAL}s qua ({Env.Current}):\n{table.concat(lines, "\n")}`)
+				warn(
+					`[Telemetry] {errorTotal} lỗi trong {ERROR_REPORT_INTERVAL}s qua ({Env.Current}):\n{table.concat(
+						lines,
+						"\n"
+					)}`
+				)
 				errorCounts = {}
 				errorTotal = 0
 			end

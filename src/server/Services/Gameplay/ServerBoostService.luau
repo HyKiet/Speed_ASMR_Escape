@@ -183,8 +183,16 @@ function ServerBoostService.Start()
 	end
 	Players.PlayerAdded:Connect(pushWhenReady)
 
-	-- Studio-only: set attribute TestBoost = "speed"|"wins"|"mega" trên Player để kích hoạt
-	-- server boost 60s (test celebration + multiplier). Không chạy ở production.
+	--[[
+		Studio-only, KHÔNG chạy ở production:
+		  TestBoost         = "speed"|"wins"|"mega" → server boost 60s (celebration + hệ số)
+		  TestPersonalBoost = "speed"|"wins"        → boost CÁ NHÂN 60s
+
+		Có cả hai mới nghiệm thu được cụm chip góc dưới phải: từ 2026-08-10 mỗi nguồn là một
+		chip riêng, mà lỗi user báo ("đang có x2 cá nhân, mua server x2 thì UI gộp thành x4
+		server") chỉ hiện ra khi HAI nguồn cùng chạy. Không có hook cá nhân thì phải chờ Daily
+		ngày 2 mới test được — tức là không test được.
+	]]
 	if RunService:IsStudio() then
 		local function hookTestAttribute(player: Player)
 			player:GetAttributeChangedSignal("TestBoost"):Connect(function()
@@ -192,6 +200,13 @@ function ServerBoostService.Start()
 				if kind == "speed" or kind == "wins" or kind == "mega" then
 					ServerBoostService.ActivateServerBoost(kind :: string, player, 60)
 					player:SetAttribute("TestBoost", nil)
+				end
+			end)
+			player:GetAttributeChangedSignal("TestPersonalBoost"):Connect(function()
+				local kind = player:GetAttribute("TestPersonalBoost")
+				if kind == "speed" or kind == "wins" then
+					ServerBoostService.ActivatePersonalBoost(player, kind :: string, 60)
+					player:SetAttribute("TestPersonalBoost", nil)
 				end
 			end)
 		end

@@ -20,9 +20,13 @@ local VIEWER_ANCHOR = Vector3.new(-4, 0, 0)
 -- `facing`: hướng mặt Front của biển. Bỏ trống ⇒ quay về `VIEWER_ANCHOR`.
 -- Khu nào có hướng nhìn RIÊNG (rương quay mặt về -X, cụm leaderboard xếp chéo) thì phải
 -- chỉ định tay, nếu không biển sẽ lệch khỏi tâm khu khi người chơi đứng đúng mặt tiền.
+-- `subText`: dòng phụ nhỏ NGAY DƯỚI chữ lớn (hiện chỉ biển Feedback dùng). Có subText thì
+-- chữ chính co lại còn 58% chiều cao biển để nhường chỗ — nên biển nào dùng phải khai báo
+-- `height` cao hơn bình thường, nếu không chữ chính teo đi trông như lỗi.
 type SignConfig = {
 	name: string,
 	text: string,
+	subText: string?,
 	position: Vector3,
 	width: number,
 	height: number,
@@ -45,8 +49,30 @@ local SIGNS: { SignConfig } = {
 	{
 		name = "MultiplierPadsSign",
 		text = "Multiplier Pads",
-		-- Sau dàn pad (x ≈ -88), cao hơn pad tầng trên (y ≈ 20).
-		position = Vector3.new(-91, 29, -9),
+		--[[
+			ĐO LẠI 2026-08-14 (user: biển lệch khỏi tâm khu). Bản cũ ở z = -9 — đó là toạ độ
+			của HÀNG PAD ĐẦU TIÊN (Pad_1/Pad_5 @ z ≈ -7), không phải tâm khu. Cả cụm trải dài
+			z từ -58.2 tới 8.3, nên biển đứng lệch hẳn 16 stud về một đầu.
+
+			Số đo thật của `Workspace.Lobby.MultiplierPads` (37 part):
+			  bbox  min (-92.0, 10.0, -58.2)  →  max (-61.2, 19.9, 8.3)
+			  tâm   (-76.6, 14.9, -25.0)      nóc y = 19.9
+			⇒ z = -25 (đúng tâm), x = -95 (lùi ~18 stud ra sau tâm theo trục khu→spawn nên
+			  không che mặt tiền), y = 29 (trên nóc pad tầng trên ~9 stud).
+
+			⚠️ `facing` PHẢI KHAI BÁO TAY, và đây là lý do (mất một vòng mới ra):
+			Để trống thì biển tự quay về `VIEWER_ANCHOR` (-4, 0, 0). Từ (-95, -25) hướng đó
+			chéo ~15°, nên tấm biển rộng 52 stud bị XOAY và một đầu văng tới x = -101.9 — trong
+			khi `Workspace.Wall.Wall_Lobby` là một mặt phẳng đứng ở x ≈ -96.6 (đo bằng raycast,
+			đều suốt z từ -55 tới +5). Đầu đó chui hẳn ra SAU tường, và người chơi đọc được đúng
+			"…iplier Pads": bốn chữ đầu bị chính bức tường nuốt mất.
+
+			Hướng +X cho biển nằm SONG SONG với tường ở x = -95 (cách mặt tường 1.6 stud), nên
+			cả 52 stud chiều ngang đều nằm trước tường. Nó cũng là hướng đúng về mặt thị giác:
+			người chơi từ spawn đi tới nhìn theo -X, tức nhìn thẳng vào mặt biển.
+		]]
+		position = Vector3.new(-95, 29, -25),
+		facing = Vector3.new(1, 0, 0),
 		width = 52,
 		height = 11,
 		-- Hồng cánh sen: nền sau biển này là vách cỏ XANH, chữ xanh lá bị chìm hẳn.
@@ -56,12 +82,13 @@ local SIGNS: { SignConfig } = {
 	{
 		name = "LeaderboardsSign",
 		text = "Leaderboards",
-		-- CHÍNH GIỮA cụm 3 bảng (tâm ≈ -74.9, 75.7) nhưng nhô RA TRƯỚC vài stud: ngay sau
-		-- cụm là `Workspace.Palm Tree` (tán phủ x -97..-69, z 74..99, y 30..41) che kín chữ.
-		-- Vẫn nằm trên trục nhìn qua tâm cụm nên trông đúng giữa.
-		position = Vector3.new(-69.5, 36, 69.8),
-		-- Ba bảng xếp chéo, mặt bảng cùng nhìn về đông-nam (trung bình 3 LookVector).
-		facing = Vector3.new(0.68, 0, -0.74),
+		-- ĐO LẠI 2026-08-10 (user dời cụm bảng): tâm 3 DisplayPanel = trung bình của
+		-- (-91.1, 35.2) / (-83.2, 62.6) / (-61.4, 81.0) ⇒ (-78.6, 59.6); nóc bảng y ≈ 30.7
+		-- (tâm 21.36 + nửa chiều cao 18.77). Biển nhô ~10 stud RA TRƯỚC theo hướng mặt bảng
+		-- để không bị chính bảng/tán cây phía sau nuốt chữ.
+		position = Vector3.new(-70.3, 38, 54),
+		-- Trung bình 3 LookVector: (1,0,0) + (0.842,0,-0.540) + (0.328,0,-0.945), chuẩn hoá.
+		facing = Vector3.new(0.825, 0, -0.565),
 		width = 44,
 		height = 10,
 		colorA = Color3.fromRGB(255, 238, 110),
@@ -97,11 +124,16 @@ local SIGNS: { SignConfig } = {
 	{
 		name = "FeedbackSign",
 		text = "Feedback",
-		-- Hòm thư `Workspace.Feedback.Mailbox` @(-69.2, 13.8, -66.2), nóc y ≈ 17.7.
-		-- Hòm thư nhỏ nên biển cũng nhỏ và hạ thấp hơn các khu khác.
-		position = Vector3.new(-74, 24, -71),
-		width = 34,
-		height = 9,
+		-- Dòng phụ: mục đích là CHẶN dislike bốc đồng — nói thẳng "báo cho tụi mình" trước
+		-- khi người chơi kịp bấm nút không thích trên trang game.
+		subText = "Not happy with something? Please don't dislike —\ntell us here and we'll fix it fast. Thank you!",
+		-- ĐO LẠI 2026-08-10 (user dời hòm thư): `Workspace.Feedback.Mailbox` @(-65.0, 13.8,
+		-- -70.4), nóc y ≈ 17.7. Biển lùi 6 stud RA SAU hòm thư theo trục hòm-thư→spawn
+		-- (spawn ≈ (3.1, -12)) nên đứng đọc prompt vẫn thấy chữ nằm trên hòm thư.
+		position = Vector3.new(-69.5, 26, -74.3),
+		-- Cao hơn biển cũ vì có thêm dòng phụ 2 dòng.
+		width = 44,
+		height = 13,
 		colorA = Color3.fromRGB(150, 255, 210),
 		colorB = Color3.fromRGB(20, 175, 130),
 	},
@@ -137,11 +169,13 @@ local function buildFace(part: BasePart, config: SignConfig, face: Enum.NormalId
 		ZOffset = 0,
 	}, part) :: SurfaceGui
 
+	local hasSub = config.subText ~= nil
+
 	local label = create("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBlack,
 		Position = UDim2.fromScale(0, 0),
-		Size = UDim2.fromScale(1, 1),
+		Size = if hasSub then UDim2.fromScale(1, 0.58) else UDim2.fromScale(1, 1),
 		Text = config.text,
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		TextScaled = true,
@@ -151,6 +185,34 @@ local function buildFace(part: BasePart, config: SignConfig, face: Enum.NormalId
 		MaxTextSize = 200,
 		MinTextSize = 24,
 	}, label)
+
+	if config.subText then
+		-- Dòng phụ để TRẮNG NGÀ đặc (không gradient): gradient dọc trên chữ nhỏ làm nửa dưới
+		-- tối lại và mất nét ở khoảng cách xa.
+		local sub = create("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			Position = UDim2.fromScale(0.03, 0.58),
+			Size = UDim2.fromScale(0.94, 0.38),
+			Text = config.subText,
+			TextColor3 = Color3.fromRGB(255, 252, 226),
+			TextScaled = true,
+			-- TextWrapped PHẢI để true: đặt false sẽ tắt luôn TextScaled (bẫy biển Stage 15).
+			TextWrapped = true,
+		}, gui) :: TextLabel
+
+		create("UITextSizeConstraint", {
+			MaxTextSize = 46,
+			MinTextSize = 12,
+		}, sub)
+
+		create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+			Color = Color3.fromRGB(18, 18, 30),
+			LineJoinMode = Enum.LineJoinMode.Round,
+			Thickness = 4,
+		}, sub)
+	end
 
 	-- Gradient tô thân chữ (ApplyStrokeMode của UIStroke độc lập nên viền vẫn đen tuyền).
 	create("UIGradient", {

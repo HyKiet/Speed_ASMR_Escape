@@ -16,6 +16,24 @@ type PlayerData = typeof(Constants.DATA_TEMPLATE)
 type Profile = any
 
 local DATA_STORE_NAME = Env.StoreName("SpeedEscape_Player_v1")
+
+--[[
+	HỒ SƠ TEST TRONG STUDIO — CÔNG TẮC
+	==================================
+	Studio dùng `playerStore.Mock` nên KHÔNG lưu gì cả, và mỗi lần Play là hồ sơ được bơm
+	lại từ đầu theo hằng số dưới đây. Nghĩa là "xoá dữ liệu test" trong Studio là việc vô
+	nghĩa: phiên sau nó tự mọc lại. Muốn đổi thì phải đổi ở ĐÂY.
+
+	`STUDIO_FRESH_PLAYER = true`  → vào Studio là một NGƯỜI CHƠI MỚI TINH (0 Wins, Level 1).
+	                                Dùng khi test FTUE: Daily ngày 1, tutorial 3 bước, mở
+	                                khoá Pad 2, cảm giác tốc độ 60 giây đầu.
+	`STUDIO_FRESH_PLAYER = false` → bơm 1M Wins / 500K Speed / Level 120. Dùng khi test
+	                                nội dung cuối game: Stage 12-15, Rebirth, trail đắt.
+
+	⚠️ Preset cũ (1M Wins) chính là thứ làm tutorial không bao giờ hiện trong Studio:
+	`TutorialService` thấy `TotalWins > 0` là đánh dấu "người chơi cũ" và im lặng.
+]]
+local STUDIO_FRESH_PLAYER = true
 local STUDIO_TEST_TOTAL_WINS = 1_000_000
 local STUDIO_TEST_SPEED = 500_000
 local STUDIO_TEST_LEVEL = 120
@@ -32,8 +50,8 @@ local DataService = {}
 
 local function createValue(parent: Instance, className: string, name: string, value: any): Instance
 	local instance = Instance.new(className)
-	instance.Name = name
-	;(instance :: any).Value = value
+	instance.Name = name;
+	(instance :: any).Value = value
 	instance.Parent = parent
 	return instance
 end
@@ -75,6 +93,19 @@ local function normalizeData(data: { [string]: any })
 	if typeof(data.hasConfirmedLikeGroupReward) ~= "boolean" then
 		data.hasConfirmedLikeGroupReward = false
 	end
+	--[[
+		Starter Pack: mốc bắt đầu đếm 48h. Ghi ở đây (lúc nạp profile) chứ không phải lúc tạo
+		profile mới, nên tài khoản CŨ — có từ trước khi gói này ra đời — cũng được tính giờ từ
+		lần đăng nhập đầu tiên sau bản cập nhật. Họ chưa từng thấy gói, cắt luôn cửa sổ của họ
+		là vừa mất doanh thu vừa vô lý.
+	]]
+	if typeof(data.FirstJoinTime) ~= "number" or data.FirstJoinTime <= 0 then
+		data.FirstJoinTime = os.time()
+	end
+	if typeof(data.StarterPackBought) ~= "boolean" then
+		data.StarterPackBought = false
+	end
+
 	local coreLoopVersion = readNumber(data, "CoreLoopVersion", 0)
 	readNumber(data, "HighestCompletedStage", 0)
 	readNumber(data, "Rebirths", 0)
@@ -106,7 +137,7 @@ local function normalizeData(data: { [string]: any })
 		data.CoreLoopVersion = Constants.CORE_LOOP_VERSION
 	end
 
-	if RunService:IsStudio() then
+	if RunService:IsStudio() and not STUDIO_FRESH_PLAYER then
 		data.TotalWins = math.max(data.TotalWins, STUDIO_TEST_TOTAL_WINS)
 		data.Speed = STUDIO_TEST_SPEED
 		data.Level = STUDIO_TEST_LEVEL
@@ -119,7 +150,6 @@ local function normalizeData(data: { [string]: any })
 		data.EquippedTrail = "none"
 		data.EquippedAura = "none"
 	end
-
 end
 
 local function updateLeaderstats(player: Player, data: PlayerData)
@@ -181,6 +211,51 @@ local function loadPlayer(player: Player)
 	player:SetAttribute("HighestCompletedStage", math.floor(readNumber(profile.Data, "HighestCompletedStage", 0)))
 end
 
+--[[
+	[Studio-only test hook] TRẢ NGƯỜI CHƠI VỀ TÀI KHOẢN MỚI TINH.
+
+	Đặt attribute `StudioResetData` = 1 lên Player ⇒ ghi đè toàn bộ profile bằng
+	`Constants.DATA_TEMPLATE`, rồi đá ra để lần vào lại là một người chơi hoàn toàn mới —
+	Speed 0, 0 Wins, chưa cosmetic, và tutorial chạy lại từ bước 1.
+
+	── VÌ SAO ĐÁ RA THAY VÌ ĐỒNG BỘ LẠI TẠI CHỖ ──────────────────────────────────────────────
+	Trạng thái người chơi nằm rải ở rất nhiều nơi: leaderstats, chừng chục attribute, snapshot
+	client, bộ đếm của TutorialService, cache cosmetic ở client… Ghép tay từng chỗ là chắc chắn
+	sót một cái, và cái sót đó lại trông y như một con bug thật lúc nghiệm thu. Nạp lại profile
+	từ đầu là đường đi mà game vốn đã chạy đúng mỗi ngày.
+
+	⚠️ Studio-only, và có `RunService:IsStudio()` chặn: hook này XOÁ SẠCH dữ liệu, không có
+	đường hoàn lại. Tuyệt đối không được để nó sống ở bản Live.
+]]
+local function watchResetHook(player: Player)
+	player:GetAttributeChangedSignal("StudioResetData"):Connect(function()
+		if not player:GetAttribute("StudioResetData") then
+			return
+		end
+		player:SetAttribute("StudioResetData", nil)
+
+		local profile = profiles[player]
+		if not profile or not profile:IsActive() then
+			return
+		end
+
+		-- Ghi đè TỪNG KHOÁ chứ không gán bảng mới: `profile.Data` là bảng ProfileStore đang theo
+		-- dõi để lưu; thay tham chiếu là nó lưu tiếp bảng cũ.
+		for key in profile.Data do
+			profile.Data[key] = nil
+		end
+		for key, value in Constants.DATA_TEMPLATE :: { [string]: any } do
+			profile.Data[key] = if typeof(value) == "table" then table.clone(value) else value
+		end
+
+		profile:Save()
+		warn(
+			`[DataService] ĐÃ RESET dữ liệu của {player.Name} về mặc định — đá ra để nạp lại.`
+		)
+		player:Kick("Dữ liệu đã reset về mặc định. Vào lại game để chơi như người mới.")
+	end)
+end
+
 function DataService.Init() end
 
 function DataService.Start()
@@ -191,6 +266,13 @@ function DataService.Start()
 	Players.PlayerAdded:Connect(function(player)
 		task.spawn(loadPlayer, player)
 	end)
+
+	if RunService:IsStudio() then
+		for _, player in Players:GetPlayers() do
+			watchResetHook(player)
+		end
+		Players.PlayerAdded:Connect(watchResetHook)
+	end
 
 	Players.PlayerRemoving:Connect(function(player)
 		player:SetAttribute("ProfileLoaded", false)

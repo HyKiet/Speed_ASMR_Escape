@@ -3,8 +3,12 @@
 	Zone4BossService.luau — MonkeyBoss đuổi người chơi trong arena Stage 4.
 
 	Chuyển từ script inline Workspace.Zones.Zone4.Zone4BossScript sang Service (bootstrapper
-	nạp, Rojo sync). Boss VẪN CHẠY TRÊN SERVER và luôn nhắm NGƯỜI GẦN NHẤT (yêu cầu thiết kế):
-	3 người vào arena thì boss dí người gần nó nhất, đổi mục tiêu khi ai đó lại gần hơn.
+	nạp, Rojo sync). Boss VẪN CHẠY TRÊN SERVER.
+
+	MỤC TIÊU = NGƯỜI DẪN ĐẦU (đổi 2026-08-14, trước đây là người gần boss nhất): 3 người vào
+	arena thì boss dí người gần Stage4Finish nhất, có mép 6 studs chống đổi mục tiêu liên tục.
+	Phép thử chạm chết áp cho MỌI người trong sân, không riêng mục tiêu. Xem khối lý do ở
+	`collectRunners` / `pickLeader`.
 
 	TỐI ƯU so với bản cũ:
 	  • Vòng đuổi fixed-timestep 30Hz thay vì mỗi Heartbeat 60Hz → giảm 1/2 lượng replicate
@@ -289,31 +293,101 @@ local function ensureBoss(): Model?
 	return model
 end
 
--- Quét MỘT lượt tìm người GẦN NHẤT đủ điều kiện bị đuổi. Trả về nil khi arena trống.
-local function findNearestRunner(model: Model): BasePart?
-	local bossPosition = model:GetPivot().Position
-	local closestRoot: BasePart? = nil
-	local closestDistance = math.huge
+--[[
+	QUÉT MỘT LƯỢT CHO CẢ TICK (viết lại 2026-08-14 — user báo boss hỏng khi có 2 client).
+
+	Bản cũ có hai khuyết tật chỉ lộ ra khi arena có từ 2 người:
+
+	  1. NHẮM NGƯỜI GẦN NHẤT, TÍNH LẠI MỖI TICK. Hai người chạy song song thì mỗi lần ai đó
+	     nhích lên nửa stud là boss quay ngoắt sang người kia — 30 lần mỗi giây. Nhìn từ client
+	     là con khỉ rung lắc tại chỗ giữa hai người và không đuổi kịp ai cả.
+	  2. CHỈ MỤC TIÊU MỚI CHẾT ĐƯỢC. Phép thử khoảng cách chạm chỉ chạy trên đúng cái root vừa
+	     chọn, nên người thứ hai đứng LỌT TRONG con khỉ vẫn sống nhăn — đúng cái "vào zone mà
+	     nó không hoạt động" user thấy.
+
+	Giờ quét một lượt duy nhất mỗi tick, dựng danh sách ứng viên rồi dùng lại cho CẢ hai việc
+	(chọn mục tiêu + phép thử chạm), thay vì hai vòng lặp Players riêng.
+]]
+-- Khoảng cách BỎ QUA CHIỀU CAO: boss chạy trên mặt sàn phẳng, chênh lệch Y (nhảy, đứng trên
+-- bục) không được tính vào phép thử chạm lẫn phép đo thứ hạng.
+local function getFlatDistance(a: Vector3, b: Vector3): number
+	return (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
+end
+
+type Runner = { player: Player, character: Model, root: BasePart, position: Vector3 }
+
+local runnerBuffer: { Runner } = {}
+
+local function collectRunners(): { Runner }
+	table.clear(runnerBuffer)
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
 		local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
 		local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-		if humanoid and humanoid.Health > 0 and root and root:IsA("BasePart") then
+		if character and humanoid and humanoid.Health > 0 and root and root:IsA("BasePart") then
 			local position = root.Position
 			if shouldChasePlayer(player, position) then
-				local distance = (position - bossPosition).Magnitude
-				if distance < closestDistance then
-					closestDistance = distance
-					closestRoot = root
-				end
+				table.insert(runnerBuffer, {
+					player = player,
+					character = character,
+					root = root,
+					position = position,
+				})
 			end
 		end
 	end
-	return closestRoot
+	return runnerBuffer
 end
 
-local function getFlatDistance(a: Vector3, b: Vector3): number
-	return (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
+--[[
+	MỤC TIÊU = NGƯỜI DẪN ĐẦU (chốt với user 2026-08-14), đo bằng khoảng cách còn lại tới
+	Stage4Finish — ai gần đích nhất thì bị dí. Vì sao không phải người gần boss nhất:
+
+	  • Ổn định. Thứ hạng trong cuộc đua đổi vài lần một ván, không phải 30 lần một giây, nên
+	    boss chạy thành một đường liền mạch thay vì rung giữa hai người.
+	  • Đúng vai của con boss. Nó là hình phạt dành cho người sắp thắng, nên người bị bỏ lại
+	    có cửa bắt kịp — đó mới là thứ làm arena đáng chạy khi đông người.
+
+	`LEAD_SWITCH_MARGIN`: người mới phải vượt người đang bị dí ÍT NHẤT 6 studs mới giành được
+	sự chú ý. Không có mép này thì hai người chạy ngang nhau lại quay về đúng bệnh rung lắc cũ,
+	chỉ là đổi trục đo.
+]]
+local LEAD_SWITCH_MARGIN = 6
+
+local currentTargetPlayer: Player? = nil
+
+local function scoreForRunner(runner: Runner, bossPosition: Vector3): number
+	local gate = finishGate
+	if gate then
+		return getFlatDistance(runner.position, gate.Position)
+	end
+	-- Không tìm thấy cổng đích (map chưa nạp xong): quay về luật gần-nhất cho boss vẫn có việc.
+	return getFlatDistance(runner.position, bossPosition)
+end
+
+local function pickLeader(runners: { Runner }, bossPosition: Vector3): Runner?
+	local best: Runner? = nil
+	local bestScore = math.huge
+	local incumbent: Runner? = nil
+	local incumbentScore = math.huge
+
+	for _, runner in runners do
+		local score = scoreForRunner(runner, bossPosition)
+		if score < bestScore then
+			best, bestScore = runner, score
+		end
+		if runner.player == currentTargetPlayer then
+			incumbent, incumbentScore = runner, score
+		end
+	end
+
+	-- Người đang bị dí vẫn còn trong sân và chưa bị vượt quá mép → giữ nguyên mục tiêu.
+	if incumbent and bestScore > incumbentScore - LEAD_SWITCH_MARGIN then
+		return incumbent
+	end
+
+	currentTargetPlayer = if best then best.player else nil
+	return best
 end
 
 local function repairBossVisualIfNeeded(model: Model)
@@ -367,6 +441,11 @@ end
 local function setupPlayer(player: Player)
 	player.CharacterAdded:Connect(function()
 		activeEncounterPlayers[player] = nil
+		-- Chết trong sân là mất suất bị dí: nhả mục tiêu ngay để boss chuyển sang người còn
+		-- sống ở tick kế, thay vì chờ mép LEAD_SWITCH_MARGIN của một cái xác.
+		if currentTargetPlayer == player then
+			currentTargetPlayer = nil
+		end
 	end)
 end
 
@@ -465,6 +544,11 @@ function Zone4BossService.Start()
 	Players.PlayerRemoving:Connect(function(player: Player)
 		activeEncounterPlayers[player] = nil
 		lastKillTimes[player] = nil
+		-- Người rời server mà vẫn là mục tiêu thì `pickLeader` giữ mãi một Player đã chết —
+		-- boss đứng im chờ một người không còn tồn tại.
+		if currentTargetPlayer == player then
+			currentTargetPlayer = nil
+		end
 	end)
 
 	print(
@@ -485,27 +569,36 @@ function Zone4BossService.Start()
 			return
 		end
 
-		local runnerRoot = findNearestRunner(activeBoss)
-		if runnerRoot then
+		local bossPivot = activeBoss:GetPivot()
+		local runners = collectRunners()
+		local leader = pickLeader(runners, bossPivot.Position)
+
+		if leader then
 			restingAtHome = false
 			repairBossVisualIfNeeded(activeBoss)
 			activeBoss:SetAttribute("EncounterState", "Chasing")
 			playRunAnimation(activeBoss)
-			activeBoss:PivotTo(advanceToward(activeBoss:GetPivot(), runnerRoot.Position, CHASE_SPEED, step))
+			activeBoss:PivotTo(advanceToward(bossPivot, leader.position, CHASE_SPEED, step))
 
-			if getFlatDistance(runnerRoot.Position, activeBoss:GetPivot().Position) <= TOUCH_KILL_DISTANCE then
-				local character = runnerRoot.Parent
-				local player = if character and character:IsA("Model")
-					then Players:GetPlayerFromCharacter(character)
-					else nil
-				if player and character and character:IsA("Model") then
-					killCharacter(player, character)
+			--[[
+				Phép thử chạm chạy trên MỌI người trong sân, không riêng người đang bị dí. Boss
+				là một khối thịt đặc: ai lao vào nó cũng phải chết, kể cả người nó đang quay lưng
+				lại. Bản cũ chỉ thử đúng mục tiêu nên người thứ hai đi xuyên qua boss vô sự.
+
+				Đo lại vị trí boss SAU khi PivotTo — dùng `bossPivot` cũ là bỏ lỡ tới 2 studs mỗi
+				tick ở tốc độ 56, đủ để lướt qua người chơi mà không tính là chạm.
+			]]
+			local bossPositionAfterMove = activeBoss:GetPivot().Position
+			for _, runner in runners do
+				if getFlatDistance(runner.position, bossPositionAfterMove) <= TOUCH_KILL_DISTANCE then
+					killCharacter(runner.player, runner.character)
 				end
 			end
 			return
 		end
 
 		-- Không có ứng viên: về nhà rồi NGỦ, không PivotTo lại mỗi frame.
+		currentTargetPlayer = nil
 		if restingAtHome then
 			return
 		end

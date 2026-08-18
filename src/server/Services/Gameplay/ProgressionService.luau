@@ -15,9 +15,11 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local GroupChestConfig = require(ReplicatedStorage.Shared.Config.GroupChest)
+local StarterPackConfig = require(ReplicatedStorage.Shared.Config.Economy.StarterPack)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
@@ -47,6 +49,7 @@ local ServerBoostService
 local GamepassService
 local RemoteConfigService
 local TelemetryService
+local TutorialService
 
 -- Khai báo trước: `addSpeed` (phía trên) cần gọi, nhưng thân hàm phải nằm dưới
 -- `applyRebirth`/`celebrateRebirth`. Gán ở phần AUTO-REBIRTH bên dưới.
@@ -126,19 +129,45 @@ local function computeGamepassMultiplier(player: Player): number
 	end
 
 	local multiplier = 1
-	for _, pass in {
-		{ id = Constants.GAMEPASS_IDS.DoubleSpeed, multiplier = 2 },
-		{ id = Constants.GAMEPASS_IDS.QuadSpeed, multiplier = 4 },
-		{ id = Constants.GAMEPASS_IDS.OctaSpeed, multiplier = 8 },
-	} do
+	for _, pass in
+		{
+			{ id = Constants.GAMEPASS_IDS.DoubleSpeed, multiplier = 2 },
+			{ id = Constants.GAMEPASS_IDS.QuadSpeed, multiplier = 4 },
+			{ id = Constants.GAMEPASS_IDS.OctaSpeed, multiplier = 8 },
+		}
+	do
 		if ownsPass(player, pass.id) then
 			multiplier = math.max(multiplier, pass.multiplier)
 		end
 	end
 
+	--[[
+		Starter Pack cho x2 Speed VĨNH VIỄN. Không thể tặng gamepass thật (Roblox không có API
+		cấp pass), nên buff sống bằng cờ dữ liệu và gộp vào đúng chỗ này.
+
+		── CỘNG CHỒNG, KHÔNG PHẢI math.max (đổi 2026-08-14 theo yêu cầu user) ────────────────
+		Bản cũ dùng `math.max`: ai đã có pass x8 thì mua gói xong hệ số vẫn y nguyên x8 — người
+		vừa trả tiền không thấy một con số nào nhúc nhích, và đó đúng là lỗi user báo.
+
+		Luật mới là CỘNG chứ không NHÂN:  x8 pass + gói = x10  (không phải x16).
+		  • Có pass:    multiplier = bậc pass cao nhất + 2
+		  • Chưa pass:  multiplier = 2  (đúng lời hứa "x2 Speed forever" trên thẻ)
+		Cộng giữ được phần thưởng nhìn thấy được cho người mua chồng, mà không mở cửa cho tích
+		số nhân leo thang — thứ từng là lý do dùng `math.max` ban đầu.
+	]]
+	local data = DataService.GetData(player)
+	if data and data.StarterPackBought then
+		local packBonus = StarterPackConfig.SPEED_MULTIPLIER
+		multiplier = if multiplier > 1 then multiplier + packBonus else packBonus
+	end
+
 	session.gamepassMultiplier = multiplier
 	return multiplier
 end
+
+-- Hệ số Wins của VIP Membership. Chỉ áp cho thưởng VƯỢT ẢI — xem khối lý do trong `AwardWins`.
+-- Đây là số ĐỘC LẬP với hệ số Speed (1.5) ở dưới: hai xô khác nhau, đừng gộp làm một hằng.
+local VIP_WINS_MULTIPLIER = 1.25
 
 local function computeVipMultiplier(player: Player): number
 	local session = getSession(player)
@@ -208,7 +237,7 @@ local function getMultiplierBreakdown(player: Player, data: PlayerData)
 
 	local premiumMult = additiveBucket(treadmillMult, speedPassMult, vipMult)
 	local cosmeticMult = additiveBucket(trailMult, auraMult)
-	
+
 	local playtimeMult = if PlaytimeService then PlaytimeService.GetPlaytimeMultiplier(player) else 1
 	local friendsMult = if FriendService then FriendService.GetFriendsMultiplier(player) else 1
 	-- Server Boost (Dev Product, toàn server) × Personal Boost (Roulette) — x2 mỗi loại.
@@ -299,21 +328,45 @@ local function sendSnapshot(player: Player)
 	local data = DataService.GetData(player)
 	if not data then
 		GamePackets.profileSnapshot.sendTo({
-			isLoaded = false, speed = 0, totalWins = 0, currentRunWins = 0, streak = 0,
-			personalBestDistance = 0, personalBestRunWins = 0, totalRuns = 0,
-			highestCompletedStage = 0, level = 1, xp = 0,
-			requiredXP = Constants.GetRequiredXP(1), rebirths = 0,
+			isLoaded = false,
+			speed = 0,
+			totalWins = 0,
+			currentRunWins = 0,
+			streak = 0,
+			personalBestDistance = 0,
+			personalBestRunWins = 0,
+			totalRuns = 0,
+			highestCompletedStage = 0,
+			level = 1,
+			xp = 0,
+			requiredXP = Constants.GetRequiredXP(1),
+			rebirths = 0,
 			maxWalkSpeed = Constants.GetMaxWalkSpeed(1),
 			customSpeedLimit = Constants.GetMaxWalkSpeed(1),
-			gainMultiplier = 1, treadmillMultiplier = 1, isOnTreadmill = false,
-			speedPassMultiplier = 1, vipMultiplier = 1, premiumMultiplier = 1,
-			trailMultiplier = 1, auraMultiplier = 1, cosmeticMultiplier = 1, rebirthMultiplier = 1,
-			playtimeMultiplier = 1, friendsMultiplier = 1, serverMultiplier = 1, liveOpsMultiplier = 1,
+			gainMultiplier = 1,
+			treadmillMultiplier = 1,
+			isOnTreadmill = false,
+			speedPassMultiplier = 1,
+			vipMultiplier = 1,
+			premiumMultiplier = 1,
+			trailMultiplier = 1,
+			auraMultiplier = 1,
+			cosmeticMultiplier = 1,
+			rebirthMultiplier = 1,
+			playtimeMultiplier = 1,
+			friendsMultiplier = 1,
+			serverMultiplier = 1,
+			liveOpsMultiplier = 1,
 			friendsInServer = 0,
-			canRebirth = false, requiredRebirthLevel = Constants.GetRequiredLevelForRebirth(0),
-			ownsAutoRebirth = false, autoRebirthEnabled = true,
-			activeTreadmillId = "treadmill_1", equippedTrail = "none", equippedAura = "none",
-			unlockedTrails = { none = true }, unlockedAuras = { none = true },
+			canRebirth = false,
+			requiredRebirthLevel = Constants.GetRequiredLevelForRebirth(0),
+			ownsAutoRebirth = false,
+			autoRebirthEnabled = true,
+			activeTreadmillId = "treadmill_1",
+			equippedTrail = "none",
+			equippedAura = "none",
+			unlockedTrails = { none = true },
+			unlockedAuras = { none = true },
 		}, player)
 		return
 	end
@@ -351,7 +404,6 @@ local function addSpeed(player: Player, data: PlayerData, amount: number)
 	if TelemetryService then
 		TelemetryService.Onboarding(player, "FirstSpeed")
 	end
-
 	while data.XP >= Constants.GetRequiredXP(data.Level) do
 		data.XP -= Constants.GetRequiredXP(data.Level)
 		data.Level += 1
@@ -409,7 +461,9 @@ end
 
 function ProgressionService.SetTreadmillState(player: Player, treadmillId: string, multiplier: number, isOn: boolean)
 	local session = getSession(player)
-	local stateChanged = session.treadmillId ~= treadmillId or session.treadmillMultiplier ~= multiplier or session.isOnTreadmill ~= isOn
+	local stateChanged = session.treadmillId ~= treadmillId
+		or session.treadmillMultiplier ~= multiplier
+		or session.isOnTreadmill ~= isOn
 
 	session.treadmillId = treadmillId
 	session.treadmillMultiplier = multiplier
@@ -421,6 +475,12 @@ function ProgressionService.SetTreadmillState(player: Player, treadmillId: strin
 		player:SetAttribute("TreadmillFarming", isOn)
 		sendSnapshot(player)
 	end
+
+	-- Bước 3 tutorial. Phải móc ở ĐÂY chứ không phải ở "lần đầu nhận Speed": Multiplier Pad
+	-- của bước 2 cũng sinh Speed, móc nhầm chỗ đó là tutorial nhảy cóc qua bước 3.
+	if isOn and TutorialService then
+		TutorialService.Notify(player, "Farm")
+	end
 end
 
 function ProgressionService.SetActivePad(player: Player, padId: string, speedPerStep: number)
@@ -429,15 +489,45 @@ function ProgressionService.SetActivePad(player: Player, padId: string, speedPer
 	session.activePadStep = speedPerStep
 end
 
-function ProgressionService.AwardWins(player: Player, amount: number, reason: string?): boolean
+--[[
+	Trả về (có trao được không, SỐ WINS THỰC NHẬN sau mọi hệ số).
+
+	⚠️ Con số thứ hai mới là con số ĐƯỢC PHÉP hiện lên màn hình. Chỗ gọi tự đọc lại
+	`Constants.STAGE_WINS[stage]` là đang đọc số TRƯỚC hệ số: người chơi đang bật x2 Wins thấy
+	toast báo "+2 Wins earned" (số cuối, do hàm này gửi) trong khi thẻ ăn mừng giữa màn hình
+	ghi "+1" (số gốc, do chỗ gọi tự tính) — hai con số cho cùng một lần nhận, và con số nhỏ
+	hơn lại là con số to đùng giữa màn hình, đúng lúc người chơi vừa trả tiền cho x2.
+]]
+function ProgressionService.AwardWins(player: Player, amount: number, reason: string?): (boolean, number)
 	local data = DataService.GetData(player)
 	if not data or amount <= 0 then
-		return false
+		return false, 0
 	end
 
 	local finalWins = math.max(0, math.floor(amount))
 	if GroupChestService and GroupChestService.IsGroupMember(player) then
 		finalWins = math.max(1, math.floor(finalWins * GroupChestConfig.WINS_MULTIPLIER))
+	end
+
+	--[[
+		VIP Membership: +25% Wins mỗi lần vượt ải (2026-08-12).
+
+		PHẠM VI HẸP LÀ ĐIỀU KIỆN SỐNG CÒN — đúng bộ lọc `reason` mà Group Chest / Server Boost
+		/ event đang dùng, và vì những lý do y hệt:
+		  • Nhân cả `product` thì Ultra Wins Pack 1.299 R$ tự thành 1.250.000 Wins với người
+		    có VIP — tự phá giá món đắt thứ hai của shop.
+		  • Nhân `daily`/`roulette`/`code` thì phá lại chính phép siết bảng điểm danh xuống
+		    1.177 Wins/tuần (xem GDD 8.A1) — thứ được siết có chủ đích để người mới không
+		    nhảy cóc qua đoạn đầu game.
+		Cộng dồn với buff group (+10%) ⇒ x1.375, không phải x1.5.
+
+		Đọc qua `computeVipMultiplier` (đã cache theo session) chứ không gọi `ownsPass` trực
+		tiếp: hàm này chạy mỗi lần chốt Wins ở pad, gọi web API ở đó là treo cả pad.
+	]]
+	if reason == "stage" or reason == "stage_x2" then
+		if computeVipMultiplier(player) > 1 then
+			finalWins = math.max(1, math.floor(finalWins * VIP_WINS_MULTIPLIER))
+		end
 	end
 
 	-- Wins Boost (server/personal) chỉ áp cho thưởng vượt ải — không nhân đôi gói mua/daily/roulette.
@@ -462,6 +552,11 @@ function ProgressionService.AwardWins(player: Player, amount: number, reason: st
 			TelemetryService.Onboarding(player, "FirstStage")
 		end
 	end
+	-- Bước 3 tutorial: đã chạy hết một stage VÀ dậm pad vàng để chốt Wins — trọn vẹn vòng
+	-- lặp cốt lõi. Chỉ tính thưởng vượt ải; quà daily/roulette không được tính là "đã hiểu".
+	if TutorialService and (reason == "stage" or reason == "stage_x2") then
+		TutorialService.Notify(player, "Claim")
+	end
 
 	GamePackets.toast.sendTo({
 		kind = reason or "wins",
@@ -469,7 +564,7 @@ function ProgressionService.AwardWins(player: Player, amount: number, reason: st
 		amount = finalWins,
 	}, player)
 	sendSnapshot(player)
-	return true
+	return true, finalWins
 end
 
 function ProgressionService.GrantSpeed(player: Player, amount: number): boolean
@@ -482,14 +577,12 @@ function ProgressionService.GrantSpeed(player: Player, amount: number): boolean
 	return true
 end
 
+-- Trả về số Wins THỰC nhận. Trước đây hàm này tự nhân lại hệ số group để đoán con số đó —
+-- một bản sao của phép tính trong `AwardWins`, và đã lệch ngay: nó chỉ nhân hệ số group, bỏ
+-- qua Wins Boost lẫn hệ số event. Giờ lấy thẳng con số mà `AwardWins` vừa cộng vào profile.
 function ProgressionService.GiveWins(player: Player, baseWins: number): number
-	local finalWins = math.max(0, math.floor(baseWins))
-	if GroupChestService and GroupChestService.IsGroupMember(player) then
-		finalWins = math.max(1, math.floor(finalWins * GroupChestConfig.WINS_MULTIPLIER))
-	end
-
-	ProgressionService.AwardWins(player, baseWins, "wins")
-	return finalWins
+	local ok, finalWins = ProgressionService.AwardWins(player, baseWins, "wins")
+	return if ok then finalWins else 0
 end
 
 local function celebrateRebirth(player: Player, data: PlayerData)
@@ -619,9 +712,91 @@ function ProgressionService.Init()
 	GamepassService = ServiceLocator.Find("GamepassService")
 	RemoteConfigService = ServiceLocator.Find("RemoteConfigService")
 	TelemetryService = ServiceLocator.Find("TelemetryService")
+	-- Find (không phải Get): tutorial là thứ phụ, thiếu nó thì game vẫn phải chạy.
+	TutorialService = ServiceLocator.Find("TutorialService")
+end
+
+--[[
+	[Studio-only test hook] MỞ KHOÁ + TRANG BỊ cosmetic bằng attribute (2026-08-14).
+
+	Đặt trên Player: `StudioUnlockTrail` = "trail_streak_aurora" (hoặc `StudioUnlockAura`).
+	Server mở khoá món đó trong profile RỒI trang bị luôn, và tự xoá attribute để lần đặt sau
+	vẫn kích hoạt được.
+
+	Vì sao attribute chứ không phải một hàm gọi thẳng: `execute_luau` của MCP chạy trong VM
+	RIÊNG, nên `require(ServiceLocator)` ở đó nhận về một registry rỗng — không với tới được
+	service thật đang chạy. Attribute nằm trên Instance chung nên mọi VM đều thấy; đây đúng là
+	cách `TutorialService.StudioTutorialReset` và vé test của RouletteService đang dùng.
+
+	Ngoài Studio hook này KHÔNG tồn tại — người chơi thật không set được attribute trên server.
+]]
+local function grantStudioCosmetic(player: Player, category: string, itemId: string, source: string)
+	if not DataService.GetData(player) then
+		warn(`[ProgressionService] Hook Studio: profile của {player.Name} chưa nạp xong, bỏ qua "{itemId}".`)
+		return
+	end
+	ProgressionService.UnlockCosmetic(player, category, itemId, true)
+	print(
+		`[ProgressionService] [Studio hook/{source}] Mở khoá + trang bị {category} "{itemId}" cho {player.Name}.`
+	)
+end
+
+local function watchStudioCosmeticHook(player: Player)
+	-- (a) TỨC THỜI: đặt attribute lên PLAYER khi đang chơi ⇒ mở khoá ngay lập tức.
+	local function handleOneShot(attributeName: string, category: string)
+		local itemId = player:GetAttribute(attributeName)
+		if typeof(itemId) ~= "string" or itemId == "" then
+			return
+		end
+		player:SetAttribute(attributeName, nil)
+		grantStudioCosmetic(player, category, itemId, attributeName)
+	end
+	player:GetAttributeChangedSignal("StudioUnlockTrail"):Connect(function()
+		handleOneShot("StudioUnlockTrail", "trail")
+	end)
+	player:GetAttributeChangedSignal("StudioUnlockAura"):Connect(function()
+		handleOneShot("StudioUnlockAura", "aura")
+	end)
+
+	--[[
+		(b) BỀN QUA MỌI LẦN RESTART: attribute trên WORKSPACE.
+
+		Vì sao cần cả hai. Hook (a) ghi vào profile, mà profile Studio KHÔNG chắc lưu kịp khi
+		phiên Play bị dừng đột ngột — đã dính đúng chuyện đó: mở khoá xong, restart một cái là
+		Streak Aurora khoá lại như cũ. Attribute trên `Workspace` được LƯU THẲNG VÀO FILE PLACE,
+		nên nó sống sót qua restart Studio lẫn qua việc profile mất, và cứ mỗi lần vào Play là
+		món được cấp lại.
+
+		Dùng:  Workspace:SetAttribute("StudioGrantTrail", "trail_streak_aurora")
+		Gỡ:    Workspace:SetAttribute("StudioGrantTrail", nil)
+		Cùng mẫu với `TestEventName` của RemoteConfigService. Ngoài Studio hook không tồn tại.
+	]]
+	task.spawn(function()
+		local tries = 0
+		while not DataService.IsLoaded(player) and tries < 200 and player.Parent == Players do
+			task.wait(0.1)
+			tries += 1
+		end
+		if not DataService.IsLoaded(player) then
+			return
+		end
+		for attributeName, category in { StudioGrantTrail = "trail", StudioGrantAura = "aura" } do
+			local itemId = Workspace:GetAttribute(attributeName)
+			if typeof(itemId) == "string" and itemId ~= "" then
+				grantStudioCosmetic(player, category, itemId, attributeName)
+			end
+		end
+	end)
 end
 
 function ProgressionService.Start()
+	if RunService:IsStudio() then
+		for _, player in Players:GetPlayers() do
+			watchStudioCosmeticHook(player)
+		end
+		Players.PlayerAdded:Connect(watchStudioCosmeticHook)
+	end
+
 	GamePackets.requestSnapshot.listen(function(_data, player: Player)
 		if isRateLimited(player, "snapshot") then
 			return
@@ -634,7 +809,12 @@ function ProgressionService.Start()
 			return
 		end
 		local data = DataService.GetData(player)
-		if not data or typeof(packet.walkSpeed) ~= "number" or packet.walkSpeed ~= packet.walkSpeed or math.abs(packet.walkSpeed) == math.huge then
+		if
+			not data
+			or typeof(packet.walkSpeed) ~= "number"
+			or packet.walkSpeed ~= packet.walkSpeed
+			or math.abs(packet.walkSpeed) == math.huge
+		then
 			return
 		end
 		local maxSpeed = getMaxWalkSpeed(data)
@@ -687,7 +867,10 @@ function ProgressionService.Start()
 			return
 		end
 
-		local catalog = if request.category == "trail" then Constants.TRAILS elseif request.category == "aura" then Constants.AURAS else nil
+		local catalog = if request.category == "trail"
+			then Constants.TRAILS
+			elseif request.category == "aura" then Constants.AURAS
+			else nil
 		if not catalog then
 			return
 		end
@@ -710,6 +893,12 @@ function ProgressionService.Start()
 			-- `priceWins` = 999.999.999 vốn là chốt chặn, nhưng whale hoàn toàn có thể
 			-- chạm mốc đó ⇒ phải chặn tường minh, đừng dựa vào con số.
 			if config.spinOnly then
+				return
+			end
+
+			-- Trail độc quyền chuỗi điểm danh (Streak Aurora): cùng lý lẽ như spinOnly —
+			-- `priceWins = 0` mà không chặn tường minh thì packet giả mua được MIỄN PHÍ.
+			if config.dailyOnly then
 				return
 			end
 

@@ -43,11 +43,13 @@ function ReceiptService.Init()
 	local serverBoost = ServiceLocator.Get("ServerBoostService")
 	local roulette = ServiceLocator.Get("RouletteService")
 	local product = ServiceLocator.Get("ProductService")
+	local starterPack = ServiceLocator.Get("StarterPackService")
 	processors = {
 		teleport.ProcessReceipt,
 		stage.ProcessReceipt,
 		serverBoost.ProcessReceipt,
 		roulette.ProcessReceipt,
+		starterPack.ProcessReceipt,
 		product.ProcessReceipt,
 	}
 

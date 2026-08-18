@@ -67,10 +67,7 @@ local function horizontalDistance(a: Vector3, b: Vector3): number
 end
 
 local function getAllowedSpeed(player: Player, humanoid: Humanoid): number
-	local allowed = math.max(
-		humanoid.WalkSpeed * AntiCheatConfig.SPEED_HEADROOM,
-		AntiCheatConfig.MIN_ALLOWED_SPEED
-	)
+	local allowed = math.max(humanoid.WalkSpeed * AntiCheatConfig.SPEED_HEADROOM, AntiCheatConfig.MIN_ALLOWED_SPEED)
 
 	local activeStage = player:GetAttribute("ActiveStage")
 	if typeof(activeStage) == "number" then
@@ -172,7 +169,11 @@ local function checkPlayer(player: Player, now: number)
 		table.insert(entry.strikes, now)
 
 		if AntiCheatConfig.LOG_VIOLATIONS then
-			warn(`[AntiCheat] {player.Name}: strike {#entry.strikes}/{AntiCheatConfig.MAX_STRIKES} — {math.floor(speed)} > {math.floor(allowed)} studs/s`)
+			warn(
+				`[AntiCheat] {player.Name}: strike {#entry.strikes}/{AntiCheatConfig.MAX_STRIKES} — {math.floor(speed)} > {math.floor(
+					allowed
+				)} studs/s`
+			)
 		end
 
 		if #entry.strikes >= AntiCheatConfig.MAX_STRIKES then
@@ -202,6 +203,13 @@ end
 function AntiCheatService.Init() end
 
 function AntiCheatService.Start()
+	if not AntiCheatConfig.ENABLED then
+		-- NoteTeleport vẫn phải gọi được (các service khác gọi vô điều kiện), chỉ là
+		-- không có vòng kiểm tra nào chạy nên nó thành no-op.
+		warn("[AntiCheat] ĐANG TẮT (AntiCheatConfig.ENABLED = false) — nhớ bật lại trước khi publish")
+		return
+	end
+
 	for _, player in Players:GetPlayers() do
 		watchPlayer(player)
 	end

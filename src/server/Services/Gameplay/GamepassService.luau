@@ -22,10 +22,12 @@ local RunService = game:GetService("RunService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
+local StarterPackConfig = require(ReplicatedStorage.Shared.Config.Economy.StarterPack)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
 
 local DataService: any = nil
 local ProgressionService: any = nil
+local StarterPackService: any = nil
 
 local GamepassService = {}
 
@@ -60,11 +62,13 @@ end
 
 local function buildMaps()
 	local ids = Constants.GAMEPASS_IDS
-	for passId, name in {
-		[ids.DoubleSpeed or 0] = "x2 SPEED GAMEPASS",
-		[ids.QuadSpeed or 0] = "x4 SPEED GAMEPASS",
-		[ids.OctaSpeed or 0] = "x8 SPEED GAMEPASS",
-	} do
+	for passId, name in
+		{
+			[ids.DoubleSpeed or 0] = "x2 SPEED GAMEPASS",
+			[ids.QuadSpeed or 0] = "x4 SPEED GAMEPASS",
+			[ids.OctaSpeed or 0] = "x8 SPEED GAMEPASS",
+		}
+	do
 		if passId > 0 then
 			SPEED_PASS_NAMES[passId] = name
 		end
@@ -78,10 +82,12 @@ local function buildMaps()
 		end
 	end
 
-	for category, catalog in {
-		aura = Constants.AURAS :: { any },
-		trail = Constants.TRAILS :: { any },
-	} do
+	for category, catalog in
+		{
+			aura = Constants.AURAS :: { any },
+			trail = Constants.TRAILS :: { any },
+		}
+	do
 		for _, config in catalog do
 			local passId = config.gamepassId or 0
 			if passId > 0 then
@@ -149,7 +155,6 @@ function GamepassService.OwnsPass(player: Player, passId: number): boolean
 	return false
 end
 
-
 local function markSessionOwned(player: Player, passId: number)
 	local owned = sessionOwned[player]
 	if not owned then
@@ -206,6 +211,37 @@ local function unlockCosmetic(player: Player, pass: CosmeticRef, announce: boole
 			message = `{pass.name} unlocked!`,
 			amount = 0,
 		}, player)
+	end
+end
+
+--[[
+	Hai cosmetic ĐỘC QUYỀN đi kèm VIP Membership. Chúng không có gamepass riêng và không bán
+	bằng Wins (`dailyOnly` trong config), nên ĐÂY là đường trao duy nhất — hỏng chỗ này thì
+	người mua 399 R$ vĩnh viễn không nhận được hai phần ba giá trị của gói.
+
+	Trao KHÔNG kèm `announce`: mua VIP đã có banner "VIP MEMBERSHIP" riêng, thêm hai banner
+	cosmetic nữa là ba tấm chồng nhau cho cùng một giao dịch. Cũng KHÔNG tự trang bị — người
+	chơi có thể đang đeo món họ thích hơn, và VIP là gói mua vì quyền lợi chứ không phải vì
+	một bộ đồ cụ thể.
+]]
+local VIP_COSMETICS: { { category: string, id: string, name: string } } = {
+	{ category = "trail", id = "trail_vip", name = "VIP Gold Trail" },
+	{ category = "aura", id = "aura_vip", name = "VIP Gold Aura" },
+}
+
+local function grantVipCosmetics(player: Player)
+	if VIP_PASS_ID <= 0 or not GamepassService.OwnsPass(player, VIP_PASS_ID) then
+		return
+	end
+	local data = DataService.GetData(player)
+	if not data then
+		return
+	end
+	for _, item in VIP_COSMETICS do
+		local unlocked = if item.category == "trail" then data.UnlockedTrails else data.UnlockedAuras
+		if not unlocked[item.id] then
+			ProgressionService.UnlockCosmetic(player, item.category, item.id, false)
+		end
 	end
 end
 
@@ -294,6 +330,10 @@ end
 function GamepassService.Init()
 	DataService = ServiceLocator.Get("DataService")
 	ProgressionService = ServiceLocator.Get("ProgressionService")
+	-- `Find` chứ không phải `Get`: StarterPackService cũng lấy GamepassService trong Init của
+	-- nó, hai bên phụ thuộc chéo nên bên chạy trước không được phép nổ vì bên kia chưa sẵn
+	-- sàng. Chỉ cần nó có mặt lúc người chơi bấm mua, mà lúc đó cả hai đã Init xong từ lâu.
+	StarterPackService = ServiceLocator.Find("StarterPackService")
 	buildMaps()
 end
 
@@ -312,6 +352,7 @@ function GamepassService.Start()
 		if passId == VIP_PASS_ID and VIP_PASS_ID > 0 then
 			ProgressionService.RefreshGamepassCache(player)
 			syncVipAttribute(player)
+			grantVipCosmetics(player)
 			celebrate(player, "VIP MEMBERSHIP")
 			return
 		end
@@ -321,6 +362,17 @@ function GamepassService.Start()
 		if AUTO_REBIRTH_PASS_ID > 0 and passId == AUTO_REBIRTH_PASS_ID then
 			ProgressionService.RefreshGamepassCache(player)
 			celebrate(player, "AUTO-REBIRTH")
+			return
+		end
+
+		--[[
+			Gamepass Rookie Rocket ĐỜI ĐẦU (đã tắt bán, giờ gói bán bằng Developer Product).
+			Nhánh này gần như không bao giờ chạy nữa — giữ cho trường hợp Roblox bắn lại sự
+			kiện với người đã sở hữu. `trusted = true`: giao dịch vừa được chứng kiến tại đây.
+			Không dùng `celebrate` — StarterPackService tự gửi banner riêng có liệt kê quà.
+		]]
+		if StarterPackService and StarterPackConfig.LEGACY_PASS_ID > 0 and passId == StarterPackConfig.LEGACY_PASS_ID then
+			StarterPackService.GrantIfOwnedLegacyPass(player, true)
 			return
 		end
 
@@ -336,31 +388,33 @@ function GamepassService.Start()
 		end
 	end
 
-	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, passId: number, purchased: boolean)
-		if purchased then
-			print(`[GamepassService] {player.Name} mua pass {passId} thành công`)
-			applyPass(player, passId)
-			return
-		end
-
-		-- Khi purchased = false (người chơi bấm Cancel / đóng prompt):
-		-- CHỈ unlock nếu tài khoản ĐÃ SỞ HỮU THẬT trên Web Roblox (UserOwnsGamePassAsync == true).
-		-- Ngược lại nếu bấm Cancel và chưa sở hữu pass → TUYỆT ĐỐI KHÔNG UNLOCK.
-		task.spawn(function()
-			if player.Parent ~= Players then
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
+		function(player: Player, passId: number, purchased: boolean)
+			if purchased then
+				print(`[GamepassService] {player.Name} mua pass {passId} thành công`)
+				applyPass(player, passId)
 				return
 			end
-			local ok, ownsOnWeb = pcall(function()
-				return MarketplaceService:UserOwnsGamePassAsync(player.UserId, passId)
+
+			-- Khi purchased = false (người chơi bấm Cancel / đóng prompt):
+			-- CHỈ unlock nếu tài khoản ĐÃ SỞ HỮU THẬT trên Web Roblox (UserOwnsGamePassAsync == true).
+			-- Ngược lại nếu bấm Cancel và chưa sở hữu pass → TUYỆT ĐỐI KHÔNG UNLOCK.
+			task.spawn(function()
+				if player.Parent ~= Players then
+					return
+				end
+				local ok, ownsOnWeb = pcall(function()
+					return MarketplaceService:UserOwnsGamePassAsync(player.UserId, passId)
+				end)
+				print(
+					`[GamepassService] {player.Name} prompt {passId} closed without purchase | ownsOnWeb = {ok and ownsOnWeb}`
+				)
+				if ok and ownsOnWeb == true then
+					applyPass(player, passId)
+				end
 			end)
-			print(`[GamepassService] {player.Name} prompt {passId} closed without purchase | ownsOnWeb = {ok and ownsOnWeb}`)
-			if ok and ownsOnWeb == true then
-				applyPass(player, passId)
-			end
-		end)
-	end)
-
-
+		end
+	)
 
 	-- [Studio-only] đổi `TestOwnedPasses` giữa chừng phải XOÁ cache ownership của session,
 	-- nếu không giá trị false lưu từ lúc join sẽ dính vĩnh viễn và hook vô dụng.
@@ -369,6 +423,7 @@ function GamepassService.Start()
 			player:GetAttributeChangedSignal("TestOwnedPasses"):Connect(function()
 				ProgressionService.RefreshGamepassCache(player)
 				syncVipAttribute(player)
+				grantVipCosmetics(player)
 			end)
 		end
 		for _, player in Players:GetPlayers() do
@@ -389,6 +444,9 @@ function GamepassService.Start()
 				syncOwnedTreadmills(player)
 				syncOwnedCosmetics(player)
 				syncVipAttribute(player)
+				-- Người mua VIP TRƯỚC khi có hai món này (hoặc mua trên web) chỉ nhận được
+				-- chúng ở đây — applyPass chỉ chạy khi giao dịch xảy ra trong session.
+				grantVipCosmetics(player)
 			end
 		end)
 	end

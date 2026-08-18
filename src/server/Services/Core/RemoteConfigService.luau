@@ -128,7 +128,9 @@ local function refresh(): boolean
 	end)
 	if not ok or not snapshot then
 		if lastFetchOk then
-			warn(`[RemoteConfigService] Không lấy được config, giữ giá trị đang dùng: {tostring(snapshot)}`)
+			warn(
+				`[RemoteConfigService] Không lấy được config, giữ giá trị đang dùng: {tostring(snapshot)}`
+			)
 		end
 		return false
 	end
@@ -209,7 +211,9 @@ function RemoteConfigService.Init()
 	end)
 	configService = if ok then service else nil
 	if not configService then
-		warn("[RemoteConfigService] ConfigService không khả dụng — chạy hoàn toàn bằng giá trị mặc định.")
+		warn(
+			"[RemoteConfigService] ConfigService không khả dụng — chạy hoàn toàn bằng giá trị mặc định."
+		)
 	end
 end
 
