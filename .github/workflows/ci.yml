@@ -45,8 +45,12 @@ jobs:
             "https://github.com/JohnnyMorganz/luau-lsp/releases/download/${LUAU_LSP_VERSION}/luau-lsp-linux-x86_64.zip"
           unzip -q luau-lsp.zip
           chmod +x luau-lsp
+          # ⚠️ PIN theo ĐÚNG tag của binary, KHÔNG lấy từ nhánh main.
+          # main trôi liên tục (đo 2026-08-18: main 19.615 dòng vs tag 1.69.0 19.110 — lệch 505).
+          # Lấy từ main nghĩa là số lỗi đổi theo ngày chạy CI mà source không hề đổi, nên
+          # baseline mất hết ý nghĩa và ratchet có thể đỏ oan.
           curl -sL -o globalTypes.d.luau \
-            https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
+            "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_VERSION}/scripts/globalTypes.d.luau"
 
       - name: luau-lsp analyze (không được vượt baseline)
         run: |
@@ -57,19 +61,52 @@ jobs:
             --ignore="**/Packages/**" \
             --ignore="**/ServerPackages/**" \
             src > lsp-out.txt 2>&1 || true
-          COUNT=$(grep -c "TypeError\|SyntaxError\|UnknownSymbol" lsp-out.txt || true)
+          # ⚠️ ĐẾM LỖI DUY NHẤT, không đếm số DÒNG.
+          #
+          # luau-lsp báo lại CÙNG một lỗi một lần cho mỗi ngữ cảnh require trong sourcemap.
+          # Đo 2026-08-18: 722 dòng nhưng chỉ 418 lỗi thật — hệ số nhân tới 17× cho file
+          # được require nhiều (Responsive.luau). Hệ quả của cách đếm cũ: chỉ cần thêm MỘT
+          # `require` tới file đang có lỗi là số nhảy vọt và CI đỏ, dù không ai viết thêm
+          # dòng lỗi nào; ngược lại sửa thật thì số tụt quá đà, trông như tiến bộ ảo.
+          #
+          # Bỏ tiền tố đường dẫn tuyệt đối rồi `sort -u`: khoá còn lại là (module, dòng, cột,
+          # thông điệp) — đúng một lỗi thật.
+          COUNT=$(grep "TypeError\|SyntaxError\|UnknownSymbol" lsp-out.txt \
+            | sed 's/^[^[]*//' | sort -u | wc -l | tr -d ' ')
           BASELINE=$(cat tests/luau-lsp-baseline.txt)
-          echo "Type errors: $COUNT (baseline $BASELINE)"
+          echo "Lỗi type duy nhất: $COUNT (baseline $BASELINE)"
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Thêm $((COUNT - BASELINE)) lỗi type mới so với baseline."
-            grep "TypeError\|SyntaxError\|UnknownSymbol" lsp-out.txt | head -40
+            grep "TypeError\|SyntaxError\|UnknownSymbol" lsp-out.txt \
+              | sed 's/^[^[]*//' | sort -u | head -40
             exit 1
           fi
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::notice::Giảm được $((BASELINE - COUNT)) lỗi — hạ tests/luau-lsp-baseline.txt xuống $COUNT."
           fi
 
-      # 5. Cổng chặn cứng: unit test công thức thuần (XP curve, walkspeed cap,
+      # 5. Không chặn: canh chừng snapshot thế giới game.
+      #
+      #    Header .rbxl khai sẵn số instance ở offset 20 (u32 little-endian) — đọc 4 byte đó
+      #    là biết ngay, không cần giải nén hay parse gì. Cách này chính xác tuyệt đối, khác
+      #    hẳn việc grep chuỗi trong file binary (chunk bị nén nên grep luôn cho kết quả sai).
+      #
+      #    Cổng này không biết map có MỚI hay không — nó chỉ phân biệt "vỏ rỗng" với
+      #    "snapshot thật", để không ai tưởng nhầm repo đã có map.
+      - name: Place snapshot (chỉ cảnh báo)
+        continue-on-error: true
+        run: |
+          if [ ! -f SpeedEscape.rbxl ]; then
+            echo "::warning::Không có SpeedEscape.rbxl — thế giới game hiện chỉ tồn tại trên Roblox Cloud. Xem README → 'Sao lưu thế giới ra git'."
+            exit 0
+          fi
+          COUNT=$(od -An -tu4 -j20 -N4 SpeedEscape.rbxl | tr -d ' ')
+          echo "SpeedEscape.rbxl khai $COUNT instance."
+          if [ "$COUNT" -lt 10000 ]; then
+            echo "::warning::SpeedEscape.rbxl chỉ có $COUNT instance — trông như bản build chỉ-có-code chứ không phải thế giới game (~68.000). Kiểm tra lại xem đã dùng File → Download a Copy chưa."
+          fi
+
+      # 6. Cổng chặn cứng: unit test công thức thuần (XP curve, walkspeed cap,
       #    roulette weight, giá kinh tế). Chạy ngoài Roblox nên nhanh và rẻ.
       - name: Chạy unit test (Lune)
         run: |
