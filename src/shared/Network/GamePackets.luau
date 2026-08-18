@@ -155,16 +155,50 @@ return ByteNet.defineNamespace("speedEscape", function()
 				amount = ByteNet.float64,
 			}),
 		}),
-			dailyState = ByteNet.definePacket({
-				value = ByteNet.struct({
-					streakDay = ByteNet.uint8,
-					canClaim = ByteNet.bool,
-					nextDay = ByteNet.uint8,
-				}),
+		-- Tutorial người chơi mới. Server là nguồn sự thật DUY NHẤT về bước hiện tại: mọi
+		-- bước đều gắn với một sự kiện gameplay server đã tự biết (nhận Speed lần đầu, lên
+		-- Level 2, chốt Wins lần đầu), nên client không có gì để khai gian.
+		tutorialState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				step = ByteNet.uint8, -- số bước ĐÃ xong
+				active = ByteNet.bool, -- false = đã xong/đã skip, ẩn toàn bộ UI tutorial
 			}),
-			requestDailyClaim = ByteNet.definePacket({
-				value = ByteNet.struct({}),
+		}),
+		tutorialComplete = ByteNet.definePacket({
+			value = ByteNet.struct({
+				wins = ByteNet.float64,
+				spins = ByteNet.uint8,
+				skipped = ByteNet.bool,
 			}),
+		}),
+		requestTutorialSkip = ByteNet.definePacket({
+			value = ByteNet.struct({}),
+		}),
+		dailyState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				streakDay = ByteNet.uint8,
+				canClaim = ByteNet.bool,
+				nextDay = ByteNet.uint8,
+			}),
+		}),
+		requestDailyClaim = ByteNet.definePacket({
+			value = ByteNet.struct({}),
+		}),
+		--[[
+			Starter Pack "Rookie Rocket". `secondsLeft` là SỐ GIÂY CÒN LẠI chứ không phải mốc
+			hết hạn: client tự đếm lùi, khỏi phụ thuộc đồng hồ máy nó (lệch múi giờ / chỉnh tay).
+			`configured` = false khi chưa điền Product ID ⇒ client ẩn sạch, không hiện nút chết.
+		]]
+		starterPackState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				secondsLeft = ByteNet.float64,
+				bought = ByteNet.bool,
+				configured = ByteNet.bool,
+			}),
+		}),
+		requestStarterPackPurchase = ByteNet.definePacket({
+			value = ByteNet.struct({}),
+		}),
 		-- Server Boosts: server đồng bộ số giây còn lại; client tự đếm ngược cục bộ.
 		boostState = ByteNet.definePacket({
 			value = ByteNet.struct({
@@ -235,4 +269,3 @@ return ByteNet.defineNamespace("speedEscape", function()
 		}),
 	}
 end)
-

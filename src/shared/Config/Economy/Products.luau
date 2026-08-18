@@ -33,5 +33,4 @@ Products.SPIN_PACKS = {
 	{ productId = 3610357149, spins = 10, priceRobux = 149 },
 } :: { SpinPack }
 
-
 return Products

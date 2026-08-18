@@ -22,7 +22,10 @@ end
 function ServiceLocator.Get(name: string): any
 	local instance = registry[name]
 	if not instance then
-		error(`[ServiceLocator] '{name}' chưa được đăng ký. Hãy kiểm tra thứ tự Init hoặc đặt tên file.`, 2)
+		error(
+			`[ServiceLocator] '{name}' chưa được đăng ký. Hãy kiểm tra thứ tự Init hoặc đặt tên file.`,
+			2
+		)
 	end
 	return instance
 end

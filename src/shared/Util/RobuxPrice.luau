@@ -64,7 +64,6 @@ function RobuxPrice.Format(price: number?): string
 	return `{RobuxPrice.GLYPH} {price}`
 end
 
-
 -- " 1299" — glyph trước. Dùng cho nút mua trong modal.
 function RobuxPrice.FormatPrefixed(price: number?): string
 	if price == nil then
