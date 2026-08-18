@@ -230,16 +230,7 @@ for _, profile in PROFILES do
 		return "—"
 	end
 
-	print(
-		string.format(
-			"%-52s %8.1f %10s %10s %10s",
-			profile.name,
-			multiplierFor(profile, 0),
-			at(1),
-			at(3),
-			at(5)
-		)
-	)
+	print(string.format("%-52s %8.1f %10s %10s %10s", profile.name, multiplierFor(profile, 0), at(1), at(3), at(5)))
 end
 
 print(string.rep("─", 94))
@@ -280,7 +271,9 @@ if freeR1 and whaleR1 then
 	print(string.format("\n• Whale nhanh gấp %.1f lần người chơi free (tới rebirth 1).", freeR1 / whaleR1))
 	local ratio = freeR1 / whaleR1
 	if ratio > 50 then
-		print("  ⚠️ Khoảng cách quá lớn — người chơi free sẽ thấy vô vọng khi nhìn bảng xếp hạng.")
+		print(
+			"  ⚠️ Khoảng cách quá lớn — người chơi free sẽ thấy vô vọng khi nhìn bảng xếp hạng."
+		)
 	elseif ratio < 3 then
 		print("  ⚠️ Khoảng cách quá nhỏ — mua Robux gần như vô nghĩa, doanh thu sẽ thấp.")
 	else
@@ -288,7 +281,12 @@ if freeR1 and whaleR1 then
 	end
 end
 
-print(string.format("\n• Người chơi free dành %.0f%% thời gian đứng treadmill, còn lại chạy obby.", free.farmShare * 100))
+print(
+	string.format(
+		"\n• Người chơi free dành %.0f%% thời gian đứng treadmill, còn lại chạy obby.",
+		free.farmShare * 100
+	)
+)
 if free.farmShare > 0.9 then
 	print("  ⚠️ Gần như chỉ đứng yên. Phần obby — thứ tốn công làm nhất — bị bỏ phí.")
 end
@@ -299,8 +297,14 @@ for stage = 1, Stages.MAX_CONFIGURED_STAGE do
 	totalStageWins += Stages.STAGE_WINS[stage] or 0
 end
 print(string.format("Chạy trọn 15 stage một lượt = %s Wins.", Format.Number(totalStageWins)))
-print(string.format("Pad cuối (pad_%d) cần %s Wins ⇒ ~%.1f lượt chạy trọn map.",
-	#Pads, Format.Number(Pads[#Pads].requiredWins), Pads[#Pads].requiredWins / totalStageWins))
+print(
+	string.format(
+		"Pad cuối (pad_%d) cần %s Wins ⇒ ~%.1f lượt chạy trọn map.",
+		#Pads,
+		Format.Number(Pads[#Pads].requiredWins),
+		Pads[#Pads].requiredWins / totalStageWins
+	)
+)
 
 local mostExpensiveTrail = 0
 for _, t in Trails do
@@ -308,8 +312,13 @@ for _, t in Trails do
 		mostExpensiveTrail = t.priceWins
 	end
 end
-print(string.format("Trail đắt nhất mua bằng Wins = %s ⇒ ~%.1f lượt chạy trọn map.",
-	Format.Number(mostExpensiveTrail), mostExpensiveTrail / totalStageWins))
+print(
+	string.format(
+		"Trail đắt nhất mua bằng Wins = %s ⇒ ~%.1f lượt chạy trọn map.",
+		Format.Number(mostExpensiveTrail),
+		mostExpensiveTrail / totalStageWins
+	)
+)
 
 print("\n═══ HẾT ═══")
 

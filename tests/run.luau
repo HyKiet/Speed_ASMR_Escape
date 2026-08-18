@@ -19,6 +19,8 @@ local Trails = Shim.Require("src/shared/Config/Economy/Trails.luau")
 local Auras = Shim.Require("src/shared/Config/Economy/Auras.luau")
 local Treadmills = Shim.Require("src/shared/Config/Economy/Treadmills.luau")
 local Format = Shim.Require("src/shared/Util/Format.luau")
+local MovementConfig = Shim.Require("src/client/Controllers/Movement/MovementConfig.luau")
+local MovementMath = Shim.Require("src/client/Controllers/Movement/MovementMath.luau")
 
 local passed = 0
 local failures: { string } = {}
@@ -117,7 +119,11 @@ do
 			table.insert(unreachable, `stage {stage} cần WS {gate.minWS}`)
 		end
 	end
-	check("mọi gợi ý WS của stage 1-15 đều đạt được", #unreachable == 0, table.concat(unreachable, ", "))
+	check(
+		"mọi gợi ý WS của stage 1-15 đều đạt được",
+		#unreachable == 0,
+		table.concat(unreachable, ", ")
+	)
 end
 
 --------------------------------------------------------------------------------
@@ -217,8 +223,36 @@ local function auditCatalog(name: string, catalog: { any }, opts: { requiresPric
 			badPrice = `{item.id}: {item.priceRobux}`
 		end
 
-		-- Món độc quyền Roulette không bán ở đâu cả nên nó nằm ngoài mọi dãy giá.
-		if not item.spinOnly then
+		--[[
+			CHỈ xếp vào thang giá những món THỰC SỰ MUA ĐƯỢC bằng loại tiền đó.
+
+			Phép kiểm này khẳng định một điều về TRẢI NGHIỆM MUA HÀNG: đọc danh sách từ trên
+			xuống thì món đắt hơn phải mạnh hơn. Nó chỉ có nghĩa với món nằm trên quầy.
+
+			Bản cũ chỉ loại `spinOnly` nên vẫn nhét cả quà tặng và món gamepass vào dãy Wins,
+			rồi báo đỏ oan trên dữ liệu ĐÚNG:
+			  • `trail_streak_aurora` (5.0) — quà điểm danh Ngày 7, `dailyOnly`
+			  • `trail_rookie` (2.5)        — quà khởi đầu, cố ý đặt NGANG hạng trung
+			                                  (xem khối lý do dài trong `Trails.luau`)
+			  • `trail_vip` (6.0)           — đi kèm VIP Membership
+			Cả ba đều có `priceWins = 0` — con số đó là "không bán", không phải "giá 0".
+			Xếp chúng cạnh Galaxy 500.000 Wins rồi đòi đơn điệu là so hai thứ khác loại.
+
+			Sau khi lọc, dãy Wins còn đúng thang mua bán: 1.5 → 2 → 3 → 4 → 5 → 10.
+
+			⚠️ PHẢI LỌC THEO CỜ, KHÔNG THEO GIÁ — catalog mã hoá "không bán" bằng HAI kiểu:
+			  • Trails dùng `priceWins = 0`
+			  • Auras  dùng `priceWins = 999999999` (số canh gác "không bao giờ đủ tiền")
+			Vì vậy chỉ kiểm `priceWins > 0` là chưa đủ: `aura_vip` (dailyOnly, multiplier 6.0)
+			vẫn lọt vào dãy và làm nó tụt sau `aura_cosmic` 8.0. Cờ `spinOnly`/`dailyOnly`/
+			`robuxOnly` mới là thứ nói đúng món đó bán ở quầy nào.
+
+			(Bản thân việc có hai cách mã hoá "không bán" là một code smell của catalog —
+			nên thống nhất về một quy ước, nhưng đó là việc đổi dữ liệu kinh tế nên tách riêng.)
+		]]
+		local buyableWithWins = type(item.priceWins) == "number" and item.priceWins > 0
+		local giveaway = item.spinOnly or item.dailyOnly
+		if not giveaway and (item.robuxOnly or buyableWithWins) then
 			local group = if item.robuxOnly then "robux" else "wins"
 			table.insert(groups[group], item.multiplier)
 		end
@@ -307,6 +341,78 @@ equals("1 triệu → 1.00M", Format.Number(1_000_000), "1.00M")
 equals("1 tỷ → 1.00B", Format.Number(1_000_000_000), "1.00B")
 equals("0 → 0", Format.Number(0), "0")
 check("số âm không vỡ", type(Format.Number(-1500)) == "string", tostring(Format.Number(-1500)))
+
+--------------------------------------------------------------------------------
+suite("Slide — dừng khi ấn lùi")
+
+do
+	local V = Shim.Vector3
+	local grace = MovementConfig.Slide.BackwardStopGrace
+	local after = grace + 0.01 -- đã qua cửa sổ ân huệ
+	local forward = V.new(0, 0, 1)
+
+	check("ấn ngược hẳn 180° → dừng", MovementMath.ShouldStopForBackward(forward, V.new(0, 0, -1), after))
+	check(
+		"ấn chéo sau (135°) → dừng",
+		MovementMath.ShouldStopForBackward(forward, V.new(0.7071, 0, -0.7071), after)
+	)
+	check(
+		"ấn ngang 90° → KHÔNG dừng (đang bẻ lái, không phải phanh)",
+		not MovementMath.ShouldStopForBackward(forward, V.new(1, 0, 0), after)
+	)
+	check("vẫn ấn tới → KHÔNG dừng", not MovementMath.ShouldStopForBackward(forward, forward, after))
+	check(
+		"thả hết phím → KHÔNG dừng (để slide trôi hết đà tự nhiên)",
+		not MovementMath.ShouldStopForBackward(forward, V.new(0, 0, 0), after)
+	)
+	check(
+		"ấn lùi TRONG cửa sổ ân huệ → KHÔNG dừng (chống cắt slide vừa mở)",
+		not MovementMath.ShouldStopForBackward(forward, V.new(0, 0, -1), grace * 0.5)
+	)
+	check("trục Y của phím bị bỏ qua", MovementMath.ShouldStopForBackward(forward, V.new(0, 5, -1), after))
+	check(
+		"slideDir rỗng → KHÔNG dừng (không có hướng để so)",
+		not MovementMath.ShouldStopForBackward(V.new(0, 0, 0), V.new(0, 0, -1), after)
+	)
+end
+
+--------------------------------------------------------------------------------
+suite("Phanh & trần tốc độ")
+
+do
+	local brake = MovementConfig.Brake
+	local grip = MovementConfig.Grip
+
+	equals("tốc độ thấp dùng gia tốc nền", MovementMath.BrakeAccelAt(10), brake.Accel)
+	check("hãm càng gắt khi càng nhanh", MovementMath.BrakeAccelAt(250) > MovementMath.BrakeAccelAt(120))
+
+	-- Đây là tính chất QUAN TRỌNG NHẤT của phanh: quãng dừng không được phình theo v².
+	-- Bản cũ (accel tỉ lệ bậc nhất với v) cho 13 studs @120 nhưng 42 studs @250.
+	check(
+		"quãng dừng @250 không vượt mục tiêu",
+		MovementMath.StopDistanceAt(250) <= brake.TargetStopDistance + 0.01,
+		`{MovementMath.StopDistanceAt(250)} studs, mục tiêu {brake.TargetStopDistance}`
+	)
+	check(
+		"quãng dừng @400 (rebirth cao) vẫn không vượt mục tiêu",
+		MovementMath.StopDistanceAt(400) <= brake.TargetStopDistance + 0.01,
+		`{MovementMath.StopDistanceAt(400)} studs`
+	)
+	check(
+		"quãng dừng @250 không quá 1.6× @120",
+		MovementMath.StopDistanceAt(250) <= MovementMath.StopDistanceAt(120) * 1.6,
+		`{MovementMath.StopDistanceAt(250)} vs {MovementMath.StopDistanceAt(120)}`
+	)
+	check(
+		"tốc độ thấp vẫn dừng dứt khoát (< 15 studs @120)",
+		MovementMath.StopDistanceAt(120) < 15,
+		`{MovementMath.StopDistanceAt(120)} studs`
+	)
+
+	equals("trần tốc độ theo WalkSpeed", MovementMath.SpeedCeiling(250), 250 * grip.MaxSpeedFactor)
+	equals("trần tốc độ có sàn tuyệt đối", MovementMath.SpeedCeiling(1), grip.MinCeiling)
+	check("trần luôn ≥ WalkSpeed", MovementMath.SpeedCeiling(250) >= 250)
+end
 
 --------------------------------------------------------------------------------
 

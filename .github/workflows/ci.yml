@@ -39,6 +39,12 @@ jobs:
         run: stylua --check src
 
       # 4. Ratchet kiểu typing: được phép còn nợ, nhưng không được nợ thêm.
+      #
+      #    WindShake bị loại cùng Packages/ServerPackages: nó là thư viện VENDORED (không
+      #    qua Wally nên nằm trong src/), đóng góp 41/418 lỗi mà không ai định viết lại.
+      #    Để nó trong phép đếm thì baseline mang 9% nợ không bao giờ trả được, làm loãng
+      #    tín hiệu về code mà team THỰC SỰ sở hữu. Đây cũng là 5 file duy nhất còn thiếu
+      #    header `--!strict` — cố ý không đụng vào code của người khác.
       - name: Tải luau-lsp
         run: |
           curl -sL -o luau-lsp.zip \
@@ -60,6 +66,7 @@ jobs:
             --settings=.vscode/settings.json \
             --ignore="**/Packages/**" \
             --ignore="**/ServerPackages/**" \
+            --ignore="**/WindController/WindShake/**" \
             src > lsp-out.txt 2>&1 || true
           # ⚠️ ĐẾM LỖI DUY NHẤT, không đếm số DÒNG.
           #

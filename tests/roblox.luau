@@ -53,6 +53,61 @@ local Color3Stub = {
 	end,
 }
 
+-- Vector3 giả: đủ new/zero + Magnitude/Unit/Dot cho phần toán di chuyển.
+local Vector3Stub = {}
+local vectorMeta
+vectorMeta = {
+	__index = function(self, key)
+		if key == "Magnitude" then
+			return math.sqrt(self.X * self.X + self.Y * self.Y + self.Z * self.Z)
+		end
+		if key == "Unit" then
+			local m = math.sqrt(self.X * self.X + self.Y * self.Y + self.Z * self.Z)
+			if m < 1e-9 then
+				return setmetatable({ X = 0, Y = 0, Z = 0 }, vectorMeta)
+			end
+			return setmetatable({ X = self.X / m, Y = self.Y / m, Z = self.Z / m }, vectorMeta)
+		end
+		if key == "Dot" then
+			return function(a, b)
+				return a.X * b.X + a.Y * b.Y + a.Z * b.Z
+			end
+		end
+		return nil
+	end,
+}
+function Vector3Stub.new(x, y, z)
+	return setmetatable({ X = x or 0, Y = y or 0, Z = z or 0 }, vectorMeta)
+end
+Vector3Stub.zero = Vector3Stub.new(0, 0, 0)
+
+local NumberRangeStub = {
+	new = function(min, max)
+		return { Min = min, Max = max or min }
+	end,
+}
+
+-- Enum giả: `Enum.KeyCode.C` trả về một token duy nhất theo tên, đủ để so sánh
+-- bằng == mà không cần engine.
+local enumTokens: { [string]: any } = {}
+local EnumStub = setmetatable({}, {
+	__index = function(_, enumName)
+		return setmetatable({}, {
+			__index = function(_, itemName)
+				local key = `{enumName}.{itemName}`
+				if not enumTokens[key] then
+					enumTokens[key] = setmetatable({}, {
+						__tostring = function()
+							return `Enum.{key}`
+						end,
+					})
+				end
+				return enumTokens[key]
+			end,
+		})
+	end,
+})
+
 local makeNode
 
 -- Tìm con tên `name` bên trong thư mục `dirPath` (chỉ tra bảng, không chạm đĩa).
@@ -118,6 +173,9 @@ local function loadFile(filePath: string, node: any)
 			script = node,
 			require = requireNode,
 			Color3 = Color3Stub,
+			Vector3 = Vector3Stub,
+			NumberRange = NumberRangeStub,
+			Enum = EnumStub,
 		},
 	})
 
@@ -151,5 +209,6 @@ function Shim.Require(filePath: string)
 end
 
 Shim.Color3 = Color3Stub
+Shim.Vector3 = Vector3Stub
 
 return Shim
