@@ -1839,7 +1839,25 @@ function Theme.MakeMenuButton(
 				then Theme.MakeSunburst({
 					-- `MakeSunburst` đã tự đặt AnchorPoint (0.5, 0.5) nên đây là TÂM ô nút.
 					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromOffset(190, 190),
+					--[[
+						⚠️ THEO TỈ LỆ Ô, KHÔNG PHẢI OFFSET CỨNG (sửa 2026-08-19).
+
+						Bản cũ để `fromOffset(190, 190)` — con số đó chỉnh cho ô 122×112. Ngày
+						2026-08-16 ô menu to thêm 10% (134×124, xem `CELL_W` trong `LeftMenu`)
+						nhưng hào quang thì đứng yên, nên phần THÒ RA co từ 34 px xuống 28 px
+						mỗi bên. Mà phần thò ra chính là toàn bộ thứ nhìn thấy được: khúc nằm
+						trong ô đã bị nền đục của nút che kín. Kết quả đúng như user báo —
+						"nút Shop thiếu hiệu ứng sunburst".
+
+						Để theo Scale thì hào quang tự lớn theo ô mãi mãi, không còn cặp số nào
+						phải nhớ đồng bộ tay. Đây đúng bài học mà chính `LeftMenu` đã rút ra cho
+						năm con số bố cục của nó (xem khối "CỠ Ô MENU TRÁI — MỘT CHỖ DUY NHẤT").
+
+						1.56 / 1.70 là ĐÚNG tỉ lệ của bản gốc (190÷122 và 190÷112) — tức khôi
+						phục lại nguyên trọng lượng thị giác đã được duyệt, không phải phóng to
+						theo cảm tính.
+					]]
+					Size = UDim2.fromScale(1.56, 1.70),
 					ZIndex = 11,
 					-- Vàng sáng, bắt màu với gradient cam của nút Shop.
 					ImageColor3 = Color3.fromRGB(255, 236, 150),
