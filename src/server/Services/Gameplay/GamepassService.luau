@@ -35,6 +35,7 @@ local GamepassService = {}
 local SPEED_PASS_NAMES: { [number]: string } = {}
 local VIP_PASS_ID = 0
 local AUTO_REBIRTH_PASS_ID = 0
+local INFINITE_REVIVES_PASS_ID = 0
 
 -- passId → treadmillId
 local TREADMILL_PASS_TO_ID: { [number]: string } = {}
@@ -75,6 +76,7 @@ local function buildMaps()
 	end
 	VIP_PASS_ID = ids.VIPMembership or 0
 	AUTO_REBIRTH_PASS_ID = ids.AutoRebirth or 0
+	INFINITE_REVIVES_PASS_ID = ids.InfiniteRevives or 0
 
 	for _, treadmill in Constants.TREADMILLS :: { Constants.TreadmillConfig } do
 		if treadmill.gamepassId and treadmill.gamepassId > 0 then
@@ -366,12 +368,36 @@ function GamepassService.Start()
 		end
 
 		--[[
+			Infinite Revives (user báo 2026-08-19: "mua xong không thấy hệ thống chúc mừng").
+
+			Đây là pass DUY NHẤT rơi qua HẾT mọi nhánh của `applyPass`: nó không phải speed
+			pass, không phải VIP, không phải Auto-Rebirth, không nằm trong bảng treadmill lẫn
+			bảng cosmetic. Hệ quả: mua xong chỉ chạy `markSessionOwned` rồi im lặng — người
+			chơi vừa trả 249 R$ mà màn hình không phản hồi gì.
+
+			QUYỀN LỢI THÌ VẪN CHẠY ĐÚNG, chỉ thiếu phản hồi: `StageCheckpointService.
+			ownsInfiniteRevives` hỏi thẳng `OwnsPass` ngay lúc chết, mà `markSessionOwned` ở
+			đầu hàm này đã ghi vào cache phiên. Nên đây thuần tuý là lỗi TRẢI NGHIỆM MUA HÀNG.
+
+			Không cần `RefreshGamepassCache`: pass này không tham gia phép nhân Speed/Wins nào,
+			khác VIP và Auto-Rebirth (hai cái đó đổi snapshot nên phải làm mới ngay).
+		]]
+		if INFINITE_REVIVES_PASS_ID > 0 and passId == INFINITE_REVIVES_PASS_ID then
+			celebrate(player, "INFINITE REVIVES", "Never restart a stage again — revive on the spot!")
+			return
+		end
+
+		--[[
 			Gamepass Rookie Rocket ĐỜI ĐẦU (đã tắt bán, giờ gói bán bằng Developer Product).
 			Nhánh này gần như không bao giờ chạy nữa — giữ cho trường hợp Roblox bắn lại sự
 			kiện với người đã sở hữu. `trusted = true`: giao dịch vừa được chứng kiến tại đây.
 			Không dùng `celebrate` — StarterPackService tự gửi banner riêng có liệt kê quà.
 		]]
-		if StarterPackService and StarterPackConfig.LEGACY_PASS_ID > 0 and passId == StarterPackConfig.LEGACY_PASS_ID then
+		if
+			StarterPackService
+			and StarterPackConfig.LEGACY_PASS_ID > 0
+			and passId == StarterPackConfig.LEGACY_PASS_ID
+		then
 			StarterPackService.GrantIfOwnedLegacyPass(player, true)
 			return
 		end
