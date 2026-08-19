@@ -41,6 +41,11 @@
       "UI": {
         "$path": "src/ui"
       }
+    },
+
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "$path": "src/replicatedfirst"
     }
   }
 }
