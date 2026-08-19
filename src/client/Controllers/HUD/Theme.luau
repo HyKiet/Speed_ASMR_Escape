@@ -1857,7 +1857,14 @@ function Theme.MakeMenuButton(
 						phục lại nguyên trọng lượng thị giác đã được duyệt, không phải phóng to
 						theo cảm tính.
 					]]
-					Size = UDim2.fromScale(1.56, 1.70),
+					--[[
+						VỪA Ô NÚT (user chốt 2026-08-19: "kích thước sunburst vừa với button thôi").
+
+						1.0 là cỡ NỀN; `Pulse` gắn thêm một `UIScale` dao động 0.92 ↔ 1.12, nên
+						thực tế hào quang thở trong khoảng 0.92× → 1.12× ô nút — vừa khít lúc co,
+						nhô ra một chút lúc nở. Đó là toàn bộ chuyển động cần có.
+					]]
+					Size = UDim2.fromScale(1, 1),
 					--[[
 						ZIndex 13 = TRÊN mặt nút (12), DƯỚI icon (14) và nhãn (15).
 						User chốt 2026-08-19: "nó phải nằm trên button shop và dưới icon".
@@ -1873,7 +1880,10 @@ function Theme.MakeMenuButton(
 					ZIndex = 13,
 					-- Vàng sáng, bắt màu với gradient cam của nút Shop.
 					ImageColor3 = Color3.fromRGB(255, 236, 150),
-					ImageTransparency = 0.3,
+					-- 0.3 → 0.12 (user 2026-08-19: "mờ quá"). Ở 0.3 hào quang chìm vào gradient
+					-- cam của chính nút Shop — hai thứ cùng tông vàng-cam nên độ tương phản
+					-- gần như bằng 0. 0.12 đủ nổi mà chưa che mất mặt nút bên dưới.
+					ImageTransparency = 0.12,
 					Pulse = true,
 					SpinSeconds = 9,
 				})
