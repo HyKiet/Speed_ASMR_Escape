@@ -1858,7 +1858,19 @@ function Theme.MakeMenuButton(
 						theo cảm tính.
 					]]
 					Size = UDim2.fromScale(1.56, 1.70),
-					ZIndex = 11,
+					--[[
+						ZIndex 13 = TRÊN mặt nút (12), DƯỚI icon (14) và nhãn (15).
+						User chốt 2026-08-19: "nó phải nằm trên button shop và dưới icon".
+
+						Bản trước để 11 tức nằm DƯỚI cả mặt nút, nên nền đục của nút che kín
+						phần giữa và chỉ còn viền thò ra ngoài ô là nhìn thấy được — quá mờ
+						nhạt để đọc ra là một hiệu ứng. Nay hào quang phủ lên chính mặt nút,
+						còn icon và chữ vẫn nổi lên trên nên không bị che.
+
+						Chỉ hoạt động vì ScreenGui đặt `ZIndexBehavior = Global`; ở chế độ
+						Sibling thì con không bao giờ xen được vào giữa các lớp của cha.
+					]]
+					ZIndex = 13,
 					-- Vàng sáng, bắt màu với gradient cam của nút Shop.
 					ImageColor3 = Color3.fromRGB(255, 236, 150),
 					ImageTransparency = 0.3,

@@ -90,15 +90,52 @@ local walkSpeed = 16
 local radiusCache: { [number]: number } = {}
 
 --[[
+	Tầm nhìn thật, quy về bán kính đánh thức. Đọc từ `Lighting.FogEnd` chứ không chép số:
+	game có Night mode / Performance mode đổi lighting (xem `ClientSettingsController`), và
+	một hằng số chép tay ở đây sẽ lệch ngay lần đầu ai đó chỉnh sương mù.
+
+	Kẹp trong `MAX_RADIUS` vì ngoài mức đó vật chưa chắc đã được stream về — đánh thức thứ
+	chưa tồn tại là vô nghĩa (xem khối lý do đầu file).
+]]
+local Lighting = game:GetService("Lighting")
+local viewFloor = math.min(Lighting.FogEnd, ZoneLod.MAX_RADIUS)
+
+Lighting:GetPropertyChangedSignal("FogEnd"):Connect(function()
+	local next = math.min(Lighting.FogEnd, ZoneLod.MAX_RADIUS)
+	if next ~= viewFloor then
+		viewFloor = next
+		table.clear(radiusCache)
+	end
+end)
+
+--[[
 	Bán kính đánh thức (bình phương) cho một controller có bán kính gốc `baseRadius`.
 	Trả về bình phương để chỗ gọi so thẳng với `dx*dx + dz*dz`, khỏi phải căn bậc hai.
+]]
+--[[
+	⚠️ SÀN THEO TẦM NHÌN (sửa 2026-08-19 — user: "trong tầm nhìn phải thấy bẫy đang hoạt động").
+
+	Bản trước lấy `max(baseRadius, WalkSpeed × LEAD_SECONDS)`. Vế tốc độ chỉ có ý nghĩa khi
+	người chơi ĐÃ nhanh; ở WalkSpeed 46 nó ra 207, thua cả `baseRadius` nên bán kính rơi về
+	240–420 studs của controller. Trong khi `Lighting.FogEnd = 1500` — người chơi NHÌN THẤY xa
+	gấp 4 lần chỗ bẫy còn cử động. Đó đúng là thứ user thấy: dàn bẫy hiện rõ cuối hành lang
+	nhưng đứng như tượng, tới gần mới giật mình sống dậy.
+
+	Luật mới, một câu: **THẤY ĐƯỢC THÌ PHẢI ĐỘNG.** Sàn bán kính = tầm nhìn thật, đọc thẳng
+	từ `FogEnd` chứ không chép số — đổi lighting (Night mode, Performance mode) là LOD tự
+	theo, không có con số nào phải nhớ đồng bộ.
+
+	Vế tốc độ GIỮ NGUYÊN và vẫn có tác dụng: ở 250 WS nó cho 1.125 studs, nhưng khi người
+	chơi vượt quá tầm nhìn thì nó mới là vế thắng (tới trần `MAX_RADIUS`). Hai vế bù nhau —
+	một cái lo "nhìn thấy", một cái lo "sắp tới nơi".
 ]]
 function ZoneLod.RadiusSq(baseRadius: number): number
 	local cached = radiusCache[baseRadius]
 	if cached then
 		return cached
 	end
-	local radius = math.clamp(walkSpeed * ZoneLod.LEAD_SECONDS, baseRadius, ZoneLod.MAX_RADIUS)
+	local reach = math.max(walkSpeed * ZoneLod.LEAD_SECONDS, viewFloor)
+	local radius = math.clamp(reach, baseRadius, ZoneLod.MAX_RADIUS)
 	local value = radius * radius
 	radiusCache[baseRadius] = value
 	return value
