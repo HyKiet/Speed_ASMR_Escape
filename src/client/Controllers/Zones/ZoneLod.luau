@@ -41,17 +41,47 @@ local Players = game:GetService("Players")
 
 local ZoneLod = {}
 
--- Bao nhiêu GIÂY chạy nữa thì tới nơi. 3.2s ở 250 WS = 800 studs — bẫy đã chuyển động từ
--- lúc còn là chấm nhỏ cuối hành lang, người chơi đọc được nhịp trước khi phải né.
-ZoneLod.LEAD_SECONDS = 3.2
--- Chặn trên: dưới StreamingTargetRadius mặc định (1024) để không đánh thức vật chưa stream.
-ZoneLod.MAX_RADIUS = 900
--- Trong tầm này: cập nhật MỌI frame. Ngoài ra: hạ xuống FAR_HZ.
+--[[
+	── NỚI TẦM 2026-08-19 (user xin "client bẫy xa hơn một chút, vẫn phải tối ưu") ────────
+
+	Trần cũ `MAX_RADIUS = 900` được chốt vì một lý do đã HẾT HIỆU LỰC: nó bám theo
+	`StreamingTargetRadius` MẶC ĐỊNH của Roblox (1024) — đánh thức vật chưa stream về là vô
+	nghĩa. Nay place đã đặt `StreamingTargetRadius = 3072` (cùng `StreamingMinRadius = 1024`
+	và `StreamingIntegrityMode = PauseOutsideLoadedArea`), nên cái trần đó chỉ còn là di sản.
+
+	Mới: nhìn trước 4.5s (ở 250 WS = 1.125 studs) và trần 1.800 — vẫn cách xa 3.072 để giữ
+	đúng nguyên tắc "không đánh thức vật chưa stream".
+
+	── VÌ SAO NỚI GẦN GẤP ĐÔI MÀ KHÔNG TỐN GẤP ĐÔI ────────────────────────────────────────
+	Thêm BẬC NHỊP THỨ BA. Trước đây chỉ có hai bậc (mọi-frame trong 300, rồi 24Hz cho tất cả
+	phần còn lại); nếu giữ nguyên hai bậc mà kéo trần lên 1.800 thì toàn bộ vùng 900→1.800
+	mới cũng chạy 24Hz — đó mới là thứ làm phình chi phí.
+
+	    ≤ 300 studs   : mọi frame      (vật đang ở ngay trước mặt, phải mượt tuyệt đối)
+	    ≤ 900 studs   : 24 Hz          (đủ mượt ở khoảng cách đó — giữ nguyên hành vi cũ)
+	    > 900 studs   : 8 Hz           (mới; ở đây một cỗ máy ép chiếm vài pixel)
+
+	8 Hz an toàn vì mọi bẫy chạy theo ĐỒNG HỒ TẤT ĐỊNH (`GetServerTimeNow`): mỗi lần cập
+	nhật là nhảy thẳng tới tư thế ĐÚNG của thời điểm đó, bỏ frame không tích luỹ sai lệch.
+	Người chơi chỉ thấy vật ở xa chuyển động hơi giật — mà ở 900+ studs thì không phân biệt
+	nổi. Cái họ CẦN thấy là "bẫy kia đang động, không phải tượng", và 8 Hz thừa sức làm việc đó.
+
+	Chi phí thực tế: vùng mới (900→1.800) rộng gấp ~3 lần vùng cũ về diện tích, nhưng chạy ở
+	1/3 nhịp ⇒ tổng số lần cập nhật mỗi giây gần như không đổi.
+]]
+ZoneLod.LEAD_SECONDS = 4.5
+ZoneLod.MAX_RADIUS = 1800
+-- Trong tầm này: cập nhật MỌI frame.
 ZoneLod.FULL_RATE_RADIUS = 300
+-- Từ FULL_RATE_RADIUS tới FAR_RADIUS: nhịp FAR_HZ. Ngoài FAR_RADIUS: nhịp DISTANT_HZ.
+ZoneLod.FAR_RADIUS = 900
 ZoneLod.FAR_HZ = 24
+ZoneLod.DISTANT_HZ = 8
 
 local FULL_RATE_SQ = ZoneLod.FULL_RATE_RADIUS * ZoneLod.FULL_RATE_RADIUS
+local FAR_SQ = ZoneLod.FAR_RADIUS * ZoneLod.FAR_RADIUS
 local FAR_STEP = 1 / ZoneLod.FAR_HZ
+local DISTANT_STEP = 1 / ZoneLod.DISTANT_HZ
 
 local player = Players.LocalPlayer
 
@@ -92,7 +122,9 @@ function ZoneLod.ShouldStepFar(distSq: number, now: number, nextFar: number): (b
 	if now < nextFar then
 		return false, nextFar
 	end
-	return true, now + FAR_STEP
+	-- Bậc ba: ngoài FAR_RADIUS thì giãn nhịp tiếp (xem khối lý do ở đầu file).
+	-- Chỗ gọi không phải sửa gì — vẫn đúng một biến `nextFar` như trước.
+	return true, now + (if distSq > FAR_SQ then DISTANT_STEP else FAR_STEP)
 end
 
 local function watchHumanoid(character: Model)
