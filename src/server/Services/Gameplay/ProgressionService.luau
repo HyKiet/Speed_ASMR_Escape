@@ -741,6 +741,50 @@ local function grantStudioCosmetic(player: Player, category: string, itemId: str
 	)
 end
 
+--[[
+	[Studio-only test hook] NHẢY THẲNG TỚI MỘT CẤP ĐỘ ĐỂ NGHIỆM THU.
+
+	Đặt attribute `StudioSetLevel` = <số> lên Player ⇒ set Level, nạp XP về 0, mở trần
+	`CustomSpeedLimit` lên kịch và áp lại WalkSpeed ngay.
+
+	VÌ SAO CẦN: trần WalkSpeed = `BASE + (Level-1) × 2`, kẹp 250 — muốn chạm 250 phải tới
+	Level ~120. Cày thật lên tới đó mất hàng giờ, nên MỌI phép nghiệm thu ở tốc độ cao
+	(AntiCheat, gate zone, ổn định 100–250 WS, LOD bẫy) trước đây đều không dựng nổi trong
+	một phiên test. Đây chính là khoảng trống đó.
+
+	CHỈ chạm Level/XP/CustomSpeedLimit — KHÔNG đụng Wins, Rebirths hay cosmetic, để không
+	làm nhiễu các phép đo kinh tế chạy cùng phiên.
+
+	⚠️ Studio-only, có `RunService:IsStudio()` chặn ở `Start()`. Đừng bao giờ để nó sống ở Live.
+]]
+local function watchStudioLevelHook(player: Player)
+	player:GetAttributeChangedSignal("StudioSetLevel"):Connect(function()
+		local target = player:GetAttribute("StudioSetLevel")
+		if typeof(target) ~= "number" or target < 1 then
+			return
+		end
+		player:SetAttribute("StudioSetLevel", nil)
+
+		local data = DataService.GetData(player)
+		if not data then
+			return
+		end
+
+		data.Level = math.floor(target)
+		data.XP = 0
+		-- Mở kịch trần tuỳ chỉnh, nếu không người chơi vẫn kẹt ở con số cũ nhỏ hơn.
+		data.CustomSpeedLimit = getMaxWalkSpeed(data)
+		applyWalkSpeed(player, data)
+		DataService.UpdateLeaderstats(player)
+		sendSnapshot(player)
+
+		warn(
+			`[ProgressionService] [Studio] {player.Name} → Level {data.Level}, `
+				.. `trần WalkSpeed {getMaxWalkSpeed(data)}`
+		)
+	end)
+end
+
 local function watchStudioCosmeticHook(player: Player)
 	-- (a) TỨC THỜI: đặt attribute lên PLAYER khi đang chơi ⇒ mở khoá ngay lập tức.
 	local function handleOneShot(attributeName: string, category: string)
@@ -793,8 +837,10 @@ function ProgressionService.Start()
 	if RunService:IsStudio() then
 		for _, player in Players:GetPlayers() do
 			watchStudioCosmeticHook(player)
+			watchStudioLevelHook(player)
 		end
 		Players.PlayerAdded:Connect(watchStudioCosmeticHook)
+		Players.PlayerAdded:Connect(watchStudioLevelHook)
 	end
 
 	GamePackets.requestSnapshot.listen(function(_data, player: Player)
