@@ -14,6 +14,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -50,6 +51,28 @@ local ICON_CAMERA_LOCK = "rbxassetid://6031082533"
 	Chạy ở `RenderPriority.Character.Value + 1`: PHẢI sau bước cập nhật nhân vật mặc định của
 	Roblox, chạy trước là bị nó ghi đè ngay trong cùng frame và nhân vật giật qua lại.
 ]]
+--[[
+	══ CHỈ MOBILE MỚI CÓ NÚT NÀY (user 2026-08-20) ═════════════════════════════════════════
+
+	User: "trên PC nếu bật thì nó khoá luôn con trỏ — muốn chức năng này chỉ có trên thiết bị
+	di động". Đúng vậy: `MouseBehavior = LockCenter` ghim con trỏ vào giữa màn hình, nên trên
+	PC người chơi hết bấm được các nút HUD (Shop, Daily, Custom Speed…) cho tới khi tắt lại.
+	Mà trên PC nút này vốn cũng thừa — Roblox đã có Shift Lock sẵn.
+
+	NHẬN DIỆN — phải hỏi ĐỦ BA thứ, không chỉ `TouchEnabled`:
+	  • `TouchEnabled` một mình là SAI: laptop cảm ứng và màn hình cảm ứng trên PC đều bật cờ
+	    này, và đó chính là nhóm máy bị dính lỗi con trỏ.
+	  • `KeyboardEnabled` / `MouseEnabled` = có bàn phím/chuột thật ⇒ là máy tính.
+	  • `IsTenFootInterface()` = console (Xbox), cũng không phải mobile.
+	Kết luận: mobile = có cảm ứng, KHÔNG bàn phím, KHÔNG chuột, KHÔNG phải console.
+]]
+local function isMobileDevice(): boolean
+	return UserInputService.TouchEnabled
+		and not UserInputService.KeyboardEnabled
+		and not UserInputService.MouseEnabled
+		and not GuiService:IsTenFootInterface()
+end
+
 local CAMERA_LOCK_BIND = "SpeedEscapeCameraLock"
 local cameraLocked = false
 
@@ -84,7 +107,14 @@ local function setCameraLocked(locked: boolean)
 
 	if locked then
 		RunService:BindToRenderStep(CAMERA_LOCK_BIND, Enum.RenderPriority.Character.Value + 1, applyCameraLockStep)
-		if not UserInputService.TouchEnabled then
+		--[[
+			DÂY AN TOÀN THỨ HAI. Nút chỉ được dựng trên mobile (xem `isMobileDevice`), nên
+			nhánh này lẽ ra không bao giờ chạy trên máy có chuột. Vẫn kiểm lại ở đây vì hậu
+			quả đoán sai là nặng và IM LẶNG: con trỏ bị ghim giữa màn hình, người chơi không
+			bấm được nút HUD nào và cũng không hiểu vì sao. Điều kiện cũ (`not TouchEnabled`)
+			để lọt đúng nhóm máy tính CÓ cảm ứng — chính là nhóm user báo lỗi.
+		]]
+		if not UserInputService.MouseEnabled and not UserInputService.KeyboardEnabled then
 			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 		end
 		return
@@ -230,7 +260,21 @@ function TopBarController.Init()
 		`oneClick(false)` (mặc định): đây là CÔNG TẮC, trạng thái "đang chọn" của icon chính là
 		dấu hiệu camera đang khoá — khác với nút Cài đặt vốn chỉ mở modal rồi thôi.
 	]]
-	Icon.new()
+	--[[
+		BẬT/TẮT THEO THIẾT BỊ, ĐÁNH GIÁ LẠI ĐƯỢC — không phải quyết định một lần lúc khởi động.
+
+		Bản đầu (2026-08-20) chỉ `return` sớm nếu không phải mobile, tức chốt cứng ngay lúc
+		`Init`. Nó đúng với 99% phiên, nhưng hỏng im lặng ở hai ca có thật:
+		  • Máy tính bảng đang chơi rồi CẮM bàn phím rời (hoặc gập vào dock) — `KeyboardEnabled`
+		    bật lên giữa phiên. Nút vẫn nằm đó, bấm vào là ghim con trỏ, đúng lỗi cũ.
+		  • Điện thoại nối tay cầm/bàn phím Bluetooth — y hệt.
+		Chốt cứng lúc khởi động thì không sửa được cho tới khi người chơi thoát game.
+
+		Nên: LUÔN dựng nút, rồi `setEnabled` theo thiết bị và nghe cả ba cờ đầu vào để đánh giá
+		lại. Rời khỏi diện mobile mà nút đang bật thì TỰ NHẢ KHOÁ — không bao giờ để ai kẹt con
+		trỏ vì một cái nút vừa biến mất khỏi màn hình.
+	]]
+	local cameraLockIcon = Icon.new()
 		:setName("CameraLockIcon")
 		:setImage(ICON_CAMERA_LOCK)
 		:setCaption("Khoá camera")
@@ -240,6 +284,23 @@ function TopBarController.Init()
 		:bindEvent("deselected", function()
 			setCameraLocked(false)
 		end)
+
+	local function syncCameraLockAvailability()
+		local mobile = isMobileDevice()
+		cameraLockIcon:setEnabled(mobile)
+		if not mobile and cameraLocked then
+			-- Gọi cả hai: `deselect` để icon không kẹt trạng thái "đang chọn" nếu sau này
+			-- thiết bị quay lại diện mobile, và `setCameraLocked` để chắc chắn con trỏ được
+			-- nhả kể cả khi `deselect` không phát sự kiện. Hàm này tự bỏ qua nếu trùng trạng thái.
+			cameraLockIcon:deselect()
+			setCameraLocked(false)
+		end
+	end
+
+	syncCameraLockAvailability()
+	for _, prop in { "TouchEnabled", "KeyboardEnabled", "MouseEnabled" } do
+		UserInputService:GetPropertyChangedSignal(prop):Connect(syncCameraLockAvailability)
+	end
 end
 
 function TopBarController.Start()

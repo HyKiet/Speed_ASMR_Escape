@@ -1174,6 +1174,16 @@ export type SurfaceProps = {
 	-- Độ trong của phần MÀU (không phải của viền). Cần cho mấy ô nền tối mờ như đồng hồ đếm
 	-- ngược Starter Pack hay bảng chú thích Playtime.
 	FillTransparency: number?,
+	--[[
+		Độ trong của KHUNG VIỀN. Mặc định 0 = đặc, giữ nguyên mọi UI cũ.
+
+		⚠️ Đây là thứ BẮT BUỘC phải chỉnh nếu muốn một ô THẬT SỰ nhìn xuyên được. Khung ngoài
+		là một Frame có nền, và nó phủ TRỌN ô chứ không chỉ viền — lớp fill nằm đè lên trên nó.
+		Nên đặt mỗi `FillTransparency` là vô ích: fill trong suốt 25% nhưng phía sau vẫn là
+		khung đen đặc, mắt thấy y hệt ô đen kín (đúng bug bảng Playtime Boost, 2026-08-20).
+		Muốn trong suốt thì phải hạ CẢ HAI.
+	]]
+	BorderTransparency: number?,
 	GradientRotation: number?,
 	Studs: boolean?,
 	StudsTransparency: number?,
@@ -1383,6 +1393,9 @@ function Theme.MakeSurface(props: SurfaceProps)
 	local outer: { [any]: any } = {
 		AnchorPoint = anchor,
 		BackgroundColor3 = props.BorderColor or Color3.fromRGB(0, 0, 0),
+		-- Xem `BorderTransparency` ở khai báo type: khung này phủ TRỌN ô, nên nó mới là thứ
+		-- quyết định ô có nhìn xuyên được hay không.
+		BackgroundTransparency = props.BorderTransparency,
 		-- Khối ngoài phình ra 2×border và lùi lại tương ứng, để PHẦN MÀU trùng khít ô mà
 		-- caller khai báo (xem `shiftForBorder`). `Radius` caller truyền cũng là bán kính của
 		-- phần màu — giống hệt ý nghĩa `MakeCorner` ở kiểu cũ.

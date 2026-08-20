@@ -310,7 +310,12 @@ function RightPanel.Build()
 						Border = Tokens.BORDER,
 						Studs = false,
 						Color = Color3.fromRGB(0, 0, 0),
-						FillTransparency = 0.25,
+						-- Trong suốt NHẸ (user 2026-08-20). Phải hạ cả hai lớp: chỉ hạ
+						-- `FillTransparency` thì khung ngoài vẫn đen đặc phủ trọn ô và bảng
+						-- trông kín mít y như cũ — xem `BorderTransparency` trong Theme.
+						-- Chữ giữ nguyên độ đục + đã có viền nên vẫn đọc rõ trên nền sáng.
+						FillTransparency = 0.6,
+						BorderTransparency = 0.4,
 						Content = {
 							Theme.MakeOutlineLabel({
 								Position = UDim2.fromOffset(16, 16),

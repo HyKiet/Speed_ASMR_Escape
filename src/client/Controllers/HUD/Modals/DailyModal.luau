@@ -12,6 +12,9 @@ local Theme = require(script.Parent.Parent.Theme)
 local UIAnchors = require(script.Parent.Parent.UIAnchors)
 local Tokens = require(script.Parent.Parent.Tokens)
 local Manager = require(script.Parent.Manager)
+-- Icon Streak Aurora lấy THẲNG từ config trail, không chép ID sang đây: CosmeticModal cũng
+-- đọc cùng chỗ đó, nên đổi icon một lần là hai màn hình khớp nhau vĩnh viễn.
+local Trails = require(ReplicatedStorage.Shared.Config.Economy.Trails)
 
 local Children = Fusion.Children
 local Computed = Fusion.Computed
@@ -20,6 +23,16 @@ local Tween = Fusion.Tween
 local Value = Fusion.Value
 
 local DailyModal = {}
+
+-- Ngã về icon trail chung nếu ai đó lỡ đổi id trong config — thà hiện icon chung còn hơn ô trống.
+local STREAK_AURORA_ICON = (function(): string
+	for _, trail in Trails do
+		if trail.id == "trail_streak_aurora" then
+			return trail.icon
+		end
+	end
+	return Theme.UI_ASSETS.Trail
+end)()
 
 local PANEL_WIDTH = 700
 local PANEL_HEIGHT = 584
@@ -106,7 +119,7 @@ local REWARD_CONFIGS: { { parts: { RewardPart } } } = {
 		parts = {
 			-- Trail đứng ĐẦU hàng: đây là món kéo người chơi đi hết bảy ngày, không phải
 			-- số Wins đi kèm. Thứ tự icon = thứ tự dòng chữ nên nó cũng là dòng đầu tiên.
-			{ icon = Theme.UI_ASSETS.Trail, label = "STREAK AURORA TRAIL" },
+			{ icon = STREAK_AURORA_ICON, label = "STREAK AURORA TRAIL" },
 			{ icon = Theme.UI_ASSETS.Trophy, label = "+1.00K Wins" },
 			{ icon = Theme.UI_ASSETS.Spin, label = "+3 Spins" },
 		},

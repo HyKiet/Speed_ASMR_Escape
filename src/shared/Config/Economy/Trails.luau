@@ -122,7 +122,10 @@ local Trails: { TrailConfig } = {
 		gamepassId = 0,
 		robuxOnly = false,
 		dailyOnly = true,
-		icon = "rbxassetid://115065552017670",
+		-- Icon riêng của trail, upload 2026-08-20 (asset "Streak Auora Trail" 75078805622702).
+		-- Đây là nguồn DUY NHẤT cho icon món này: CosmeticModal đọc thẳng từ đây, và DailyModal
+		-- cũng lấy từ đây thay vì icon trail chung — đổi một chỗ là cả hai nơi theo.
+		icon = "rbxassetid://75078805622702",
 	},
 
 	--[[
