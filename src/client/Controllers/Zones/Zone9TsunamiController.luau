@@ -32,7 +32,6 @@
 	rồi mỗi frame set part.CFrame = waveCF × offset. Part về muộn bao nhiêu cũng đúng hình.
 ]]
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -44,8 +43,6 @@ local ZoneLod = require(script.Parent.ZoneLod)
 local RENDER_RADIUS = 420
 
 local Zone9TsunamiController = {}
-
-local player = Players.LocalPlayer
 
 local model: Model? = nil
 local waveSpeed, homeX, finishX, baseY, channelZ = 0, 0, 0, 0, 0
@@ -241,14 +238,15 @@ local function step()
 		return
 	end
 
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
+	-- Gốc nhân vật tra MỘT lần mỗi frame cho cả bảy controller bẫy, không phải mỗi
+	-- controller một lần `FindFirstChild` — xem `ZoneLod.Root`.
+	if not ZoneLod.Root() then
 		return
 	end
+	local rootPos = ZoneLod.RootPosition()
 
-	local dx = root.Position.X - (homeX + finishX) * 0.5
-	local dz = root.Position.Z - channelZ
+	local dx = rootPos.X - (homeX + finishX) * 0.5
+	local dz = rootPos.Z - channelZ
 	local distSq = dx * dx + dz * dz
 	if distSq > ZoneLod.RadiusSq(RENDER_RADIUS) then
 		-- SLEEP: quá xa, ngừng cập nhật vị trí — nhưng PHẢI ẩn sóng trước.
@@ -256,7 +254,7 @@ local function step()
 		return
 	end
 
-	local now = Workspace:GetServerTimeNow()
+	local now = ZoneLod.Now()
 	local shouldStep: boolean
 	shouldStep, nextFarStep = ZoneLod.ShouldStepFar(distSq, now, nextFarStep)
 	if not shouldStep then

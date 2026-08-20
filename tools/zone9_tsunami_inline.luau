@@ -59,6 +59,33 @@
 
 	Hệ quả phải biết: gate tụt từ 139 WS về **96 WS**, thấp hơn Bảng Chỉ Số Stage 9 (138) —
 	tức Stage 9 giờ dễ hơn chuẩn. Đây là lựa chọn thiết kế của user, không phải hồi quy.
+
+	===== v9 (2026-08-20) — "CHẠM SÓNG LÀ CHẾT" =====
+	User: "test vượt qua zone 9 xong thì sóng thần không còn giết player nữa".
+
+	Thủ phạm là cờ `immune` của v6 — nó LATCH VĨNH VIỄN. `Stage9Finish.Touched` bật nó lên,
+	và thứ DUY NHẤT tắt được là `Stage9Start.Touched`, một tấm pad dày đúng 4 studs. Ai quay
+	lại lòng kênh bằng checkpoint-respawn, teleport, hay chỉ chạy vòng lại đều KHÔNG chạm lại
+	pad đó ⇒ bất tử với sóng cho tới hết phiên. Đúng triệu chứng user mô tả, và trớ trêu là nó
+	tái lập đúng cái bệnh "cổng bằng Touched" mà v6 vừa chữa xong ở lỗ (1).
+
+	Cờ đó còn THỪA: sóng biến mất đúng tại `finishX`, nên mọi chỗ sau vạch đích tự nó đã an
+	toàn về HÌNH HỌC — không cần trạng thái nào ghi nhớ cả.
+	⇒ Bỏ hẳn `immune` + hai handler Touched. Luật giết giờ gói trong MỘT câu, không trạng
+	  thái, không lịch sử: **khối sóng có phủ lên thân nhân vật ở thời điểm này không.**
+
+	Kèm hai chỗ chính xác hơn và một chỗ rẻ hơn:
+	  • CỘNG NỬA BỀ DÀY THÂN. Root nằm giữa ngực; bản cũ so tâm root với hộp sóng nên mép
+	    sóng quét qua vai/chân người chơi mà không tính là trúng.
+	  • XÉT ĐỦ 3 TRỤC TẠI TỪNG MẪU. Bản cũ chỉ xét Y/Z ở vị trí CUỐI frame rồi quét riêng
+	    trục X, nên đoạn quét nội suy có thể "trúng" ở một mẫu mà lúc đó người chơi thật ra
+	    đang ở độ cao/làn khác.
+	  • ĐỆM DÙNG LẠI. Bản cũ cấp phát hai bảng MỖI frame (120 bảng/giây rác cho GC server)
+	    chỉ để chứa đúng WAVE_COUNT phần tử.
+
+	⚠️ KHÔNG dùng `Touched` cho sóng như Zone 10 làm với KillBlock: server KHÔNG BAO GIỜ dời
+	part sóng (kiến trúc zero-replication, part nằm nguyên ở home), nên Touched sẽ nổ theo vị
+	trí HOME chứ không theo vị trí sóng đang hiện. Bẫy này bắt buộc phải phán xử giải tích.
 ]]
 
 local Players = game:GetService("Players")
@@ -76,7 +103,6 @@ local mech = model.Parent
 local zone = mech.Parent
 local ground = zone:FindFirstChild("Ground")
 local floor = ground and ground:FindFirstChild("WaterFloor")
-local stageStart = mech:FindFirstChild("Stage9Start")
 local stageFinish = mech:FindFirstChild("Stage9Finish")
 
 -- v7: 230 studs/s GIỮ NGUYÊN (tốc độ đã hiệu chỉnh cho vừa mắt). Thứ tạo ra gate là
@@ -114,10 +140,22 @@ for _, d in model:GetDescendants() do
 end
 local _, boxSize = model:GetBoundingBox()
 local killHalf = math.max(7, boxSize.X * 0.5)
+
+-- Nửa bề dày THÂN nhân vật (v9). Root nằm giữa ngực, nên đây là vế biến "tâm root trùng
+-- hộp sóng" thành "thân người chơi CHẠM hộp sóng" — đúng câu user yêu cầu.
+local BODY_HALF_X = 2
+local BODY_HALF_Y = 3
+local BODY_HALF_Z = 2
+
+-- Hộp sóng THẬT + thân người. `GetBoundingBox` trả về tâm hộp, mà pivot của model trùng
+-- tâm đó, nên `baseY` dùng được làm tâm cho cả trục Y lẫn Z.
+local hitHalfX = killHalf + BODY_HALF_X
+local hitHalfZ = boxSize.Z * 0.5 + BODY_HALF_Z
 -- Cổng theo CHIỀU CAO (v6). Bản cũ không có, vì nó dựa vào `ActiveStage == 9` để lọc.
 -- Bỏ cổng attribute đó rồi thì BẮT BUỘC phải chặn theo Y, nếu không người đứng trên cầu/
 -- nền cao vắt qua cùng dải X-Z cũng bị sóng dưới lòng kênh giết oan.
-local killHalfY = boxSize.Y * 0.5 + 8
+-- v9: lấy đúng nửa chiều cao hộp + thân người thay cho lề +8 chọn tay.
+local killHalfY = boxSize.Y * 0.5 + BODY_HALF_Y
 
 -- home = ĐÚNG vị trí user đặt model trong Edit (yêu cầu user 2026-07-25).
 local homeX = homePivot.Position.X
@@ -137,26 +175,25 @@ zone:SetAttribute("WaveSweepDuration", SWEEP_DURATION)
 zone:SetAttribute("WaveCount", WAVE_COUNT)
 zone:SetAttribute("WaveSpacing", CYCLE / WAVE_COUNT)
 
-local minX, maxX = math.min(homeX, finishX) - 14, math.max(homeX, finishX) + 14
+--[[
+	VÙNG PHÁN XỬ = LÒNG KÊNH, không hơn. Đây là thứ thay thế cờ `immune` của v6: cùng tác
+	dụng "cán đích là an toàn", nhưng suy ra từ VỊ TRÍ nên không quên, không latch, và
+	quay lại kênh là lập tức bị phán xử lại.
+
+	VÌ SAO CẮT Ở ĐÚNG `finishX` CHỨ KHÔNG PHẢI `finishX + hitHalfX`:
+	`WaterFloor` trải X = [-150, 458] rồi hết; `Stage9Finish` ở 460 là mép thoát. Nhưng thân
+	sóng dày 29 studs, nên ở nhịp cuối của lượt quét nó còn phủ tới X = 474 — trùm hẳn lên
+	vạch đích. Đo trong Studio 2026-08-20: ngồi đúng X = 460 thì chết trong vòng 1.2s. Tức là
+	"cán đích xong chết ngay trên pad" — đúng cái cảm giác tệ mà v6 dựng `immune` để tránh,
+	và lần này nó không còn cờ nào đỡ nữa.
+	⇒ Hợp đồng gameplay lấy theo KÊNH NƯỚC, không theo phần thân sóng thò ra khỏi kênh trong
+	  ~60ms cuối: ra khỏi kênh (X >= finishX) là thoát. Còn ở trong kênh thì chạm sóng là
+	  chết — lần này và MỌI lần sau.
+]]
+local minX, maxX = math.min(homeX, finishX) - hitHalfX, math.max(homeX, finishX)
 local halfChannel = channelWidth * 0.5 + 8
 
 local lastKill: { [Player]: number } = {}
-local immune: { [Player]: boolean } = {}
-
-if stageFinish then
-	stageFinish.Touched:Connect(function(hit)
-		local c = hit:FindFirstAncestorOfClass("Model")
-		local plr = c and Players:GetPlayerFromCharacter(c)
-		if plr then immune[plr] = true end
-	end)
-end
-if stageStart then
-	stageStart.Touched:Connect(function(hit)
-		local c = hit:FindFirstAncestorOfClass("Model")
-		local plr = c and Players:GetPlayerFromCharacter(c)
-		if plr then immune[plr] = nil end
-	end)
-end
 
 local SPACING = CYCLE / WAVE_COUNT
 
@@ -168,66 +205,81 @@ local function waveAt(now: number, index: number): number?
 	return homeX + WAVE_SPEED * t
 end
 
+-- Đệm DÙNG LẠI cho vị trí đầu/cuối frame của từng sóng. Bản cũ cấp phát hai bảng mới mỗi
+-- Heartbeat chỉ để chứa WAVE_COUNT phần tử — 120 bảng/giây rác cho GC của server, không
+-- đổi lấy gì cả.
+local fronts = table.create(WAVE_COUNT)
+local backs = table.create(WAVE_COUNT)
+
 RunService.Heartbeat:Connect(function(dt)
 	local now = Workspace:GetServerTimeNow()
 
 	-- Gom vị trí ĐẦU và CUỐI frame của TỪNG sóng. Sóng nào đang ẩn thì bỏ qua hẳn.
-	local fronts: { number } = {}
-	local backs: { number } = {}
+	local live = 0
 	for i = 0, WAVE_COUNT - 1 do
 		local wx = waveAt(now, i)
 		if wx then
-			table.insert(fronts, wx)
+			live += 1
+			fronts[live] = wx
 			-- Vị trí ở ĐẦU frame. Kẹp về homeX nếu frame này vắt qua ranh giới chu kỳ
 			-- (sóng vừa hồi sinh — không được nội suy ngược từ cuối kênh về đầu kênh).
-			table.insert(backs, math.max(wx - WAVE_SPEED * dt, homeX))
+			backs[live] = math.max(wx - WAVE_SPEED * dt, homeX)
 		end
 	end
-	if #fronts == 0 then return end
+	if live == 0 then return end
+
+	-- Quãng sóng đi trong frame này — dùng để chọn số mẫu (xem TrapSweep.segment).
+	local travel = fronts[1] - backs[1]
 
 	for _, plr in Players:GetPlayers() do
 		-- CỔNG VỊ TRÍ (v6): trong lòng kênh là bị phán xử, không cần attribute stage.
-		if not immune[plr] then
-			local c = plr.Character
-			local h = c and c:FindFirstChildOfClass("Humanoid")
-			local r = c and c:FindFirstChild("HumanoidRootPart")
-			if h and h.Health > 0 and r and r:IsA("BasePart") then
-				local p = r.Position
-				if
-					math.abs(p.Z - channelZ) <= halfChannel
-					and p.X >= minX
-					and p.X <= maxX
-					and math.abs(p.Y - baseY) <= killHalfY
-				then
-					-- SWEPT: quét đoạn người chơi đi, sóng cũng chạy theo cùng alpha.
-					-- Số mẫu lấy theo cái lớn hơn giữa hai quãng đường. Mọi sóng đang hiện
-					-- đều được thử trên CÙNG các mẫu đó.
-					local travel = fronts[1] - backs[1]
-					local from, steps = TrapSweep.segment(plr, p, SWEEP_STEP, travel)
-					local delta = p - from
-					local hit = false
-					for i = 0, steps do
-						local alpha = i / steps
-						local sx = (from + delta * alpha).X
-						for w = 1, #fronts do
+		-- v9: và KHÔNG còn cờ `immune` nào chen vào giữa nữa.
+		local c = plr.Character
+		local h = c and c:FindFirstChildOfClass("Humanoid")
+		local r = c and c:FindFirstChild("HumanoidRootPart")
+		if h and h.Health > 0 and r and r:IsA("BasePart") then
+			local p = r.Position
+			if
+				p.X >= minX
+				and p.X < maxX
+				and math.abs(p.Z - channelZ) <= halfChannel
+				and math.abs(p.Y - baseY) <= killHalfY
+			then
+				-- SWEPT: quét đoạn người chơi đi, sóng cũng chạy theo cùng alpha.
+				-- Số mẫu lấy theo cái lớn hơn giữa hai quãng đường. Mọi sóng đang hiện
+				-- đều được thử trên CÙNG các mẫu đó.
+				local from, steps = TrapSweep.segment(plr, p, SWEEP_STEP, travel)
+				local delta = p - from
+				local hit = false
+				for i = 0, steps do
+					local alpha = i / steps
+					local sp = from + delta * alpha
+					-- NARROW PHASE ĐỦ 3 TRỤC ngay tại mẫu (v9). Bản cũ chốt Y/Z một lần ở vị
+					-- trí CUỐI frame rồi chỉ nội suy trục X, nên một cú bật lên khỏi kênh giữa
+					-- frame vẫn bị tính là trúng ở các mẫu phía sau.
+					if
+						math.abs(sp.Z - channelZ) <= hitHalfZ
+						and math.abs(sp.Y - baseY) <= killHalfY
+					then
+						for w = 1, live do
 							local wx = backs[w] + (fronts[w] - backs[w]) * alpha
-							if math.abs(sx - wx) <= killHalf then
+							if math.abs(sp.X - wx) <= hitHalfX then
 								hit = true
 								break
 							end
 						end
-						if hit then
-							break
-						end
 					end
-					if hit and now - (lastKill[plr] or 0) >= KILL_CD then
-						lastKill[plr] = now
-						h.Health = 0
-						TrapSweep.reset(plr)
+					if hit then
+						break
 					end
-				else
-					TrapSweep.reset(plr) -- ngoài kênh: cắt dấu vết
 				end
+				if hit and now - (lastKill[plr] or 0) >= KILL_CD then
+					lastKill[plr] = now
+					h.Health = 0
+					TrapSweep.reset(plr)
+				end
+			else
+				TrapSweep.reset(plr) -- ngoài kênh: cắt dấu vết
 			end
 		end
 	end
@@ -235,5 +287,4 @@ end)
 
 Players.PlayerRemoving:Connect(function(plr)
 	lastKill[plr] = nil
-	immune[plr] = nil
 end)

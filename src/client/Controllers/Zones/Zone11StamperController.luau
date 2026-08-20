@@ -18,7 +18,6 @@
 	(mặc định dùng engine sound để luôn phát được).
 ]]
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -38,8 +37,6 @@ local LED_ALERT = Color3.fromRGB(255, 64, 0)
 local HAZARD_OFFSET_Z = 15.0
 
 local Zone11StamperController = {}
-
-local player = Players.LocalPlayer
 
 local leftCrusher: BasePart? = nil
 local rightCrusher: BasePart? = nil
@@ -192,20 +189,21 @@ local function step()
 		return
 	end
 
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
+	-- Gốc nhân vật tra MỘT lần mỗi frame cho cả bảy controller bẫy, không phải mỗi
+	-- controller một lần `FindFirstChild` — xem `ZoneLod.Root`.
+	if not ZoneLod.Root() then
 		return
 	end
+	local rootPos = ZoneLod.RootPosition()
 
-	local dx = root.Position.X - centerX
-	local dz = root.Position.Z - centerZ
+	local dx = rootPos.X - centerX
+	local dz = rootPos.Z - centerZ
 	local distSq = dx * dx + dz * dz
 	if distSq > ZoneLod.RadiusSq(RENDER_RADIUS) then
 		return -- SLEEP
 	end
 
-	local now = Workspace:GetServerTimeNow()
+	local now = ZoneLod.Now()
 	local shouldStep: boolean
 	shouldStep, nextFarStep = ZoneLod.ShouldStepFar(distSq, now, nextFarStep)
 	if not shouldStep then

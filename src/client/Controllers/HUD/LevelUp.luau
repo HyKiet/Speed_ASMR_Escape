@@ -68,10 +68,22 @@ local TIERS = {
 	     ẩn/hiện — đằng nào nó cũng sẽ được dùng lại sau vài giây.
 
 	`MAX_LIVE_DOTS` là van an toàn cho trường hợp cực đoan (nhảy 20+ cấp): quá ngưỡng thì hạt
-	già nhất bị thu hồi sớm để cấp cho cú nổ mới. 220 là trần rộng — sáu cú nổ đầy chồng nhau
-	vẫn chưa chạm tới — nên mắt thường không thấy hạt nào bị cắt.
+	già nhất bị thu hồi sớm để cấp cho cú nổ mới.
+
+	── HẠ 220 → 120 (2026-08-19) ──────────────────────────────────────────────────────────
+	Con số 220 chọn với lý do "sáu cú nổ đầy chồng nhau vẫn chưa chạm tới". Nhưng ĐÚNG cảnh
+	sáu cú nổ chồng nhau mới là thứ user đo được: FPS 47.1, Render 5.6 ms / 27% ở khoảnh khắc
+	"confetti + LEVEL UP + COMBO x2". Trần rộng không phải là ưu điểm khi chính nó là thứ cho
+	phép chi phí phình ra — nó chỉ có nghĩa "van không bao giờ đóng".
+
+	120 = ba cú nổ đầy (34 hạt) chồng nhau. Ở mật độ đó màn hình đã kín hạt rồi; hạt thứ 121
+	rơi vào chỗ đã có hạt khác che, tốn đủ chi phí mà mắt không nhận thêm được gì. Và hạt bị
+	thu hồi luôn là hạt GIÀ NHẤT — nó đang ở cuối đường bay, gần như trong suốt hoàn toàn.
+
+	Trần này đi cùng `CONFETTI_CAP` bên `BoostCelebration`: hai hiệu ứng hay nổ cùng lúc nhất
+	giờ đều có van, thay vì chỉ một cái có.
 ]]
-local MAX_LIVE_DOTS = 220
+local MAX_LIVE_DOTS = 120
 
 type Session = {
 	gui: ScreenGui,
@@ -507,7 +519,13 @@ local function showLevel(level: number)
 		:Create(s.sunburst, TweenInfo.new(2.2, Enum.EasingStyle.Linear), { Rotation = s.sunburst.Rotation + 90 })
 		:Play()
 
-	spawnParticles(s, math.clamp(10 + combo * 3, 10, 34), combo >= 6)
+	-- Performance mode (Cài đặt): giữ nguyên cú nổ, chỉ thưa hạt lại. Người bật nó là người
+	-- đang chạy máy yếu — cùng nấc giảm với confetti bên `BoostCelebration`.
+	local burstCount = math.clamp(10 + combo * 3, 10, 34)
+	if State.performanceMode:get() then
+		burstCount = math.max(6, math.floor(burstCount * 0.45))
+	end
+	spawnParticles(s, burstCount, combo >= 6)
 	playSound(combo)
 
 	-- Hết khung combo -> fade out + reset

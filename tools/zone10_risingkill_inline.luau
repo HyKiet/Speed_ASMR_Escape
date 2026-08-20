@@ -45,6 +45,27 @@
 
 	Vì sao KHÔNG hạ tiếp xuống 1.5s (gate 165): mức đó phạt cả người đã đạt chuẩn — đúng lỗi
 	mà Zone 14 v1 từng mắc.
+
+	===== v4 (2026-08-20) — "CHẠM KILLBLOCK LÀ CHẾT", VÀ RẺ HƠN =====
+	Hai phép thử giải tích ở trên đều chỉ nhìn thấy người chơi qua MỘT điểm (root) hoặc qua
+	một truy vấn bị CỔNG bởi bán kính tháp. Cả hai đều đúng với trường hợp nhanh, nhưng
+	không phải là câu "bất cứ ai chạm KillBlock là chết" theo đúng nghĩa đen.
+
+	  1. LƯỚI AN TOÀN Touched. Khối là part THẬT, Anchored, `CanTouch = true`, và server dời
+	     nó thật mỗi Heartbeat — khác hẳn sóng Zone 9 (part nằm nguyên ở home, chỉ có client
+	     vẽ). Nên ở đây Touched NỔ ĐÚNG CHỖ khối đang ở, và nó thấy MỌI part cơ thể, kể cả
+	     tay/chân thò ra ngoài tầm root. Chi phí bằng 0 khi không ai chạm (event-driven).
+	     Nó KHÔNG thay phép thử swept ở trên — Touched vẫn thủng khi hai bên lướt qua nhau
+	     trong một frame. Hai thứ bù đúng lỗ của nhau.
+
+	  2. BẮT RẺ HƠN. Truy vấn `GetPartBoundsInBox` trước đây chạy MỖI FRAME cho mọi người
+	     trong bán kính 120 studs — kể cả khi khối đang ở đáy tháp còn người chơi ở trên nóc,
+	     cách nhau 200+ studs theo Y. Tháp cao 340 studs, khối chỉ đi 223, nên phần lớn thời
+	     gian truy vấn đó chắc chắn rỗng. Giờ lọc sơ bộ theo Y trước: không ai nằm trong tầm
+	     hộp swept thì bỏ hẳn truy vấn không gian. Lề 12 studs rộng gấp đôi chiều cao một
+	     nhân vật R15 nên không thể cắt nhầm ai.
+	     `inTower` GIỮ nguyên cổng XZ: nó còn là thứ nuôi dấu vết TrapSweep, cắt theo Y ở
+	     đây sẽ làm đoạn quét đứt đoạn đúng lúc người chơi rơi nhanh nhất.
 ]]
 
 local Players = game:GetService("Players")
@@ -91,6 +112,9 @@ local TOWER_RADIUS_SQ = TOWER_RADIUS * TOWER_RADIUS
 local BODY_HALF_WIDTH = 1.5
 local BODY_HALF_HEIGHT = 2.5
 local SWEEP_STEP = 2.0
+-- Lề lọc sơ bộ theo Y trước khi truy vấn không gian (v4). Nhân vật R15 cao ~5.5 studs
+-- nên 12 là gấp đôi — không thể cắt nhầm ai, mà cắt được phần lớn các frame.
+local QUERY_MARGIN_Y = 12
 
 local BODY = {
 	HumanoidRootPart = true, Head = true, Torso = true, UpperTorso = true, LowerTorso = true,
@@ -124,6 +148,18 @@ killBlock.Anchored = true
 killBlock.CanCollide = false
 killBlock.CanTouch = true
 killBlock.CanQuery = true
+
+-- LƯỚI AN TOÀN (v4): "bất cứ ai chạm KillBlock là chết", theo đúng nghĩa đen của engine.
+-- Không phải để thay phép thử swept bên dưới (Touched vẫn thủng ở tốc độ cao — đó là lý do
+-- v2 tồn tại), mà để bắt đúng những ca phép thử giải tích bỏ sót: tay/chân thò ra ngoài
+-- hộp tính từ root, hoặc nhân vật ở tư thế bất thường (ngã, ragdoll, bị bắn văng).
+-- Chi phí 0 khi không ai chạm.
+killBlock.Touched:Connect(function(hit)
+	local plr, h = playerFromPart(hit)
+	if plr and h then
+		kill(plr, h)
+	end
+end)
 
 local basePos = killBlock.Position
 local blockHalf = killBlock.Size * 0.5
@@ -206,6 +242,13 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
+	-- HỘP SWEPT của khối: phủ trọn quãng nó vừa đi trong frame. Khối đi thẳng đứng nên chỉ
+	-- cần kéo dài theo Y quanh trung điểm — chính xác tuyệt đối, không phải xấp xỉ.
+	local travel = math.abs(currentY - prevY)
+	local midY = (currentY + prevY) * 0.5
+	local sweptSize = Vector3.new(killBlock.Size.X, killBlock.Size.Y + travel, killBlock.Size.Z)
+	local halfY = sweptSize.Y * 0.5
+
 	-- CỔNG VỊ TRÍ: ai đang trong lòng tháp (không cần attribute stage).
 	table.clear(activeChars)
 	table.clear(inTower)
@@ -215,35 +258,36 @@ RunService.Heartbeat:Connect(function(dt)
 		local h = c and c:FindFirstChildOfClass("Humanoid")
 		local r = c and c:FindFirstChild("HumanoidRootPart")
 		if h and h.Health > 0 and r and r:IsA("BasePart") then
-			local dx = r.Position.X - basePos.X
-			local dz = r.Position.Z - basePos.Z
+			local rp = r.Position
+			local dx = rp.X - basePos.X
+			local dz = rp.Z - basePos.Z
 			if dx * dx + dz * dz <= TOWER_RADIUS_SQ then
-				n += 1
-				activeChars[n] = c :: Instance
 				table.insert(inTower, plr)
+				-- Lọc sơ bộ theo Y (v4): chỉ ai ở gần tầm khối mới đáng để truy vấn không
+				-- gian. `inTower` ở trên KHÔNG lọc theo Y — nó nuôi dấu vết TrapSweep, cắt
+				-- là đứt đoạn quét đúng lúc người chơi rơi nhanh nhất.
+				if math.abs(rp.Y - midY) <= halfY + QUERY_MARGIN_Y then
+					n += 1
+					activeChars[n] = c :: Instance
+				end
 			else
 				TrapSweep.reset(plr)
 			end
 		end
 	end
-	if n == 0 then return end
+	if #inTower == 0 then return end
 
-	-- HỘP SWEPT của khối: phủ trọn quãng nó vừa đi trong frame. Khối đi thẳng đứng nên chỉ
-	-- cần kéo dài theo Y quanh trung điểm — chính xác tuyệt đối, không phải xấp xỉ.
-	local travel = math.abs(currentY - prevY)
-	local midY = (currentY + prevY) * 0.5
-	local sweptSize = Vector3.new(killBlock.Size.X, killBlock.Size.Y + travel, killBlock.Size.Z)
-	local sweptCF = CFrame.new(basePos.X, midY, basePos.Z)
-
-	params.FilterDescendantsInstances = activeChars
-	for _, part in Workspace:GetPartBoundsInBox(sweptCF, sweptSize, params) do
-		local plr, h = playerFromPart(part)
-		if plr and h then kill(plr, h) end
+	if n > 0 then
+		local sweptCF = CFrame.new(basePos.X, midY, basePos.Z)
+		params.FilterDescendantsInstances = activeChars
+		for _, part in Workspace:GetPartBoundsInBox(sweptCF, sweptSize, params) do
+			local plr, h = playerFromPart(part)
+			if plr and h then kill(plr, h) end
+		end
 	end
 
 	-- Người chơi mới là bên đi nhanh (rơi/leo/bị bắn): quét đoạn đường của họ so với hộp
 	-- swept của khối ở trên.
-	local halfY = sweptSize.Y * 0.5
 	for _, plr in inTower do
 		local c = plr.Character
 		local h = c and c:FindFirstChildOfClass("Humanoid")

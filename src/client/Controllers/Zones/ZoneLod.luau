@@ -59,12 +59,12 @@ local ZoneLod = {}
 
 	    ≤ 300 studs   : mọi frame      (vật đang ở ngay trước mặt, phải mượt tuyệt đối)
 	    ≤ 900 studs   : 24 Hz          (đủ mượt ở khoảng cách đó — giữ nguyên hành vi cũ)
-	    > 900 studs   : 8 Hz           (mới; ở đây một cỗ máy ép chiếm vài pixel)
+	    > 900 studs   : 6 Hz           (mới; ở đây một cỗ máy ép chiếm vài pixel)
 
-	8 Hz an toàn vì mọi bẫy chạy theo ĐỒNG HỒ TẤT ĐỊNH (`GetServerTimeNow`): mỗi lần cập
+	Nhịp thấp an toàn vì mọi bẫy chạy theo ĐỒNG HỒ TẤT ĐỊNH (`GetServerTimeNow`): mỗi lần cập
 	nhật là nhảy thẳng tới tư thế ĐÚNG của thời điểm đó, bỏ frame không tích luỹ sai lệch.
 	Người chơi chỉ thấy vật ở xa chuyển động hơi giật — mà ở 900+ studs thì không phân biệt
-	nổi. Cái họ CẦN thấy là "bẫy kia đang động, không phải tượng", và 8 Hz thừa sức làm việc đó.
+	nổi. Cái họ CẦN thấy là "bẫy kia đang động, không phải tượng", và 6 Hz thừa sức làm việc đó.
 
 	Chi phí thực tế: vùng mới (900→1.800) rộng gấp ~3 lần vùng cũ về diện tích, nhưng chạy ở
 	1/3 nhịp ⇒ tổng số lần cập nhật mỗi giây gần như không đổi.
@@ -76,7 +76,42 @@ ZoneLod.FULL_RATE_RADIUS = 300
 -- Từ FULL_RATE_RADIUS tới FAR_RADIUS: nhịp FAR_HZ. Ngoài FAR_RADIUS: nhịp DISTANT_HZ.
 ZoneLod.FAR_RADIUS = 900
 ZoneLod.FAR_HZ = 24
-ZoneLod.DISTANT_HZ = 8
+ZoneLod.DISTANT_HZ = 6
+
+--[[
+	══ NGÂN SÁCH MỖI FRAME — thứ THẬT SỰ giữ được 60 FPS (2026-08-19) ══════════════════════
+
+	User đo sau khi nới tầm: chạy tốc độ cao FPS tụt còn 54–55. Đó KHÔNG phải chi phí trung
+	bình tăng — tính trung bình thì ba bậc nhịp ở trên đã cân rồi. Đó là chi phí bị DỒN CỤC.
+
+	Vì sao dồn cục: `nextFar` của mỗi controller cộng đúng một hằng số (1/24 hay 1/6 giây).
+	Hai controller cùng thức dậy trong một frame — chuyện xảy ra liên tục khi người chơi lao
+	với 250 WS qua ranh giới vùng LOD — thì mãi mãi đáo hạn CÙNG MỘT FRAME về sau. Ở tầm
+	1.800 studs có 4–5 zone thức cùng lúc, nên cứ vài chục frame lại có một frame phải ghi
+	CFrame cho toàn bộ chúng. Một frame nặng gấp 4 lần trong 60 frame = trung bình 60 FPS
+	nhưng đồng hồ hiển thị 54–55, đúng con số user thấy.
+
+	Hai van, cả hai đều KHÔNG đổi hành vi nhìn thấy được:
+
+	  1. `MAX_FAR_STEPS_PER_FRAME` — mỗi frame chỉ cho phép ngần này lượt cập nhật ở vùng xa.
+	     Ai vượt ngân sách thì KHÔNG dời `nextFar`, nên frame sau hỏi lại và được phục vụ
+	     ngay lập tức. Trễ tối đa một hai frame (~30 ms).
+	  2. `JITTER` — mỗi lần đặt hẹn kế tiếp thì nhân nhịp với 0.88–1.12. Đây là thứ PHÁ hẳn
+	     sự đồng pha, để van (1) gần như không bao giờ phải kích hoạt.
+
+	Cả hai an toàn vì cùng một lý do đã ghi ở trên: bẫy chạy theo ĐỒNG HỒ TẤT ĐỊNH. Trễ một
+	frame không làm bẫy sai pha — lần cập nhật sau vẫn nhảy thẳng tới tư thế ĐÚNG của thời
+	điểm đó. Đây là điều một hệ nội suy theo dt sẽ KHÔNG làm được, và là lý do kiến trúc
+	đồng hồ tất định đáng giá.
+
+	6 = 360 lượt/giây ở 60 FPS. Vùng 24 Hz cần 24 lượt/giây mỗi controller, tức đủ cho 15
+	controller cùng ở vùng đó — nhiều hơn tổng số bẫy có LOD trong game (7). Nói cách khác
+	van này KHÔNG bóp nhịp trung bình, nó chỉ san phẳng các đỉnh.
+
+	Nhân tiện hạ `DISTANT_HZ` 8 → 6: ngoài 900 studs một cỗ máy ép chiếm vài pixel, và đây là
+	vùng rộng nhất (900→1.800) nên mỗi nấc nhịp cắt được nhiều lượt nhất.
+]]
+ZoneLod.MAX_FAR_STEPS_PER_FRAME = 6
 
 local FULL_RATE_SQ = ZoneLod.FULL_RATE_RADIUS * ZoneLod.FULL_RATE_RADIUS
 local FAR_SQ = ZoneLod.FAR_RADIUS * ZoneLod.FAR_RADIUS
@@ -84,6 +119,79 @@ local FAR_STEP = 1 / ZoneLod.FAR_HZ
 local DISTANT_STEP = 1 / ZoneLod.DISTANT_HZ
 
 local player = Players.LocalPlayer
+local jitter = Random.new()
+
+--[[
+	══ NGỮ CẢNH DÙNG CHUNG MỖI FRAME ═══════════════════════════════════════════════════════
+
+	Bảy controller bẫy đều mở đầu `step` của mình bằng đúng ba việc giống hệt nhau:
+
+	    local character = player.Character
+	    local root = character and character:FindFirstChild("HumanoidRootPart")
+	    local now = Workspace:GetServerTimeNow()
+
+	Bảy lần `FindFirstChild` (quét danh sách con của model nhân vật — ~20 phần tử), bảy lần
+	đọc `.Position`, bảy lần gọi sang engine lấy giờ, MỖI FRAME, kể cả khi cả bảy đang ngủ.
+	Đó là chi phí trả cho một câu trả lời không bao giờ khác nhau giữa chúng.
+
+	Giờ tính MỘT lần mỗi frame rồi phát lại. Quan trọng ở chỗ nó rẻ đi đúng chỗ user đau:
+	đường ngủ (controller ở xa, chỉ hỏi khoảng cách rồi thoát) là đường chạy nhiều nhất.
+
+	`RunService.RenderStepped` nối NGAY LÚC NẠP MODULE. Thứ tự các connection RenderStepped
+	là thứ tự nối, mà controller chỉ nối trong `Start` của chúng — còn `require(ZoneLod)` thì
+	nằm ở đầu file, chạy trước. Nên cái nạp ngân sách này luôn chạy TRƯỚC mọi `step`.
+]]
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local frameId = 0
+local farBudget = ZoneLod.MAX_FAR_STEPS_PER_FRAME
+local rootFrame = -1
+local rootPart: BasePart? = nil
+local rootPos = Vector3.zero
+local nowFrame = -1
+local nowValue = 0
+
+RunService.RenderStepped:Connect(function()
+	frameId += 1
+	farBudget = ZoneLod.MAX_FAR_STEPS_PER_FRAME
+end)
+
+--[[
+	HumanoidRootPart của người chơi, tra tối đa MỘT lần mỗi frame.
+	Trả về `nil` khi chưa có nhân vật — chỗ gọi thoát sớm y như trước.
+]]
+function ZoneLod.Root(): BasePart?
+	if rootFrame == frameId then
+		return rootPart
+	end
+	rootFrame = frameId
+	local character = player and player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		rootPart = root
+		rootPos = root.Position
+	else
+		rootPart = nil
+	end
+	return rootPart
+end
+
+-- Vị trí gốc nhân vật, đã cache cùng `Root()`. Gọi `Root()` trước để kiểm tra nil.
+function ZoneLod.RootPosition(): Vector3
+	ZoneLod.Root()
+	return rootPos
+end
+
+-- `workspace:GetServerTimeNow()` một lần mỗi frame thay vì một lần mỗi controller.
+-- Đồng hồ tất định của mọi bẫy — xem khối lý do đầu file.
+function ZoneLod.Now(): number
+	if nowFrame ~= frameId then
+		nowFrame = frameId
+		nowValue = Workspace:GetServerTimeNow()
+	end
+	return nowValue
+end
 
 -- WalkSpeed hiện tại + bảng cache baseRadius → radiusSq. Cả hai bị xoá khi WalkSpeed đổi.
 local walkSpeed = 16
@@ -159,9 +267,21 @@ function ZoneLod.ShouldStepFar(distSq: number, now: number, nextFar: number): (b
 	if now < nextFar then
 		return false, nextFar
 	end
+	if farBudget <= 0 then
+		--[[
+			Ngân sách frame này đã cạn. Trả false mà KHÔNG dời `nextFar`: frame sau controller
+			hỏi lại, vẫn quá hạn, và lúc đó ngân sách đã nạp lại nên nó được phục vụ ngay.
+			Không dời mốc chính là điều giữ cho nhịp trung bình không bị trôi.
+		]]
+		return false, nextFar
+	end
+	farBudget -= 1
 	-- Bậc ba: ngoài FAR_RADIUS thì giãn nhịp tiếp (xem khối lý do ở đầu file).
 	-- Chỗ gọi không phải sửa gì — vẫn đúng một biến `nextFar` như trước.
-	return true, now + (if distSq > FAR_SQ then DISTANT_STEP else FAR_STEP)
+	local step = if distSq > FAR_SQ then DISTANT_STEP else FAR_STEP
+	-- Nhiễu pha: xem `MAX_FAR_STEPS_PER_FRAME`. Đây là thứ giữ cho các controller không bao
+	-- giờ khoá pha với nhau, nên ngân sách ở trên gần như không phải can thiệp.
+	return true, now + step * (0.88 + jitter:NextNumber() * 0.24)
 end
 
 local function watchHumanoid(character: Model)

@@ -29,7 +29,6 @@
 	vào kênh `sfx` rồi nhân hệ số slider lên trên.
 ]]
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -58,8 +57,6 @@ local RUMBLE_VOLUME_FALL = 0.55
 -- Ngưỡng phân biệt "đang đi" với "đứng yên". Khối chạy 220–350 studs/s, còn lúc chờ thì đứng
 -- im tuyệt đối; 8 studs/s đủ rộng để một frame replicate trễ không bị đọc nhầm thành đứng yên.
 local MOVING_SPEED = 8
-
-local player = Players.LocalPlayer
 
 local killBlock: BasePart? = nil
 local rumble: Sound? = nil
@@ -141,13 +138,12 @@ local function step(dt: number)
 	end
 	local block = killBlock :: BasePart
 
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
+	-- Gốc nhân vật tra MỘT lần mỗi frame cho cả bảy controller bẫy, không phải mỗi
+	-- controller một lần `FindFirstChild` — xem `ZoneLod.Root`.
+	if not ZoneLod.Root() then
 		return
 	end
-
-	local pos = root.Position
+	local pos = ZoneLod.RootPosition()
 	local dx = pos.X - block.Position.X
 	local dz = pos.Z - block.Position.Z
 	if dx * dx + dz * dz > ZoneLod.RadiusSq(RENDER_RADIUS) then

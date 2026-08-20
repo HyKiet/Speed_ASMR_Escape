@@ -21,7 +21,6 @@
 	  • Zero-GC: cache part + HomeCF một lần, trong vòng lặp chỉ ghi CFrame/Color.
 ]]
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -38,8 +37,6 @@ local RENDER_RADIUS = 380
 local RESOLVE_INTERVAL = 0.5
 
 local Zone15TrapController = {}
-
-local player = Players.LocalPlayer
 
 -- `inst` là PVInstance: tấm sàn bẫy 2 do người dựng map làm là Model nhiều part, còn tia
 -- laser là Part đơn. PivotTo() dùng được cho cả hai nên không cần tách hai nhánh render.
@@ -236,14 +233,13 @@ local beamAwake, padAwake, doorAwake = false, false, false
 local beamFar, padFar, doorFar = 0, 0, 0
 
 local function step()
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
+	-- Gốc nhân vật tra MỘT lần mỗi frame cho cả bảy controller bẫy, không phải mỗi
+	-- controller một lần `FindFirstChild` — xem `ZoneLod.Root`.
+	if not ZoneLod.Root() then
 		return
 	end
-
-	local pos = root.Position
-	local now = Workspace:GetServerTimeNow()
+	local pos = ZoneLod.RootPosition()
+	local now = ZoneLod.Now()
 	local radiusSq = ZoneLod.RadiusSq(RENDER_RADIUS)
 	local shouldStep: boolean
 

@@ -10,7 +10,6 @@
 	MỘT LẦN rồi thôi (tránh part đứng chết cứng ở góc dở dang khi nhìn từ xa).
 ]]
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -25,8 +24,6 @@ local RENDER_RADIUS = 240
 local RESOLVE_INTERVAL = 0.5
 
 local Zone2LaserController = {}
-
-local player = Players.LocalPlayer
 
 type Laser = {
 	pivot: BasePart,
@@ -116,14 +113,13 @@ local function step()
 		return
 	end
 
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
+	-- Gốc nhân vật tra MỘT lần mỗi frame cho cả bảy controller bẫy, không phải mỗi
+	-- controller một lần `FindFirstChild` — xem `ZoneLod.Root`.
+	if not ZoneLod.Root() then
 		return
 	end
-
-	local pos = root.Position
-	local now = Workspace:GetServerTimeNow()
+	local pos = ZoneLod.RootPosition()
+	local now = ZoneLod.Now()
 	-- Tra bảng một lần cho cả vòng lặp — bán kính chung cho mọi laser trong zone.
 	local radiusSq = ZoneLod.RadiusSq(RENDER_RADIUS)
 

@@ -8,6 +8,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 local TweenService = game:GetService("TweenService")
 
@@ -99,7 +100,39 @@ local function iconForTitle(title: string): string
 end
 
 local BANNER_SECONDS = 4.5
-local CONFETTI_COUNT = 46
+
+--[[
+	══ CONFETTI — VIẾT LẠI CHO 60 FPS (2026-08-19) ═════════════════════════════════════════
+
+	User đo được: FPS 47.1, Render 5.6 ms / 27% ở đúng khoảnh khắc "confetti + LEVEL UP +
+	COMBO x2 chồng nhau". Bản cũ, mỗi lần ăn mừng cỡ lớn:
+
+	  • 92 × `Instance.new("Frame")` + 92 × `Instance.new("UICorner")` = 184 instance được
+	    TẠO rồi HUỶ trong ~4 giây. Tạo/huỷ instance là việc nặng nhất trong cả hiệu ứng, và
+	    nó rơi đúng vào frame mà popup lên cấp cũng đang dựng.
+	  • 92 × `task.delay` (hàng đợi rải hạt) + 92 × `TweenService:Create` = 184 mục nữa nằm
+	    trong bộ lịch của engine, mỗi mục ghi 2 thuộc tính mỗi frame.
+	  • Không có TRẦN nào cả. LevelUp có `MAX_LIVE_DOTS`, confetti thì không — nên combo x2
+	    lên cấp liên tiếp + mua hàng là số hạt cộng dồn không giới hạn.
+
+	Bản mới giữ NGUYÊN hiệu ứng nhìn thấy (vẫn rơi, vẫn xoay, vẫn dạt ngang, vẫn rải so le)
+	nhưng đổi ba thứ bên dưới:
+
+	  1. BỂ TÁI DÙNG — hạt tạo một lần rồi chỉ bật/tắt. Sau cú ăn mừng đầu tiên thì mọi cú
+	     sau KHÔNG tạo instance nào nữa. Cùng bài học đã áp cho LevelUp (xem `MAX_LIVE_DOTS`).
+	  2. BỎ `UICorner` — hạt to 10–22 px, bo góc 3 px ở cỡ đó mắt không thấy, mà nó nhân đôi
+	     số instance và đẩy mỗi hạt sang đường vẽ bo góc riêng.
+	  3. MỘT vòng lặp duy nhất thay cho 92 tween + 92 `task.delay`. Vòng lặp này tự ngắt khi
+	     hết hạt, nên lúc không ăn mừng thì chi phí bằng 0 tuyệt đối.
+
+	Và thêm `CONFETTI_CAP` — trần hạt sống cùng lúc, đúng vai trò `MAX_LIVE_DOTS` bên LevelUp:
+	đây mới là thứ chặn được cảnh chồng nhau mà user đo được.
+]]
+local CONFETTI_COUNT = 34
+local CONFETTI_COUNT_BIG = 56
+local CONFETTI_CAP = 60
+-- Performance mode (Cài đặt) hạ thêm một nấc: người bật nó là người máy yếu.
+local CONFETTI_PERF_SCALE = 0.45
 local CONFETTI_COLORS = {
 	Color3.fromRGB(255, 89, 94),
 	Color3.fromRGB(255, 202, 58),
@@ -121,6 +154,17 @@ local currentIsRebirth = Value(false)
 
 local confettiLayer: Frame? = nil
 local rng = Random.new()
+
+--[[
+	Tween xoay của sunburst trên thẻ chúc mừng. Giữ ở tầm module để `showBanner` bật và cái
+	hẹn giờ ẩn thẻ TẮT nó đi được.
+
+	Bản cũ gọi `:Play()` một lần lúc `Build` rồi cho chạy VĨNH VIỄN với `RepeatCount = -1` —
+	tức là suốt cả phiên chơi, engine vẫn ghi `Rotation` 60 lần/giây cho một ImageLabel nằm
+	trong CanvasGroup `Visible = false`. Không thấy được gì, nhưng mỗi lần ghi vẫn đánh dấu
+	bẩn cả CanvasGroup. Thẻ chỉ hiện ~4.8 giây mỗi lần mua, nên 99% thời gian là ghi thừa.
+]]
+local bannerSpin: Tween? = nil
 
 local function sendChatMessage(playerName: string, boostName: string)
 	task.spawn(function()
@@ -149,34 +193,145 @@ local function playVictorySound(isRebirth: boolean)
 	sound:Play()
 end
 
-local function spawnConfettiPiece(parent: Frame)
+--[[
+	── BỂ HẠT + VÒNG LẶP DUY NHẤT ─────────────────────────────────────────────────────────
+
+	`pool`  : hạt rảnh, `Visible = false`, chờ tái dùng.
+	`live`  : hạt đang bay, mỗi phần tử mang sẵn cả quỹ đạo của nó (không hỏi lại RNG).
+	`queue` : hạt CHƯA tới lượt xuất hiện — thay cho 92 cái `task.delay` của bản cũ.
+
+	Quỹ đạo tính bằng tay chứ không nhờ `TweenService`: hạt rơi TUYẾN TÍNH (easing Linear,
+	đúng như bản cũ) nên vị trí chỉ là một phép nội suy theo `t / fallTime`. Một vòng lặp
+	ghi 60 vị trí rẻ hơn hẳn 60 tween, và quan trọng hơn là ta GIỮ ĐƯỢC QUYỀN cắt bớt: chạm
+	`CONFETTI_CAP` thì hạt già nhất bị thu hồi ngay, không đợi tween của nó chạy hết.
+]]
+type Piece = {
+	frame: Frame,
+	startX: number,
+	startY: number,
+	drift: number,
+	fallTime: number,
+	rot0: number,
+	spin: number,
+	t: number,
+}
+
+local pool: { Frame } = {}
+local live: { Piece } = {}
+-- Mỗi phần tử là mốc thời gian (giây, tính từ lúc bắt đầu vòng lặp) mà hạt kế tiếp xuất hiện.
+local queue: { number } = {}
+local queueClock = 0
+local driver: RBXScriptConnection? = nil
+
+local FALL_END = 0
+local function fallEnd(): number
+	if FALL_END == 0 then
+		FALL_END = Theme.DESIGN_HEIGHT + 60
+	end
+	return FALL_END
+end
+
+local function releasePiece(piece: Piece)
+	piece.frame.Visible = false
+	table.insert(pool, piece.frame)
+end
+
+local function acquireFrame(parent: Frame): Frame
+	local reused = table.remove(pool)
+	if reused then
+		return reused
+	end
+	-- KHÔNG có `UICorner`: xem khối lý do ở `CONFETTI_COUNT`.
+	local frame = Instance.new("Frame")
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.BorderSizePixel = 0
+	frame.Visible = false
+	frame.ZIndex = 210
+	frame.Parent = parent
+	return frame
+end
+
+local function launchPiece(parent: Frame)
+	-- Chạm trần: thu hồi hạt GIÀ NHẤT (đang ở cuối đường rơi, sát mép dưới màn hình) — đó là
+	-- hạt ít bị nhìn thấy nhất. Cùng luật với `MAX_LIVE_DOTS` của LevelUp.
+	if #live >= CONFETTI_CAP then
+		local oldest = table.remove(live, 1)
+		if oldest then
+			releasePiece(oldest)
+		end
+	end
+
+	local frame = acquireFrame(parent)
 	local size = rng:NextInteger(10, 22)
 	local startX = rng:NextInteger(0, Theme.DESIGN_WIDTH)
-	local drift = rng:NextInteger(-220, 220)
-	local fallTime = rng:NextNumber(2.2, 4.2)
+	local startY = -40 - rng:NextInteger(0, 240)
+	local rot0 = rng:NextInteger(0, 360)
 
-	local piece = Instance.new("Frame")
-	piece.AnchorPoint = Vector2.new(0.5, 0.5)
-	piece.BackgroundColor3 = CONFETTI_COLORS[rng:NextInteger(1, #CONFETTI_COLORS)]
-	piece.BorderSizePixel = 0
-	piece.Position = UDim2.fromOffset(startX, -40 - rng:NextInteger(0, 240))
-	piece.Rotation = rng:NextInteger(0, 360)
-	piece.Size = UDim2.fromOffset(size, math.max(6, size // 2))
-	piece.ZIndex = 210
-	piece.Parent = parent
+	frame.BackgroundColor3 = CONFETTI_COLORS[rng:NextInteger(1, #CONFETTI_COLORS)]
+	frame.Size = UDim2.fromOffset(size, math.max(6, size // 2))
+	frame.Position = UDim2.fromOffset(startX, startY)
+	frame.Rotation = rot0
+	frame.Visible = true
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 3)
-	corner.Parent = piece
-
-	local tween = TweenService:Create(piece, TweenInfo.new(fallTime, Enum.EasingStyle.Linear), {
-		Position = UDim2.fromOffset(startX + drift, Theme.DESIGN_HEIGHT + 60),
-		Rotation = piece.Rotation + rng:NextInteger(240, 720) * (if rng:NextNumber() < 0.5 then -1 else 1),
+	table.insert(live, {
+		frame = frame,
+		startX = startX,
+		startY = startY,
+		drift = rng:NextInteger(-220, 220),
+		fallTime = rng:NextNumber(2.2, 4.2),
+		rot0 = rot0,
+		spin = rng:NextInteger(240, 720) * (if rng:NextNumber() < 0.5 then -1 else 1),
+		t = 0,
 	})
-	tween.Completed:Once(function()
-		piece:Destroy()
-	end)
-	tween:Play()
+end
+
+local function stopDriver()
+	if driver then
+		driver:Disconnect()
+		driver = nil
+	end
+end
+
+local function stepConfetti(dt: number)
+	local layer = confettiLayer
+	if not layer or not layer.Parent then
+		for index = #live, 1, -1 do
+			releasePiece(live[index])
+			live[index] = nil
+		end
+		table.clear(queue)
+		stopDriver()
+		return
+	end
+
+	-- 1. Thả những hạt đã tới lượt. `queue` xếp tăng dần nên chỉ cần xét từ đầu.
+	queueClock += dt
+	while queue[1] and queue[1] <= queueClock do
+		table.remove(queue, 1)
+		launchPiece(layer)
+	end
+
+	-- 2. Đẩy hạt đang bay. Duyệt NGƯỢC để xoá tại chỗ không lệch chỉ số.
+	local endY = fallEnd()
+	for index = #live, 1, -1 do
+		local piece = live[index]
+		piece.t += dt
+		local alpha = piece.t / piece.fallTime
+		if alpha >= 1 then
+			releasePiece(piece)
+			table.remove(live, index)
+		else
+			local frame = piece.frame
+			frame.Position =
+				UDim2.fromOffset(piece.startX + piece.drift * alpha, piece.startY + (endY - piece.startY) * alpha)
+			frame.Rotation = piece.rot0 + piece.spin * alpha
+		end
+	end
+
+	-- 3. Hết việc thì NGẮT HẲN — lúc không ăn mừng, hiệu ứng này tốn đúng 0.
+	if #live == 0 and #queue == 0 then
+		stopDriver()
+	end
 end
 
 -- Chớp sáng vàng toàn màn hình (0.5s) — báo hiệu "sự kiện lớn" tức thì cho mọi người.
@@ -219,13 +374,35 @@ local function burstConfetti(isRebirth: boolean)
 	if not layer then
 		return
 	end
-	local count = if isRebirth then CONFETTI_COUNT * 2 else CONFETTI_COUNT
+
+	local count = if isRebirth then CONFETTI_COUNT_BIG else CONFETTI_COUNT
+	if State.performanceMode:get() then
+		count = math.max(8, math.floor(count * CONFETTI_PERF_SCALE))
+	end
+
+	--[[
+		Ăn mừng CHỒNG LÊN nhau (mua hàng ngay giữa lúc combo lên cấp — đúng cảnh user đo được
+		47 FPS): không cộng dồn vô hạn nữa. Chỗ còn trống tính theo trần, phần thừa bỏ đi.
+		Bỏ đi là ĐÚNG chứ không phải cắt bớt cho rẻ: 60 hạt đã phủ kín màn hình rồi, hạt thứ
+		61 không thêm được gì cho mắt mà vẫn ăn đủ chi phí.
+	]]
+	local room = CONFETTI_CAP - (#live + #queue)
+	if room <= 0 then
+		return
+	end
+	count = math.min(count, room)
+
+	-- Rải so le y như bản cũ (0.02s/hạt khi lớn, 0.035s khi thường) — nhưng bằng một hàng
+	-- đợi mốc thời gian chứ không phải `count` cái `task.delay`.
+	local gap = if isRebirth then 0.02 else 0.035
+	local base = queueClock
 	for index = 1, count do
-		task.delay((index - 1) * (if isRebirth then 0.02 else 0.035), function()
-			if layer.Parent then
-				spawnConfettiPiece(layer)
-			end
-		end)
+		table.insert(queue, base + (index - 1) * gap)
+	end
+	table.sort(queue)
+
+	if not driver then
+		driver = RunService.RenderStepped:Connect(stepConfetti)
 	end
 end
 
@@ -242,6 +419,9 @@ local function showBanner(title: string, subtitle: string, big: boolean?)
 	bannerSubtitle:set(subtitle)
 	bannerVisible:set(true)
 	bannerScaleGoal:set(1)
+	if bannerSpin then
+		bannerSpin:Play()
+	end
 
 	bannerToken += 1
 	local token = bannerToken
@@ -253,6 +433,11 @@ local function showBanner(title: string, subtitle: string, big: boolean?)
 		task.delay(0.3, function()
 			if token == bannerToken then
 				bannerVisible:set(false)
+				-- `Pause` chứ không `Cancel`: giữ nguyên góc đang xoay, lần sau chạy tiếp từ đó
+				-- nên không có cú giật về 0 độ ngay khi thẻ vừa trượt vào.
+				if bannerSpin then
+					bannerSpin:Pause()
+				end
 			end
 		end)
 	end)
@@ -295,7 +480,52 @@ function BoostCelebration.TriggerReward(rewardName: string, subtitle: string, bi
 	showBanner(rewardName, subtitle, big)
 end
 
+--[[
+	HOOK NGHIỆM THU TRONG STUDIO — cùng kiểu với `StudioTestSpin` / `StudioTutorialFinale`.
+
+	Đặt thuộc tính `StudioTestCelebration` lên LocalPlayer là chạy đúng hiệu ứng thật:
+	    "buy"  → banner mua hàng thường (confetti thưa)
+	    "big"  → cỡ Server Boost: chớp vàng + confetti dày + nhạc
+	    "spam" → bắn 6 cú liên tiếp cách nhau 0.15s, tức ĐÚNG cảnh chồng nhau đã làm tụt FPS
+
+	Phải đi qua attribute chứ không gọi thẳng hàm: `execute_luau` chạy trong một VM riêng, nên
+	`require` từ đó sẽ nạp một BẢN SAO của module này — bản sao ấy chưa từng gọi `Build` nên
+	`confettiLayer` là nil và không có gì hiện ra. Attribute nằm trên Instance nên mọi VM đều
+	ghi/đọc được (bài học đã ghi lại ở TutorialController).
+]]
+local function bindStudioHook()
+	if not RunService:IsStudio() then
+		return
+	end
+	local Players = game:GetService("Players")
+	local localPlayer = Players.LocalPlayer
+	if not localPlayer then
+		return
+	end
+	localPlayer:GetAttributeChangedSignal("StudioTestCelebration"):Connect(function()
+		local mode = localPlayer:GetAttribute("StudioTestCelebration")
+		if type(mode) ~= "string" then
+			return
+		end
+		localPlayer:SetAttribute("StudioTestCelebration", nil)
+		if mode == "big" then
+			BoostCelebration.Trigger("QA_Tester", "MEGA BOOST X2 ALL")
+		elseif mode == "spam" then
+			task.spawn(function()
+				for index = 1, 6 do
+					BoostCelebration.TriggerPurchase(`QA STRESS {index}`, "stress test")
+					task.wait(0.15)
+				end
+			end)
+		else
+			BoostCelebration.TriggerPurchase("PURPLE TREADMILL", "Purchase successful — enjoy your power!")
+		end
+	end)
+end
+
 function BoostCelebration.Build()
+	bindStudioHook()
+
 	-- Lớp confetti phủ toàn canvas (không bắt chuột).
 	local layer = New("Frame")({
 		BackgroundTransparency = 1,
@@ -406,12 +636,12 @@ function BoostCelebration.Build()
 		ZIndex = 210,
 	})
 
-	local rotateTween = TweenService:Create(
+	-- CHƯA chạy ở đây: `showBanner` bật, hẹn giờ ẩn thẻ tắt (xem `bannerSpin`).
+	bannerSpin = TweenService:Create(
 		sunburstLabel,
 		TweenInfo.new(8, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1),
 		{ Rotation = 360 }
 	)
-	rotateTween:Play()
 
 	local banner = New("CanvasGroup")({
 		-- Neo mép PHẢI-TRÊN của chính thẻ: `Position` trả về toạ độ góc phải-trên nên thẻ trượt

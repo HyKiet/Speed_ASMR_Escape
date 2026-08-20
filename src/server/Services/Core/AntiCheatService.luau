@@ -51,6 +51,29 @@ local function getEntry(player: Player): Entry
 	return entry
 end
 
+--[[
+	DẤU VẾT CHẨN ĐOÁN (chỉ Studio) — xem `Controllers/Debug/RubberBandLogger`.
+
+	Client thấy mình bị dời chỗ nhưng KHÔNG biết ai dời. Server thì biết, nên nó đóng dấu mốc
+	thời gian lên chính Player; attribute nằm trên Instance nên client đọc được ngay.
+
+	Dùng `workspace:GetServerTimeNow()` chứ KHÔNG dùng `os.clock()`: `os.clock()` đếm từ lúc
+	tiến trình khởi động nên số của server và số của client là hai gốc khác nhau, so với nhau
+	là vô nghĩa. `GetServerTimeNow` là đồng hồ chung của cả hai phía — cùng lý do mà mọi bẫy
+	zone đang dùng nó.
+]]
+local IS_STUDIO = RunService:IsStudio()
+
+local function stamp(player: Player, attribute: string, reason: string?)
+	if not IS_STUDIO then
+		return
+	end
+	player:SetAttribute(attribute, workspace:GetServerTimeNow())
+	if reason then
+		player:SetAttribute("DbgBandReason", reason)
+	end
+end
+
 -- Gọi sau MỌI lần server chủ động đặt CFrame cho player (teleport/revive/spawn).
 function AntiCheatService.NoteTeleport(player: Player)
 	local entry = getEntry(player)
@@ -58,6 +81,7 @@ function AntiCheatService.NoteTeleport(player: Player)
 	entry.lastPos = nil
 	entry.validPos = nil
 	table.clear(entry.strikes)
+	stamp(player, "DbgTeleportAt")
 end
 
 local function horizontalDistance(a: Vector3, b: Vector3): number
@@ -90,6 +114,7 @@ local function rubberBand(player: Player, entry: Entry, root: BasePart, reason: 
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
 	root.CFrame = CFrame.new(target) * root.CFrame.Rotation
+	stamp(player, "DbgBandAt", reason)
 
 	table.clear(entry.strikes)
 	entry.lastPos = target

@@ -43,12 +43,40 @@ local RunService = game:GetService("RunService")
 local FLOOR_TAG = "ASMRFloor"
 local KEY_CONTAINER = "Clicky Keyboard Asmr"
 
--- Ngân sách nhãn tồn tại cùng lúc. Đây là KNOB DUY NHẤT để đổi tầm phủ ↔ chi phí:
--- mỗi nhãn = 1 SurfaceGui. Bàn hiện tại 112–126 phím ⇒ 800 ≈ 6 bàn liền kề.
-local MAX_LABELS = 800
-local BOARD_RANGE = 300 -- bàn xa hơn mức này không xét
+--[[
+	══ NGÂN SÁCH — chỉnh lại 2026-08-20 sau khi ĐO, không phải đoán ═══════════════════════
+
+	Đo trong Studio, đứng đúng trên `KB_Platform_1` của Zone 1:
+	    442 SurfaceGui đang sống, và cả 442 đều NẰM TRONG `GUI_MAX_DIST` ⇒ engine vẽ hết.
+	Đây là nguồn draw-call UI lớn nhất của game: mỗi nhãn là một SurfaceGui world-space
+	riêng, không batch được với nhau (Scene Analysis của user: UI = 466 draw call, trong
+	khi toàn bộ HUD Fusion chỉ chiếm phần nhỏ trong đó).
+
+	Phần lớn số đó là chữ KHÔNG ĐỌC ĐƯỢC. Chữ trên phím cao ~4 studs; trên màn 1080p ở FOV
+	70° thì:
+	    260 studs → ~12 px   (nhoè, chỉ còn là vệt)
+	    170 studs → ~18 px
+	    150 studs → ~20 px   ← ngưỡng chọn
+	    110 studs →  ~28 px
+	Số nhãn phải vẽ theo từng ngưỡng (đo thật, cùng vị trí đứng): 260→442 · 200→374 ·
+	170→336 · 140→280 · 110→224.
+
+	⇒ `GUI_MAX_DIST` 260 → 150: cắt ~1/3 số draw-call world-space mà KHÔNG bỏ một chữ nào
+	  người chơi đọc nổi. Chức năng ("phím mình đang chạy lên có chữ") không đổi — bàn dưới
+	  chân cách 8 studs, bàn kế cách 31 studs.
+
+	`BOARD_RANGE` (dựng instance) GIỮ rộng hơn `GUI_MAX_DIST` một khoảng lớn — đó là vùng
+	đệm để bàn được dán TRỌN VẸN từ trước khi lọt vào tầm vẽ, nên không bao giờ thấy chữ
+	hiện dần ra từng phím. 240 = 90 studs đệm ≈ 3 bàn.
+
+	`MAX_LABELS` là trần an toàn cho số instance sống, không phải knob điều chỉnh tầm phủ:
+	ở đây `BOARD_RANGE` mới là thứ chặn (442 < 800 nên trần cũ chưa bao giờ chạm tới).
+	Hạ về 640 vẫn thừa cho 4 bàn to nhất (168 phím/bàn).
+]]
+local MAX_LABELS = 640
+local BOARD_RANGE = 240 -- bàn xa hơn mức này không xét (vùng dựng, rộng hơn vùng vẽ)
 local BOARD_RANGE_SQ = BOARD_RANGE * BOARD_RANGE
-local GUI_MAX_DIST = 260 -- engine tắt render ngoài tầm này
+local GUI_MAX_DIST = 150 -- engine tắt render ngoài tầm này — xem khối đo ở trên
 local BUILD_PER_FRAME = 45
 local REFRESH_INTERVAL = 0.5
 local PPS = 24

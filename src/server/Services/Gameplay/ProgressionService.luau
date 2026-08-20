@@ -996,6 +996,47 @@ function ProgressionService.Start()
 				applyWalkSpeed(player, data)
 			end
 		end)
+
+		--[[
+			══ HỒI SINH XONG PHẢI CÓ TỐC ĐỘ NGAY ═══════════════════════════════════════════
+
+			ĐO ĐƯỢC 2026-08-19 (probe client, Level 120 ⇒ WalkSpeed 250). Dòng thời gian thật
+			của mỗi lần chết:
+
+			     7.14s  NHÂN VẬT MỚI, state → Running (HP=100, WS=6)
+			     7.18s  WalkSpeed 6 → 250          ← 40 ms
+			    11.29s  NHÂN VẬT MỚI, state → Running (HP=100, WS=6)
+			    11.56s  WalkSpeed 6 → 250          ← 270 ms
+
+			6 là `Tuning.DEFAULT_WALK_SPEED` — giá trị StarterPlayer cấp cho nhân vật mới. Tốc
+			độ THẬT chỉ được đặt lại ở `tickPlayer`, mà tick là vòng lặp có nhịp riêng, nên
+			người chơi cầm lái một nhân vật bò 6 studs/s trong tối đa ~0.3 giây sau khi hồi
+			sinh. Ở 250 WS đó là chênh lệch 40 LẦN: đúng cảm giác "chết xong nhân vật bị đơ".
+
+			Vì sao trước đây không ai thấy: ở Level thấp `DEFAULT_WALK_SPEED = 6` gần bằng tốc
+			độ thật nên khoảng trễ này vô hình. Nó chỉ lộ ra ở tốc độ cao — và đó chính là
+			trạng thái mà mọi người chơi gắn bó đều đang ở.
+
+			Sửa bằng cách áp tốc độ NGAY trong `CharacterAdded` thay vì đợi tick. `CharacterAdded`
+			nổ trước khi người chơi kịp bấm phím đầu tiên, nên khoảng bò 6 studs/s biến mất hẳn
+			chứ không phải rút ngắn.
+
+			`task.defer` chứ không gọi thẳng: `CharacterAdded` nổ lúc model vừa được parent,
+			Humanoid có thể chưa có con đầy đủ — `CharacterUtil.GetCharacterParts` sẽ trượt.
+			Defer đẩy sang cuối frame, vẫn trong cùng frame đó nên người chơi không thấy gì.
+		]]
+		local function applyOnSpawn()
+			task.defer(function()
+				local data = DataService.GetData(player)
+				if data then
+					applyWalkSpeed(player, data)
+				end
+			end)
+		end
+		player.CharacterAdded:Connect(applyOnSpawn)
+		if player.Character then
+			applyOnSpawn()
+		end
 	end
 
 	for _, player in Players:GetPlayers() do

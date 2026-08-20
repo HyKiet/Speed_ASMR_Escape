@@ -1852,38 +1852,53 @@ function Theme.MakeMenuButton(
 						Để theo Scale thì hào quang tự lớn theo ô mãi mãi, không còn cặp số nào
 						phải nhớ đồng bộ tay. Đây đúng bài học mà chính `LeftMenu` đã rút ra cho
 						năm con số bố cục của nó (xem khối "CỠ Ô MENU TRÁI — MỘT CHỖ DUY NHẤT").
-
-						1.56 / 1.70 là ĐÚNG tỉ lệ của bản gốc (190÷122 và 190÷112) — tức khôi
-						phục lại nguyên trọng lượng thị giác đã được duyệt, không phải phóng to
-						theo cảm tính.
 					]]
 					--[[
 						VỪA Ô NÚT (user chốt 2026-08-19: "kích thước sunburst vừa với button thôi").
 
-						1.0 là cỡ NỀN; `Pulse` gắn thêm một `UIScale` dao động 0.92 ↔ 1.12, nên
-						thực tế hào quang thở trong khoảng 0.92× → 1.12× ô nút — vừa khít lúc co,
-						nhô ra một chút lúc nở. Đó là toàn bộ chuyển động cần có.
+						1.28 là cỡ NỀN; `Pulse` gắn thêm một `UIScale` dao động 0.92 ↔ 1.12, nên
+						hào quang thở trong khoảng 1.18× → 1.43× ô nút. Vì sao KHÔNG để đúng 1.0:
+						ảnh sunburst có lõi sáng ở giữa và tia mảnh dần ra rìa — để vừa khít ô thì
+						cái lõi ấy nằm gọn sau icon 61px, phần còn nhìn thấy chỉ là mấy đầu tia mờ
+						nhất. 1.28 đẩy vành tia ra tới đúng mép tile, chỗ mắt đọc được là "quầng
+						sáng quanh nút" chứ không phải một vệt loang sau icon.
 					]]
-					Size = UDim2.fromScale(1, 1),
+					Size = UDim2.fromScale(1.28, 1.28),
 					--[[
-						ZIndex 13 = TRÊN mặt nút (12), DƯỚI icon (14) và nhãn (15).
-						User chốt 2026-08-19: "nó phải nằm trên button shop và dưới icon".
+						⚠️ ZIndex 14, KHÔNG PHẢI 13 — và đây là lần THỨ BA cùng một cái bẫy.
 
-						Bản trước để 11 tức nằm DƯỚI cả mặt nút, nên nền đục của nút che kín
-						phần giữa và chỉ còn viền thò ra ngoài ô là nhìn thấy được — quá mờ
-						nhạt để đọc ra là một hiệu ứng. Nay hào quang phủ lên chính mặt nút,
-						còn icon và chữ vẫn nổi lên trên nên không bị che.
+						User chốt 2026-08-19: "nó phải nằm trên button shop và dưới icon". Bản đầu
+						để 11 (dưới mặt nút) nên bị nền đục che kín. Bản sau nâng lên 13 vì tưởng
+						mặt nút là ZIndex 12 — ĐO LẠI TRONG STUDIO 2026-08-19 thì không phải:
+
+						    TextButton      Z=12   (nền ngoài)
+						      └ Frame       Z=13   BackgroundTransparency=0  ← LỚP ĐỤC THẬT SỰ
+						      └ ImageLabel  Z=14   (hoa văn studs)
+						    ImageLabel      Z=14   (icon)
+						    TextLabel       Z=15   (nhãn)
+
+						Lớp mặt đục nằm ở 13, và nó là sibling ĐỨNG SAU hào quang ⇒ ZIndex hoà nhau
+						thì cái duyệt sau vẽ đè lên. Kết quả: hào quang tồn tại, Visible=true,
+						ImageTransparency=0.12, mà trên màn hình KHÔNG THẤY GÌ — đúng như user báo.
+
+						14 thắng lớp đục (13). Icon cũng 14 nhưng là sibling ĐỨNG SAU nên vẫn nổi
+						lên trên hào quang — chính cái luật hoà-thì-sau-thắng vừa gây lỗi giờ cho
+						đúng thứ tự ta cần. Nhãn 15 thì luôn ở trên.
 
 						Chỉ hoạt động vì ScreenGui đặt `ZIndexBehavior = Global`; ở chế độ
 						Sibling thì con không bao giờ xen được vào giữa các lớp của cha.
 					]]
-					ZIndex = 13,
-					-- Vàng sáng, bắt màu với gradient cam của nút Shop.
-					ImageColor3 = Color3.fromRGB(255, 236, 150),
-					-- 0.3 → 0.12 (user 2026-08-19: "mờ quá"). Ở 0.3 hào quang chìm vào gradient
-					-- cam của chính nút Shop — hai thứ cùng tông vàng-cam nên độ tương phản
-					-- gần như bằng 0. 0.12 đủ nổi mà chưa che mất mặt nút bên dưới.
-					ImageTransparency = 0.12,
+					ZIndex = 14,
+					--[[
+						KEM SÁNG chứ không phải vàng (đổi 2026-08-19 cùng lúc với ZIndex).
+
+						Hào quang giờ nằm TRÊN mặt nút, mà mặt nút Shop là gradient vàng-cam. Màu
+						cũ 255,236,150 là vàng — vàng trên cam thì tương phản gần bằng 0, đó là lý
+						do lần trước phải hạ độ mờ xuống 0.12 mà vẫn thấy "mờ quá". 255,252,226
+						sáng hơn hẳn mọi điểm của gradient bên dưới nên tia đọc ra ngay ở 0.1.
+					]]
+					ImageColor3 = Color3.fromRGB(255, 252, 226),
+					ImageTransparency = 0.1,
 					Pulse = true,
 					SpinSeconds = 9,
 				})

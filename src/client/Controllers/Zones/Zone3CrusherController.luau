@@ -31,7 +31,6 @@
 	Workspace vào kênh `sfx` rồi nhân hệ số slider lên trên.
 ]]
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -57,8 +56,6 @@ local ROLLOFF_MIN = 28
 local ROLLOFF_MAX = 240
 
 local Zone3CrusherController = {}
-
-local player = Players.LocalPlayer
 
 type Crusher = {
 	piston: BasePart,
@@ -187,13 +184,12 @@ local function step()
 		return
 	end
 
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
+	-- Gốc nhân vật tra MỘT lần mỗi frame cho cả bảy controller bẫy, không phải mỗi
+	-- controller một lần `FindFirstChild` — xem `ZoneLod.Root`.
+	if not ZoneLod.Root() then
 		return
 	end
-
-	local pos = root.Position
+	local pos = ZoneLod.RootPosition()
 	local dx, dz = pos.X - centerX, pos.Z - centerZ
 	local distSq = dx * dx + dz * dz
 	if distSq > ZoneLod.RadiusSq(RENDER_RADIUS) then
@@ -217,7 +213,7 @@ local function step()
 	end
 	awake = true
 
-	local now = Workspace:GetServerTimeNow()
+	local now = ZoneLod.Now()
 	local shouldStep: boolean
 	shouldStep, nextFarStep = ZoneLod.ShouldStepFar(distSq, now, nextFarStep)
 	if not shouldStep then

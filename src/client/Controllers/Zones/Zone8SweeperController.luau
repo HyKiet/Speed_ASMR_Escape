@@ -10,7 +10,6 @@
 	Early-out: ra khỏi tầm nhìn (RENDER_RADIUS) là ngừng cập nhật.
 ]]
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -21,7 +20,6 @@ local RENDER_RADIUS = 320
 
 local Zone8SweeperController = {}
 
-local player = Players.LocalPlayer
 local arm: BasePart? = nil
 local center = Vector3.zero
 local baseRot = CFrame.identity
@@ -62,20 +60,21 @@ local function step()
 		return
 	end
 
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
+	-- Gốc nhân vật tra MỘT lần mỗi frame cho cả bảy controller bẫy, không phải mỗi
+	-- controller một lần `FindFirstChild` — xem `ZoneLod.Root`.
+	if not ZoneLod.Root() then
 		return
 	end
+	local rootPos = ZoneLod.RootPosition()
 
-	local dx = root.Position.X - center.X
-	local dz = root.Position.Z - center.Z
+	local dx = rootPos.X - center.X
+	local dz = rootPos.Z - center.Z
 	local distSq = dx * dx + dz * dz
 	if distSq > ZoneLod.RadiusSq(RENDER_RADIUS) then
 		return -- SLEEP: quá xa, không cần render
 	end
 
-	local now = Workspace:GetServerTimeNow()
+	local now = ZoneLod.Now()
 	local shouldStep: boolean
 	shouldStep, nextFarStep = ZoneLod.ShouldStepFar(distSq, now, nextFarStep)
 	if not shouldStep then
