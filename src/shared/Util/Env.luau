@@ -12,8 +12,15 @@
 --   • DataStore đã tách sẵn ở tầng Roblox (DataStore gắn theo universe). Tiền tố "QA_"
 --     dưới đây thành lớp khoá THỨ HAI — thừa nhưng giữ lại, vì nó là thứ bảo vệ Studio
 --     (Studio chạy từ file có thể mang PlaceId bất kỳ).
---   • Gamepass và Dev Product thì KHÔNG còn dùng chung. ID trong Config/Economy thuộc
---     universe Live, nên luồng mua Robux không test được trên QA bằng chính các ID đó.
+--   • Gamepass và Dev Product: TẤT CẢ đều được tạo ở universe LIVE (dashboard của QA trống
+--     trơn — 0 pass, 0 product, kiểm 2026-08-23). Bán chúng bên trong QA chính là
+--     "cross-game sale" — thứ Roblox đã TẮT từ 2026-05-29, và thông báo ghi rõ KHÔNG có
+--     ngoại lệ kể cả hai experience cùng một chủ hoặc cùng group.
+--     Triệu chứng dễ hiểu nhầm: hộp mua VẪN HIỆN đúng tên và giá trong QA, vì
+--     `GetProductInfo` tra theo ID thì universe nào cũng tra được. Cái bị chặn là bước
+--     THANH TOÁN, không phải bước hiển thị.
+--     ⇒ Hệ quả cho World 2: phải là SUB-PLACE trong ĐÚNG universe Live. Tách universe riêng
+--     là mất sạch khả năng bán pass/product ở đó.
 --
 -- Quy tắc an toàn: chỉ đúng LIVE_PLACE_ID mới được coi là Live. Bất kỳ place nào
 -- khác — kể cả place mới tạo sau này — đều rơi về QA. Đoán sai theo hướng này

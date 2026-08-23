@@ -33,6 +33,12 @@ Stages.STAGE_15_FIRST_CLEAR_BONUS = 50000
 
 -- CHỈ LÀ GỢI Ý: dùng cho biển báo "Recommend: Lv X" và UI — KHÔNG chặn người chơi.
 -- (Cơ chế gate chặn theo Level/WalkSpeed đã gỡ bỏ hoàn toàn khỏi gameplay.)
+--
+-- ⚠️ XOÁ 2026-08-23 — bảng này từng khai tiếp tới [30] với minWS 248→444. Đó là dữ liệu CHẾT
+-- và SAI: trần WalkSpeed là 250 (`Formulas.GetMaxWalkSpeed`) và World 2 GIỮ NGUYÊN trần 250
+-- (GDD mục 9), nên mọi gate từ [17] trở đi yêu cầu tốc độ không thể đạt được. Chưa lộ vì
+-- `MAX_CONFIGURED_STAGE = 15`. Khi dựng World 2 thì viết lại bảng cho Stage 16–30 trong
+-- khoảng ≤ 250 — phải đi kèm thiết kế 15 màn mới, không suy ra bằng công thức được.
 Stages.STAGE_GATES = {
 	[1] = { minLv = 1, minWS = 12 },
 	[2] = { minLv = 8, minWS = 26 },
@@ -49,21 +55,6 @@ Stages.STAGE_GATES = {
 	[13] = { minLv = 96, minWS = 202 },
 	[14] = { minLv = 104, minWS = 218 },
 	[15] = { minLv = 112, minWS = 234 },
-	[16] = { minLv = 119, minWS = 248 },
-	[17] = { minLv = 126, minWS = 262 },
-	[18] = { minLv = 133, minWS = 276 },
-	[19] = { minLv = 140, minWS = 290 },
-	[20] = { minLv = 147, minWS = 304 },
-	[21] = { minLv = 154, minWS = 318 },
-	[22] = { minLv = 161, minWS = 332 },
-	[23] = { minLv = 168, minWS = 346 },
-	[24] = { minLv = 175, minWS = 360 },
-	[25] = { minLv = 182, minWS = 374 },
-	[26] = { minLv = 189, minWS = 388 },
-	[27] = { minLv = 196, minWS = 402 },
-	[28] = { minLv = 203, minWS = 416 },
-	[29] = { minLv = 210, minWS = 430 },
-	[30] = { minLv = 217, minWS = 444 },
 } :: { [number]: StageGate }
 
 Stages.REVIVE_PROMPT_SECONDS = 5

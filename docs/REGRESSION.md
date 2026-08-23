@@ -25,9 +25,17 @@ trả `No universe exists for place ID`). Số đúng là `134428972694212`.
 Hai place nằm ở **hai universe riêng**: QA `10648253073`, Live `10456737957`. Vì vậy:
 - **DataStore tách sẵn ở tầng Roblox**, không phụ thuộc code. Tiền tố `QA_` trong
   `Shared/Util/Env.luau` vẫn giữ làm lớp khoá thứ hai (bảo vệ Studio).
-- **Gamepass/Dev Product KHÔNG dùng chung.** Ghi chú cũ "test mua thật được" không còn đúng:
-  các ID trong `Config/Economy` thuộc universe Live. Cần nghiệm thu luồng Robux thì phải kiểm
-  trên Live, hoặc tạo bộ ID riêng cho universe QA.
+- **Gamepass/Dev Product KHÔNG dùng chung.** Ghi chú cũ "test mua thật được" không còn đúng.
+  Toàn bộ pass/product nằm ở universe **Live**; dashboard của universe QA trống trơn (0 pass,
+  0 product — kiểm 2026-08-23). Bán chúng trong QA là **cross-game sale**, thứ Roblox đã tắt
+  từ **2026-05-29**, không ngoại lệ kể cả cùng chủ / cùng group.
+
+  ⚠️ Bẫy khi test: hộp mua **vẫn hiện đúng tên và giá** trong QA (`GetProductInfo` tra được
+  theo ID ở bất kỳ universe nào). Đừng lấy việc "thấy hộp mua" làm bằng chứng là mua được —
+  chỗ bị chặn là bước thanh toán.
+
+  Muốn nghiệm thu luồng Robux: kiểm trên **Live**, hoặc tạo bộ pass/product **riêng** cho
+  universe QA rồi cho `Config/Economy` đọc ID theo `Env.Current`.
 
 ---
 
