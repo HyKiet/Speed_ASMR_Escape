@@ -83,9 +83,7 @@ local function normalizeData(data: { [string]: any })
 	readNumber(data, "TotalWins", 0)
 	readNumber(data, "CurrentRunWins", 0)
 	readNumber(data, "Streak", 0)
-	readNumber(data, "PersonalBestDistance", 0)
 	readNumber(data, "PersonalBestRunWins", 0)
-	readNumber(data, "TotalRuns", 0)
 	readNumber(data, "TotalDonatedRobux", 0)
 	if typeof(data.hasClaimedGroupReward) ~= "boolean" then
 		data.hasClaimedGroupReward = false
