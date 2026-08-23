@@ -524,12 +524,29 @@ Lỡ **một** ngày → chuỗi reset về Ngày 1. Luật khắc nghiệt này
 
 ### C. Mã Quà Tặng (Promo Codes)
 
-| Mã Code | Phần Thưởng Kích Hoạt |
-| :--- | :--- |
-| **`RELEASE`** | +1,000 Wins & 🎟️ 1 Spin Ticket |
-| **`SPEED`** | +5,000 Speed Boost |
-| **`FREEWINS`** | +2,500 Wins |
-| **`LUCKY`** | +10,000 Speed & 🎟️ 2 Spin Tickets |
+| Mã Code | Phần Thưởng Kích Hoạt | Dùng cho |
+| :--- | :--- | :--- |
+| **`RELEASE`** | +250,000 Speed & 🎟️ 3 Spin Tickets | Quà ra mắt, phát cho tất cả |
+| **`ASMR`** | +100,000 Speed & 🎟️ 2 Spin Tickets | Bài đăng mạng xã hội / video |
+
+> **Viết lại 2026-08-23 — từ 4 mã xuống 2, và bỏ hẳn phần thưởng Wins.**
+>
+> Bản cũ mắc đúng lỗi mà mục 8.A1 vừa sửa cho bảng điểm danh: `FREEWINS` cho thẳng **2.500
+> Wins**, nhập một cái là nhảy qua pad_2 (3) → pad_6 (2.500), bỏ qua trọn đoạn chơi mà phần
+> đầu game được dựng ra để dạy. Siết daily xuống 1.177 Wins/tuần mà để mã quà phát 2.500 Wins
+> thì phép siết đó vô nghĩa.
+>
+> **Luật mới: mã phát Speed + vé quay, không phát Wins.** Speed là xương sống (cộng vào XP ⇒
+> Level ⇒ WalkSpeed, cảm nhận ngay mà không mua vượt cấp được gì). Vé quay là phần thưởng
+> **không mất giá theo cấp** — với người mới lẫn người Level 98, một vé vẫn là 1% cơ hội
+> Frozen Bloom. Đó là cách duy nhất khiến mã "đáng" ở cả hai đầu đường cong, thay vì thành
+> con số vô nghĩa với người chơi cuối game.
+>
+> Thang độ mạnh: `RELEASE` (250K Speed + 3 vé) **mạnh hơn** ngày Speed to nhất của daily
+> (ngày 6 = 150K) nhưng vẫn **dưới ngày 7** — chuỗi 7 ngày phải hơn một mã gõ trong 5 giây.
+>
+> ⚠️ Mỗi mã chỉ nhận MỘT LẦN/tài khoản. Sửa thưởng của mã đã phát hành thì người nhập rồi
+> không nhận lại được — phát đợt mới thì **thêm mã mới**.
 
 ---
 

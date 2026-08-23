@@ -61,11 +61,10 @@ function CodeService.RedeemCode(player: Player, rawCode: string)
 	-- Đánh dấu đã nhận
 	data.RedeemedCodes[cleanCode] = true
 
-	-- Trao phần thưởng
-	if reward.wins and reward.wins > 0 then
-		ProgressionService.AwardWins(player, reward.wins, "code")
-	end
-
+	-- Trao phần thưởng.
+	-- ⚠️ KHÔNG có nhánh Wins, và đó là CHỦ Ý (2026-08-23) — xem khối lý do đầu
+	-- `Config/Economy/Codes.luau`. Mã quà phát Wins là mở cửa sau cho phép siết bảng daily
+	-- xuống 1.177 Wins/tuần ở GDD 8.A1. Muốn thêm lại thì đọc chỗ đó trước.
 	if reward.speed and reward.speed > 0 then
 		ProgressionService.GrantSpeed(player, reward.speed)
 	end

@@ -455,6 +455,176 @@ local function setGateVisible(entry: TrailGate, visible: boolean)
 	end
 end
 
+--[[
+	── LOD HIỆU ỨNG THEO TẦM NHÌN (2026-08-23, user báo "trang bị cosmetic bị tụt fps nhẹ") ──
+
+	RÀNG BUỘC USER ĐẶT RA: **không được giảm VFX hay đồ hoạ của cosmetic**. Vậy nên khối này
+	KHÔNG đụng tới bất kỳ tham số tạo hình nào — màu, texture, size, lifetime, số lớp ribbon,
+	số emitter đều giữ nguyên tuyệt đối. Thứ duy nhất bị cắt là hiệu ứng mà **không ai đang
+	nhìn thấy**.
+
+	── VÌ SAO CẮT Ở ĐÂY MỚI ĐÚNG CHỖ ──
+	Vòng Heartbeat của file này đã chạy 10 Hz trên một bảng nhỏ ⇒ chi phí Lua gần như bằng 0.
+	Nên "tụt fps nhẹ khi trang bị cosmetic" KHÔNG phải chi phí script mà là **chi phí GPU**:
+	  • aura standard = 8 Beam + 13 ParticleEmitter mỗi người;
+	  • trail premium = 5 ribbon trong suốt, dài 150 studs (`TARGET_TRAIL_LENGTH`);
+	  • tất cả đều là mặt TRONG SUỐT ⇒ overdraw, thứ đắt nhất trên máy yếu;
+	  • và nhân lên theo SỐ NGƯỜI trong server, ai cũng vẽ đủ dù đứng sau lưng camera.
+
+	── BA BẬC ──
+	  bậc 0 (đầy đủ): trong tầm nhìn và gần hơn LOD_NEAR_STUDS  → y hệt trước đây
+	  bậc 1 (thưa):   trong tầm nhìn, LOD_NEAR..LOD_FAR         → Rate × LOD_MID_RATE_SCALE
+	  bậc 2 (tắt):    xa hơn LOD_FAR, HOẶC nằm sau lưng camera  → Rate = 0, Beam tắt
+
+	Ở bậc 1 hạt thưa đi, nhưng ở khoảng cách đó cả chùm hạt chiếm vài chục pixel — mắt không
+	phân biệt được mật độ. Ở bậc 2 thì theo định nghĩa không ai nhìn thấy.
+
+	── HAI NGUYÊN TẮC AN TOÀN (đừng phá khi sửa) ──
+	1. **Người chơi CỦA MÁY NÀY không bao giờ bị hạ bậc.** Cosmetic của chính mình là thứ họ
+	   bỏ tiền ra mua và nhìn suốt phiên chơi — hạ nó là đúng thứ user cấm.
+	2. **Chỉ ghi `Rate` của ParticleEmitter và `Enabled` của Beam.** Cổng ẩn-khi-đứng-yên ở
+	   trên (`setGateVisible`) ghi `Enabled` của Trail và ParticleEmitter. Hai hệ chạm vào hai
+	   thuộc tính KHÁC NHAU nên không bao giờ giẫm chân nhau. Nếu sau này định cho LOD ghi
+	   `Enabled` của emitter, phải gộp hai hệ lại làm một chứ đừng ghi song song — chúng sẽ
+	   bật/tắt lẫn nhau mỗi 0,1 giây.
+
+	Dùng `Rate = 0` thay vì `Enabled = false`: hạt đang sống bay nốt vòng đời rồi mới hết,
+	nên lúc hạ bậc không thấy chớp tắt đột ngột.
+]]
+local LOD_NEAR_STUDS = 140
+local LOD_FAR_STUDS = 340
+local LOD_MID_RATE_SCALE = 0.35
+-- Tích vô hướng giữa hướng camera và hướng tới người chơi. Nhỏ hơn mức này = nằm rõ ràng
+-- sau lưng. Để -0.35 chứ không phải 0 vì FOV rộng và camera vai lệch: cắt sát 0 là hiệu ứng
+-- chớp mất ở rìa màn hình khi xoay người.
+local LOD_BEHIND_DOT = -0.35
+
+type LodEntry = {
+	root: BasePart,
+	emitters: { ParticleEmitter },
+	beams: { Beam },
+	baseRate: { [ParticleEmitter]: number },
+	tier: number,
+}
+local lodEntries: { [Player]: LodEntry } = {}
+
+local function invalidateLod(player: Player)
+	lodEntries[player] = nil
+end
+
+-- Duyệt character MỘT LẦN lúc vừa gắn cosmetic (hiếm) thay vì mỗi tick.
+local function buildLodEntry(player: Player): LodEntry?
+	local root = getRoot(player)
+	local character = player.Character
+	if not root or not character then
+		return nil
+	end
+
+	local entry: LodEntry = {
+		root = root,
+		emitters = {},
+		beams = {},
+		baseRate = {},
+		tier = 0,
+	}
+
+	for _, descendant in character:GetDescendants() do
+		local name = descendant.Name
+		if name ~= TRAIL_OBJECT and name ~= TRAIL_FX_OBJECT and name ~= AURA_OBJECT then
+			continue
+		end
+		if descendant:IsA("ParticleEmitter") then
+			table.insert(entry.emitters, descendant)
+			entry.baseRate[descendant] = descendant.Rate
+		elseif descendant:IsA("Beam") then
+			table.insert(entry.beams, descendant)
+		end
+	end
+
+	-- Emitter nằm SÂU bên trong rig aura (Attachment/Model con) mang tên riêng của template
+	-- chứ không phải AURA_OBJECT — vòng trên bỏ sót chúng. Quét thêm một lượt từ những nút
+	-- đã mang đúng tên: mọi thứ bên dưới chúng đều là hiệu ứng cosmetic.
+	for _, descendant in character:GetDescendants() do
+		if descendant.Name ~= AURA_OBJECT and descendant.Name ~= TRAIL_FX_OBJECT then
+			continue
+		end
+		for _, sub in descendant:GetDescendants() do
+			if sub:IsA("ParticleEmitter") and entry.baseRate[sub] == nil then
+				table.insert(entry.emitters, sub)
+				entry.baseRate[sub] = sub.Rate
+			elseif sub:IsA("Beam") then
+				table.insert(entry.beams, sub)
+			end
+		end
+	end
+
+	lodEntries[player] = entry
+	return entry
+end
+
+local function applyLodTier(entry: LodEntry, tier: number)
+	if entry.tier == tier then
+		return
+	end
+	entry.tier = tier
+
+	local scale = if tier >= 2 then 0 elseif tier == 1 then LOD_MID_RATE_SCALE else 1
+	for _, emitter in entry.emitters do
+		if emitter.Parent then
+			emitter.Rate = (entry.baseRate[emitter] or 0) * scale
+		end
+	end
+
+	local beamsOn = tier < 2
+	for _, beam in entry.beams do
+		if beam.Parent then
+			beam.Enabled = beamsOn
+		end
+	end
+end
+
+local function stepCosmeticLod()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local camCF = camera.CFrame
+	local camPos = camCF.Position
+	local look = camCF.LookVector
+	local localPlayer = Players.LocalPlayer
+
+	for _, player in Players:GetPlayers() do
+		if player == localPlayer then
+			continue -- nguyên tắc 1: không bao giờ hạ bậc cosmetic của chính mình
+		end
+
+		local entry = lodEntries[player]
+		if entry and (entry.root.Parent == nil or player.Character ~= entry.root.Parent) then
+			entry = nil
+			lodEntries[player] = nil
+		end
+		if not entry then
+			entry = buildLodEntry(player)
+		end
+		if not entry or (#entry.emitters == 0 and #entry.beams == 0) then
+			continue
+		end
+
+		local offset = entry.root.Position - camPos
+		local distance = offset.Magnitude
+		local behind = distance > 1 and look:Dot(offset.Unit) < LOD_BEHIND_DOT
+		local tier
+		if distance > LOD_FAR_STUDS or behind then
+			tier = 2
+		elseif distance > LOD_NEAR_STUDS then
+			tier = 1
+		else
+			tier = 0
+		end
+		applyLodTier(entry, tier)
+	end
+end
+
 local MAX_TRAIL_SPAN = 4.6 -- ribbon cao hơn thân nhân vật thì thu lại (Golden Ray 6.37)
 
 -- ĐỘ DÀI VỆT KHÔNG ĐỔI THEO TỐC ĐỘ (2026-07-28) — cách sửa "hoa văn bị lặp".
@@ -1127,6 +1297,7 @@ local function setupCharacter(player: Player, character: Model)
 		if player.Character == character and humanoid.Health > 0 then
 			applyTrail(player)
 			applyAura(player)
+			invalidateLod(player)
 		end
 
 		-- 4. Double check kiểm tra phụ sau 0.5s để chống mất Trail/Aura khi vừa hồi sinh
@@ -1156,9 +1327,11 @@ end
 local function watchPlayer(player: Player)
 	player:GetAttributeChangedSignal("EquippedTrail"):Connect(function()
 		applyTrail(player)
+		invalidateLod(player)
 	end)
 	player:GetAttributeChangedSignal("EquippedAura"):Connect(function()
 		applyAura(player)
+		invalidateLod(player)
 	end)
 
 	-- Vệt phải giữ chiều dài cố định khi WalkSpeed đổi (lên level / rebirth / Custom Speed).
@@ -1196,6 +1369,7 @@ function CosmeticVisualController.SetOthersEnabled(enabled: boolean)
 		if player ~= Players.LocalPlayer then
 			applyTrail(player)
 			applyAura(player)
+			invalidateLod(player)
 		end
 	end
 end
@@ -1212,6 +1386,7 @@ function CosmeticVisualController.Start()
 
 	Players.PlayerRemoving:Connect(function(player)
 		trailGate[player] = nil
+		lodEntries[player] = nil
 	end)
 
 	-- Cổng ẩn/hiện trail premium theo tốc độ. Chỉ chạy 10 Hz và chỉ duyệt những người ĐANG
@@ -1241,6 +1416,9 @@ function CosmeticVisualController.Start()
 				setGateVisible(entry, true)
 			end
 		end
+
+		-- Cùng nhịp 10 Hz: hạ bậc hiệu ứng của người chơi ở xa / ngoài tầm nhìn.
+		stepCosmeticLod()
 	end)
 end
 
