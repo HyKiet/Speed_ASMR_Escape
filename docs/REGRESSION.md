@@ -16,11 +16,18 @@
 | | Place | PlaceId |
 |---|---|---|
 | Dev | Studio trên máy | — |
-| QA | `[QA] SpeedEscape` | `76318425379626` |
+| QA | `[QA] Speed ASMR Escape` | `134428972694212` |
 | Live | `+1 Speed ASMR Escape` | `94107323826144` |
 
-Cùng UniverseId `10456737957` ⇒ **dùng chung gamepass/product** (test mua thật được) nhưng
-**tách DataStore** qua `Shared/Util/Env.luau` (QA và Studio ghi vào bể `QA_*`).
+⚠️ **Sửa 2026-08-23:** bảng cũ ghi QA là `76318425379626` — place đó KHÔNG TỒN TẠI (Open Cloud
+trả `No universe exists for place ID`). Số đúng là `134428972694212`.
+
+Hai place nằm ở **hai universe riêng**: QA `10648253073`, Live `10456737957`. Vì vậy:
+- **DataStore tách sẵn ở tầng Roblox**, không phụ thuộc code. Tiền tố `QA_` trong
+  `Shared/Util/Env.luau` vẫn giữ làm lớp khoá thứ hai (bảo vệ Studio).
+- **Gamepass/Dev Product KHÔNG dùng chung.** Ghi chú cũ "test mua thật được" không còn đúng:
+  các ID trong `Config/Economy` thuộc universe Live. Cần nghiệm thu luồng Robux thì phải kiểm
+  trên Live, hoặc tạo bộ ID riêng cho universe QA.
 
 ---
 

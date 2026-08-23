@@ -1,10 +1,19 @@
 --!strict
 -- Nhận diện môi trường đang chạy (Studio / QA / Live) và tách không gian dữ liệu.
 --
--- Cả 2 place nằm chung MỘT universe nên chúng dùng chung DataStore, gamepass và
--- product. Dùng chung ID mua bán là điều ta muốn (test được luồng Robux thật),
--- nhưng dùng chung DataStore thì QA sẽ đè lên dữ liệu người chơi thật. Vì vậy
--- mọi tên store phải đi qua Env.StoreName().
+-- ⚠️ SỬA 2026-08-23 — bản cũ ghi "cả 2 place nằm chung MỘT universe". KHÔNG ĐÚNG NỮA.
+-- QA và Live nằm ở HAI universe riêng (kiểm bằng Open Cloud 2026-08-23):
+--     QA   universe 10648253073 · place 134428972694212 · "[QA] Speed ASMR Escape"
+--     Live universe 10456737957 · place  94107323826144 · "+1 Speed ASMR Escape"
+-- Place 76318425379626 mà tài liệu cũ gọi là QA thì KHÔNG TỒN TẠI — Open Cloud trả về
+-- "No universe exists for place ID".
+--
+-- Hệ quả của việc tách universe:
+--   • DataStore đã tách sẵn ở tầng Roblox (DataStore gắn theo universe). Tiền tố "QA_"
+--     dưới đây thành lớp khoá THỨ HAI — thừa nhưng giữ lại, vì nó là thứ bảo vệ Studio
+--     (Studio chạy từ file có thể mang PlaceId bất kỳ).
+--   • Gamepass và Dev Product thì KHÔNG còn dùng chung. ID trong Config/Economy thuộc
+--     universe Live, nên luồng mua Robux không test được trên QA bằng chính các ID đó.
 --
 -- Quy tắc an toàn: chỉ đúng LIVE_PLACE_ID mới được coi là Live. Bất kỳ place nào
 -- khác — kể cả place mới tạo sau này — đều rơi về QA. Đoán sai theo hướng này
@@ -18,7 +27,10 @@
 local RunService = game:GetService("RunService")
 
 local LIVE_PLACE_ID = 94107323826144
-local QA_PLACE_ID = 76318425379626
+local QA_PLACE_ID = 134428972694212
+
+local LIVE_UNIVERSE_ID = 10456737957
+local QA_UNIVERSE_ID = 10648253073
 
 export type Environment = "Studio" | "QA" | "Live"
 
@@ -35,7 +47,8 @@ local Env = {}
 
 Env.LIVE_PLACE_ID = LIVE_PLACE_ID
 Env.QA_PLACE_ID = QA_PLACE_ID
-Env.UNIVERSE_ID = 10456737957
+Env.LIVE_UNIVERSE_ID = LIVE_UNIVERSE_ID
+Env.QA_UNIVERSE_ID = QA_UNIVERSE_ID
 
 Env.Current = current
 

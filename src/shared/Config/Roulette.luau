@@ -1,7 +1,10 @@
 --!strict
 --[[
 	Cấu hình Vòng quay May mắn (Speed Roulette) — 8 ô.
-	Thứ tự SLOTS xếp theo GIÁ TRỊ TĂNG DẦN: Extra Spin gamepass chọn slot index cao hơn.
+	Thứ tự SLOTS xếp theo GIÁ TRỊ TĂNG DẦN.
+	(Sửa 2026-08-23: lý do gốc của quy ước này là "Extra Spin gamepass chọn slot index cao
+	hơn" — pass đó đã gỡ 2026-07-31 và không còn logic quay đôi. Vẫn giữ thứ tự tăng dần vì
+	nó là quy ước dễ đọc, nhưng giờ KHÔNG còn code nào phụ thuộc vào nó.)
 
 	── CÂN BẰNG LẠI 2026-08-10 (user: "cân bằng hơn nhưng vẫn kích thích") ────────────────
 	Bảng cũ hỏng ở HAI đầu cùng lúc, vì phần thưởng là số CỐ ĐỊNH còn thu nhập của người chơi

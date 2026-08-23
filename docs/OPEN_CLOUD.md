@@ -53,6 +53,22 @@ và log chỉ ra đúng danh tính.
    ⛔ **Không thêm** bất cứ mục nào trỏ vào universe **Live** (`10456737957`). Key này để thử
    ở QA; một lệnh gọi nhầm vào Live là người chơi thật lãnh. Cần thì cấp sau.
 
+3b. **Giới hạn từng khối vào ĐÚNG experience QA — bước quan trọng nhất.**
+
+   Mỗi khối API System có một **toggle bên phải**. Để nguyên (tắt) thì key chạm được **mọi
+   experience hiện tại và tương lai của bạn, kể cả game của mọi group** — lúc bấm Save,
+   Roblox sẽ nẹt hộp đỏ *"Unrestricted Experience Access"*. **Bật toggle lên**, ô
+   *"Search for an experience"* hiện ra, chọn **[QA] Speed ASMR Escape**. Làm cho **cả bốn**
+   khối.
+
+   Làm đúng thì lúc Save chỉ còn **hộp cảnh báo vàng** về `luau-execution-sessions`. Hộp vàng
+   đó KHÔNG mất được: quyền chạy Luau trong engine đồng nghĩa với việc code chạy được dùng
+   **mọi Engine API**, tức đọc/ghi được DataStore & MemoryStore của experience đó bất kể bạn
+   cấp scope datastore nào. Nói cách khác, giới hạn experience ở bước này là **hàng rào an
+   toàn duy nhất còn lại** — đó là lý do nó quan trọng nhất.
+
+   ⛔ Tuyệt đối không chọn universe **Live** ở bất kỳ khối nào.
+
 4. **Security → Restrict which IP addresses** — bật lên rồi dán IP công cộng của máy này:
    ```powershell
    (Invoke-RestMethod https://api.ipify.org?format=json).ip

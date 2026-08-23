@@ -44,8 +44,8 @@ và một bản đồ trống rỗng.
 
 1. Mở place từ Roblox (Home → My Games), **không** mở file `.rbxlx` trong repo.
 2. Hai PlaceId hợp lệ — **luôn kiểm tra bạn đang ở đâu** trước khi sửa:
-   - QA `76318425379626` — nơi thử nghiệm.
-   - Live `94107323826144` — **người chơi thật đang ở đây**.
+   - QA `134428972694212` — nơi thử nghiệm (universe `10648253073`).
+   - Live `94107323826144` — **người chơi thật đang ở đây** (universe `10456737957`).
    Kiểm nhanh trong Command Bar: `print(game.PlaceId)`.
 3. Sửa map xong thì **Publish** (File → Publish to Roblox) — đó mới là lưu thật.
 
@@ -78,7 +78,7 @@ CI có cổng `Place snapshot` cảnh báo khi file trong repo vẫn còn là v�
 
 > Mở từ cloud, KHÔNG mở `SpeedEscape.rbxl` trong repo — file đó là *bản sao lưu*, sửa vào nó
 > thì không ai thấy. Xác nhận đúng place trước khi làm gì: `print(game.PlaceId)` →
-> `76318425379626` (QA). Ra `94107323826144` là bạn đang ở **Live**.
+> `134428972694212` (QA). Ra `94107323826144` là bạn đang ở **Live**.
 
 **2. Start Rojo sync** trong VSCode terminal:
 ```bash

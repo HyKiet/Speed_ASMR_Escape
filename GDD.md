@@ -228,8 +228,11 @@ Tại Bệ dừng chân, người chơi có **4 lựa chọn chiến lược**:
 | **VIP Membership** | 399 R$ | `1899686706` | x1.5 Speed · x1.25 Wins/stage · VIP Gold Trail x6 + Aura x6 · vé quay 8 phút (trần 5) · teleport miễn phí · tag `[VIP]`. Chi tiết & lý do cân bằng: mục 7.A1 |
 | **Auto-Rebirth** | 99 R$ | `1899434608` | Tự động Trùng sinh ngay khi đủ Level (có công tắc ON/OFF trong Rebirth modal) |
 | **Infinite Revives** | 249 R$ | `1930442093` | Hồi sinh tại chỗ **không giới hạn số lần** khi ngã Obby (thay cho Revive 19 R$/lần) |
-| **Extra Spin** | 149 R$ | *(In Dev)* | Quay Roulette 2 lượt cùng lúc, chọn ô tốt nhất |
-| **Infinite Revives** | 249 R$ | `1930442093` | Hồi sinh tại chỗ không giới hạn số lần khi ngã Obby |
+
+> **Sửa 2026-08-23 — hai lỗi của bảng cũ:** (a) dòng *Infinite Revives* bị lặp hai lần;
+> (b) còn dòng **Extra Spin 149 R$ *(In Dev)***, nhưng gamepass đó **đã gỡ ngày 2026-07-31** —
+> xem `Config/Economy/Gamepass.luau`: lượt quay giờ bán bằng Dev Product 1/5/10 Spins
+> (`3610356888` / `3610357071` / `3610357149`), liệt kê ở mục 7.B.
 
 ### A2. Double Wins (x2) — 399 R$ (2026-08-21, **ĐÃ TẠO & BẬT** — pass `1940593812`)
 
@@ -535,4 +538,34 @@ Lỡ **một** ngày → chuỗi reset về Ngày 1. Luật khắc nghiệt này
 - **Điều kiện mở khóa World 2:** Hoàn thành Stage 15 (World 1).
 - **Chủ đề thiết kế (Theme):** Neon Cyber City (Cyberpunk, Glitch Lighting, Moving Lasers).
 - **Đường cong lạm phát XP:** Hàm mũ `1.082^(Level - 120)` từ Level 120 trở lên.
-- **Hệ thống Kinh tế Mới:** Thêm 15 Stage mới (Stage 16 - 30), Multiplier Pads cấp số nhân hàng triệu, Mở rộng giới hạn WalkSpeed tối đa lên **444 studs/s** (Stage 30).
+- **Hệ thống Kinh tế Mới:** Thêm 15 Stage mới (Stage 16 - 30), Multiplier Pads cấp số nhân hàng triệu.
+
+### ⚠️ SỬA 2026-08-23 — chốt lại luật WalkSpeed ở World 2
+
+Bản cũ ghi *"mở rộng giới hạn WalkSpeed tối đa lên **444 studs/s**"*. **Không còn đúng.**
+Luật đã chốt:
+
+> **Trần WalkSpeed vẫn là 250 ở cả hai world. Sang World 2, người chơi GIỮ NGUYÊN toàn bộ
+> chỉ số và vật phẩm (Wins, Level, Rebirth, Trail, Aura, Pad, Gamepass) — chỉ WalkSpeed bị
+> reset về mốc đầu và leo lại từ đầu.**
+
+**Vướng mắc kỹ thuật phải xử lý trước khi code World 2:** hiện tại WalkSpeed **không được lưu**
+ở đâu cả — nó được tính lại từ Level mỗi lần cần (`Formulas.GetMaxWalkSpeed`). Giữ Level thì
+đương nhiên giữ luôn WalkSpeed; không có chỗ nào để reset.
+
+Hướng gỡ: thêm một trục tiến trình riêng theo world trong `DataTemplate` (ví dụ `World2Level`,
+khởi điểm 1). World 2 tính WalkSpeed từ trục đó; `Level` cũ giữ nguyên làm chỉ số tích luỹ.
+
+Kèm theo là hai chỗ phải sửa:
+1. `Config/Formulas.luau` — số `250` đang gõ thẳng trong `GetMaxWalkSpeed`, không nằm trong
+   `Tuning`. Hàm cần biết đang ở world nào.
+2. `Services/Core/DataService.luau` — `CustomSpeedLimit` được kẹp theo `GetMaxWalkSpeed(Level)`
+   lúc nạp profile; sang World 2 sẽ kẹp theo trần sai.
+3. `Shared/Util/Env.luau` — place World 2 phải được khai là Live, nếu không nó bị xếp vào QA
+   và người chơi thật ghi vào kho dữ liệu QA.
+
+`Config/AntiCheat.luau` thì **không phải đụng**, vì trần vẫn 250.
+
+**Còn để ngỏ:** trục XP/Level của World 2. Mục này vẫn ghi Max Level 220 với đường cong
+`1.082^(Level-120)` — nhưng nếu WalkSpeed chạy trên một trục riêng thì quan hệ giữa hai trục
+cần chốt lại. Chưa quyết.

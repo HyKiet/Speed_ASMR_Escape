@@ -104,6 +104,14 @@ bấm đều nằm trong tầm một buổi chơi.
 
 **Stage 17 trở đi đang yêu cầu tốc độ không thể đạt được.** Hiện chưa lộ vì mới có 15 zone, nhưng phải nâng trần hoặc hạ bảng **trước khi dựng World 2**.
 
+> **✅ ĐÃ CHỐT HƯỚNG 2026-08-23:** **hạ bảng**, không nâng trần. Trần WalkSpeed giữ nguyên
+> **250 ở cả World 1 và World 2** (xem GDD mục 9). Sang World 2 người chơi giữ nguyên mọi chỉ
+> số và vật phẩm, chỉ WalkSpeed reset về mốc đầu rồi leo lại — nên gate của Stage 16–30 phải
+> được viết lại trong khoảng **≤ 250**, chứ không phải 262–444 như hiện tại.
+>
+> `Stages.STAGE_GATES[16..30]` vì vậy đang là **dữ liệu chết và sai**. Chưa sửa: bảng mới phải
+> đi kèm thiết kế 15 stage của World 2, không đoán số được.
+
 ## 4. Điểm mạnh — giữ nguyên
 
 - **Trần tốc độ là chủ ý và gắn với obby.** Gate cao nhất (Stage 15 = 234 WS) nằm sát trần 250, nên obby luôn còn thử thách. Đa số simulator để sức mạnh vô hạn nên nội dung mất nghĩa sau vài giờ.

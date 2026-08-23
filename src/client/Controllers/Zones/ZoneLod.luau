@@ -18,9 +18,11 @@
 	1. `LEAD_SECONDS` là hằng số ⇒ chi phí KHÔNG tăng theo tốc độ theo nghĩa "mỗi frame lại
 	   xét nhiều vật hơn": người chơi càng nhanh thì càng ít thời gian ở trong vùng đó.
 	   Trung bình số vật thức cùng lúc gần như không đổi.
-	2. `MAX_RADIUS` chặn trên ở 900 studs — dưới mức `StreamingTargetRadius` mặc định (1024).
-	   Đánh thức vật CHƯA stream về là vô nghĩa, và ngoài 900 studs thì một cỗ máy ép chiếm
-	   chưa tới vài pixel.
+	2. `MAX_RADIUS` chặn trên ở 1.800 studs, nhưng trần THẬT SỰ có tác dụng là công thức
+	   `WalkSpeed × LEAD_SECONDS`: trần tốc độ của game là 250 WS (`Formulas.GetMaxWalkSpeed`)
+	   nên bán kính lớn nhất đạt được = 250 × 4,5 = **1.125 studs**. `MAX_RADIUS` chỉ chặn khi
+	   tốc độ vượt 400 WS — tức là không bao giờ. Đánh thức vật CHƯA stream về là vô nghĩa, và
+	   ở khoảng cách đó một cỗ máy ép chiếm chưa tới vài pixel.
 	3. Vùng xa hạ nhịp còn `FAR_HZ` thay vì mỗi frame (xem `ShouldStepFar`). Toàn bộ bẫy đều
 	   chạy theo ĐỒNG HỒ TẤT ĐỊNH (`workspace:GetServerTimeNow()`), nên mỗi lần cập nhật là
 	   nhảy thẳng tới tư thế ĐÚNG của thời điểm đó — bỏ frame không hề trôi lệch, chỉ là
@@ -46,11 +48,16 @@ local ZoneLod = {}
 
 	Trần cũ `MAX_RADIUS = 900` được chốt vì một lý do đã HẾT HIỆU LỰC: nó bám theo
 	`StreamingTargetRadius` MẶC ĐỊNH của Roblox (1024) — đánh thức vật chưa stream về là vô
-	nghĩa. Nay place đã đặt `StreamingTargetRadius = 3072` (cùng `StreamingMinRadius = 1024`
-	và `StreamingIntegrityMode = PauseOutsideLoadedArea`), nên cái trần đó chỉ còn là di sản.
+	nghĩa. Place đã tự đặt giá trị riêng nên cái trần đó chỉ còn là di sản.
 
-	Mới: nhìn trước 4.5s (ở 250 WS = 1.125 studs) và trần 1.800 — vẫn cách xa 3.072 để giữ
-	đúng nguyên tắc "không đánh thức vật chưa stream".
+	Mới: nhìn trước 4.5s (ở 250 WS = 1.125 studs) và trần 1.800.
+
+	⚠️ SỬA 2026-08-23 — khối này từng ghi place đặt `StreamingTargetRadius = 3072` và
+	`StreamingMinRadius = 1024`. Đo lại trong Studio: **Target 1536 · Min 512 ·
+	IntegrityMode PauseOutsideLoadedArea**. Con số 1.800 của `MAX_RADIUS` do đó LỚN HƠN
+	bán kính stream thật (1.536) — nhưng vô hại, vì như mục 2 ở trên, bán kính thực dùng
+	bị công thức tốc độ chặn ở 1.125 studs, vẫn nằm gọn trong 1.536. Nếu sau này nới
+	`LEAD_SECONDS` hoặc trần WalkSpeed thì phải kiểm lại phép so này.
 
 	── VÌ SAO NỚI GẦN GẤP ĐÔI MÀ KHÔNG TỐN GẤP ĐÔI ────────────────────────────────────────
 	Thêm BẬC NHỊP THỨ BA. Trước đây chỉ có hai bậc (mọi-frame trong 300, rồi 24Hz cho tất cả

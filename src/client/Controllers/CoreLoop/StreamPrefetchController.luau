@@ -6,8 +6,13 @@
 	"WalkSpeed cao chạy các zone bị lỗi / map chưa load kịp."
 
 	Streaming của Roblox nạp content quanh VỊ TRÍ HIỆN TẠI. Ở tốc độ thấp thì thừa thời
-	gian, nhưng game này cho phép tới 250 studs/giây — người chơi đi hết một bán kính 1.024
-	studs trong 4 giây, và đi hết `StreamingMinRadius` mặc định (64) trong đúng 0,26 giây.
+	gian, nhưng game này cho phép tới 250 studs/giây. Quy bán kính ra GIÂY — đơn vị duy nhất
+	có nghĩa với game tốc độ cao — theo cấu hình THẬT của place (đo 2026-08-23:
+	Target 1.536 · Min 512 · IntegrityMode PauseOutsideLoadedArea):
+	   • vượt hết `StreamingTargetRadius` 1.536 studs trong **6,1 giây**
+	   • vượt hết `StreamingMinRadius` 512 studs trong **2,0 giây**
+	Với đẩy hợp lệ tối đa mà AntiCheat cho phép (437 studs/s: slide + gió Zone 12/14) thì
+	vùng Min chỉ còn **1,2 giây** — đó là biên hẹp nhất của hệ thống.
 	Kết quả là chạy nhanh thì lao vào vùng chưa nạp: sàn chưa có nên rơi xuyên, bẫy chưa có
 	nên không bị chặn, vật thể bật ra ngay trước mặt.
 

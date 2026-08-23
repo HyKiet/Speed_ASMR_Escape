@@ -909,6 +909,15 @@ Khi đổi giá thật (GDD: 15/39/89) phải sửa `Theme.SPEED_PASS_TIERS` + c
   UnlockedTreadmills khi mua/own pass.
 - Small Wins Pack không thấy trong ảnh dashboard (dùng ID 3608400621 từ file `ID`) — xác nhận giá 99R$.
 
+> **✅ ĐỐI CHIẾU LẠI 2026-08-23 — danh sách trên ĐÃ XONG, giữ nguyên chữ cũ vì đây là nhật ký:**
+> - **Spin Packs: đã có ID thật** — `Products.SPIN_PACKS` = `3610356888` / `3610357071` /
+>   `3610357149` (1/5/10 lượt).
+> - **Extra Spin: không làm nữa** — gamepass đã gỡ hẳn ngày 2026-07-31
+>   (`Economy/Gamepass.luau` dòng 27). Lượt quay chỉ bán bằng Dev Product.
+> - **Treadmill gamepass: đã có logic server** — `GamepassService` dựng bảng
+>   `TREADMILL_PASS_TO_ID` và đồng bộ `UnlockedTreadmills` cả lúc profile load lẫn lúc mua
+>   trong session.
+
 ### 2026-07-06 (Session 5) — Chuẩn bị release: Anti-Cheat + Tối ưu server 25 player
 **Model:** Claude Fable 5
 **Làm được (tất cả đã test PASS trong Studio):**

@@ -2,7 +2,9 @@
 --[[
 	RouletteModal.luau — Vòng quay May mắn (Speed Roulette).
 	Bánh xe 8 ô (Config/Roulette) quay tròn giảm tốc dừng đúng ô trúng do SERVER quyết định.
-	Vé: free 15 phút/vé (max 3), mua Robux 1/5/10 lượt, Extra Spin gamepass quay đôi.
+	Vé: free 15 phút/vé (max 3, VIP rút còn 8 phút / cap 5), mua Robux 1/5/10 lượt.
+	(Sửa 2026-08-23: dòng này từng ghi "Extra Spin gamepass quay đôi" — pass đó đã gỡ
+	2026-07-31 và trong repo không còn logic quay đôi nào.)
 ]]
 
 local MarketplaceService = game:GetService("MarketplaceService")
