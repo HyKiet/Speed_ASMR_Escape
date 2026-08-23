@@ -55,11 +55,28 @@ local function applyPerformance(on: boolean)
 		    CinematicDoF     DepthOfFieldEffect               → thuần điện ảnh
 		Tắt sạch cả 5 là tắt luôn 3 cái đầu — đó chính là chỗ "giảm ánh sáng".
 
-		Và lý do KỸ THUẬT để giữ, không chỉ vì thẩm mỹ: đo 2026-08-22 bằng MicroProfiler,
-		**CPU 17,25 ms > GPU 13,65 ms** (ngân sách 60 fps = 16,67 ms) — game nghẽn CPU, GPU
-		còn dư. Post-effect là chi phí GPU. Hi sinh chúng là trả bằng hình ảnh để mua thứ
-		đang KHÔNG thiếu. Mấy khối còn lại của hàm này (bóng, cosmetic, nhãn phím) mới là
-		phần cắt việc của CPU, và chúng được giữ nguyên.
+		Lý do KỸ THUẬT để giữ — nhưng ĐỌC CẢ PHẦN SỬA BÊN DƯỚI:
+		đo 2026-08-22 bằng MicroProfiler: **CPU 17,25 ms > GPU 13,65 ms** ⇒ kết luận lúc đó là
+		"game nghẽn CPU, GPU còn dư", nên hi sinh post-effect là trả bằng hình ảnh để mua thứ
+		đang không thiếu.
+
+		⚠️ **SỬA 2026-08-23 — kết luận "nghẽn CPU" KHÔNG ĐÚNG cho mức chất lượng cao.**
+		Phân tích video quay màn hình 53 giây (i7-4790 + GT 1030, 1920×1017, Lighting
+		Technology = Unified), đọc thẳng khối Timing của MicroProfiler:
+
+		    FRM level 15 (auto on) : CPU  9–12 ms (present 0,5–1,4) · GPU 11–15 ms · idle 4–8 ms
+		    FRM level 21 (auto off): CPU 20–25 ms (present  13–17 ) · GPU 20–26 ms · idle 0,4 ms
+
+		Chìa khoá là tách `present` ra khỏi `perform`. `perform` — việc THẬT của CPU — đứng yên
+		ở **6–7 ms suốt cả video**, không đổi một chút nào giữa hai mức. Toàn bộ phần tăng thêm
+		nằm ở `present`, tức thời gian CPU **đứng chờ GPU vẽ xong**. Đó là chữ ký của nghẽn GPU,
+		không phải nghẽn CPU. Số draw call cũng bác bỏ giả thuyết CPU: chỉ 136–331 lệnh vẽ cho
+		1,0–1,9 triệu tam giác ⇒ batch đang rất tốt, CPU không hề bận rộn.
+
+		⇒ Ở mức Auto, máy này chạy **60 fps đều với 4–8 ms dư**. Ở Manual+Max thì tụt còn
+		39–49 fps vì GPU quá tải. Post-effect VẪN nên giữ ở Performance Mode (chúng chỉ là một
+		phần của chi phí GPU, và người bật Performance Mode cần ánh sáng), nhưng đừng lấy lý do
+		"GPU còn dư" nữa — nó chỉ đúng ở mức Auto.
 	]]
 	if on then
 		table.clear(savedEffects)
