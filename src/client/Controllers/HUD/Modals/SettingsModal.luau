@@ -40,12 +40,17 @@ local UserInputService = game:GetService("UserInputService")
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local AudioMixController = require(script.Parent.Parent.Parent.Effects.AudioMixController)
 local BgmController = require(script.Parent.Parent.Parent.Effects.BgmController)
+local AutoPerformanceController = require(script.Parent.Parent.Parent.Effects.AutoPerformanceController)
 local ClientSettingsController = require(script.Parent.Parent.Parent.Effects.ClientSettingsController)
 local ModalShell = require(script.Parent.Parent.Components.ModalShell)
 local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
 local Tokens = require(script.Parent.Parent.Tokens)
 local Manager = require(script.Parent.Manager)
+local Toast = require(script.Parent.Parent.Toast)
+
+-- Đã nhắc kéo Graphics Quality của Roblox chưa (một lần mỗi phiên) — xem chỗ dùng bên dưới.
+local qualityHintShown = false
 
 local Children = Fusion.Children
 local Computed = Fusion.Computed
@@ -486,12 +491,39 @@ local function buildDisplayTab()
 				chipA = Color3.fromRGB(255, 208, 84),
 				chipB = Color3.fromRGB(226, 130, 22),
 				title = "Performance Mode",
-				hint = "Turns off shadows, post-processing and other players' effects — best for low-end devices",
+				hint = "Turns off shadows and other players' effects — lighting and colours stay untouched",
 				order = 1,
 				state = State.performanceMode,
 				onChanged = function(on)
 					State.performanceMode:set(on)
+					-- Người chơi đã tự quyết ⇒ `AutoPerformanceController` im lặng vĩnh viễn
+					-- trong phiên này. Phải gọi TRƯỚC `SetPerformanceMode` để không có khe hở
+					-- nào mà bên tự-động còn tưởng công tắc là của mình.
+					AutoPerformanceController.NotePlayerOverride()
 					ClientSettingsController.SetPerformanceMode(on)
+					--[[
+						Nhắc kéo thanh Graphics Quality của Roblox — MỘT LẦN mỗi phiên.
+
+						Vì sao phải nhờ người chơi tự kéo thay vì game tự làm: engine CHẶN, và
+						chặn thẳng chứ không phải "ghi không ăn". Đo 2026-08-22:
+						`UserGameSettings.SavedQualityLevel` → "lacking capability RobloxScript";
+						`GraphicsQualityLevel` và `GraphicsOptimizationMode` thì đến ĐỌC cũng
+						không được. Chi tiết ở khối 4 của `ClientSettingsController`.
+
+						Nên đây là nửa còn lại của Performance Mode, và chỉ người chơi bấm được.
+
+						Khuyên **Automatic** chứ không phải "kéo Quality xuống thấp nhất": user test
+						nhiều lần 2026-08-22 và thấy Automatic mượt hẳn, còn Manual + max thì giật.
+						Automatic để engine tự hạ khi không theo kịp — đúng thứ mình muốn mà không
+						bắt người chơi chịu hình ảnh xấu lúc máy đang thừa sức.
+					]]
+					if on and not qualityHintShown then
+						qualityHintShown = true
+						Toast.Show(
+							"Mượt hơn nữa: menu Roblox ⚙ → Graphics Quality kéo xuống thấp nhất",
+							"success"
+						)
+					end
 				end,
 			}),
 			makeToggle({
@@ -566,7 +598,9 @@ local function buildAudioTab()
 				function()
 					setChannel("master", State.volMaster, 1)
 					setChannel("asmr", State.volAsmr, 1)
-					setMusicLevel(1)
+					-- "Mặc định" phải là ĐÚNG cái mức lúc vào game, không phải 100%: nhạc ở
+					-- 100% (0.45 hiệu dụng) sẽ đè lên tiếng sàn ASMR — xem DEFAULT_MUSIC.
+					setMusicLevel(AudioMixController.DEFAULT_MUSIC)
 				end
 			),
 		},

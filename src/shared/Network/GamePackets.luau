@@ -267,5 +267,24 @@ return ByteNet.defineNamespace("speedEscape", function()
 				lookZ = ByteNet.float32,
 			}),
 		}),
+
+		--[[
+			Server → Client: "tải trước địa hình quanh điểm này".
+
+			`RequestStreamAroundAsync` là hàm của `Player` và CHỈ gọi được từ client, nên khi
+			server biết trước người chơi sắp xuất hiện ở đâu (hồi sinh về Lobby, revive, teleport)
+			nó phải NHỜ client tải hộ. Không có gói này thì người chơi chết ở Zone 15 phải đứng
+			chờ cả vùng Lobby tải về SAU khi nhân vật đã spawn — đúng lỗi "lâu lâu về Lobby rất
+			lâu" user báo 2026-08-21.
+
+			Bên nhận: `CoreLoop/StreamPrefetchController`.
+		]]
+		prefetchAround = ByteNet.definePacket({
+			value = ByteNet.struct({
+				x = ByteNet.float32,
+				y = ByteNet.float32,
+				z = ByteNet.float32,
+			}),
+		}),
 	}
 end)

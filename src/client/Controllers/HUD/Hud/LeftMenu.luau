@@ -39,8 +39,22 @@ local CELL_GAP = 10
 local COLUMN_W = CELL_W * 2 + CELL_GAP
 -- Chiều cao hai dòng đếm (Wins + Rebirths) nằm phía trên lưới.
 local GRID_TOP = 136
-local GRID_H = CELL_H * 4 + CELL_GAP * 3
+--[[
+	⚠️ 4 → 3 HÀNG (2026-08-21). Lưới có ĐÚNG 6 nút (Daily · Rebirth · Shop · Cosmetics ·
+	Teleport · Codes) trên 2 cột ⇒ 3 hàng. Số 4 là tàn dư từ hồi còn nút Feedback (gỡ
+	2026-07-29) và nó khai khống chiều cao cụm đúng một hàng: đo được ở Studio, khung menu
+	trái cao 662 design px trong khi nội dung thật chỉ tới 528 — thừa 134 px trống ở đáy.
+
+	Không ai nhìn ra vì khung trong suốt. Nhưng nó là con số mà cột phải soi gương theo để
+	căn giữa, nên sai ở đây là cột phải lệch xuống 67 px và trông "không đối xứng".
+]]
+local GRID_ROWS = 3
+local GRID_H = CELL_H * GRID_ROWS + CELL_GAP * (GRID_ROWS - 1)
 local COLUMN_H = GRID_TOP + GRID_H
+
+-- Cột phải soi gương theo chiều cao này (xem `Theme.RightColumnOrigin`). Ghi vào Theme thay vì
+-- chép số sang bên đó: chiều cao cụm suy ra từ cỡ ô, đổi cỡ ô là hai bên phải đổi cùng lúc.
+Theme.LEFT_MENU_HEIGHT = COLUMN_H
 
 local winsScaleGoal = Value(1)
 
@@ -107,14 +121,29 @@ end
 	≈175 px — nên KHÔNG có giá trị lề nào tránh joystick hoàn toàn. Muốn hết hẳn thì phải rút bớt
 	số hàng nút, đó là đổi thiết kế chứ không phải chỉnh responsive.
 ]]
-local ANCHOR = {
-	X = "left" :: "left",
-	Y = "top" :: "top",
-	Width = COLUMN_W,
-	Height = COLUMN_H,
-	MarginX = 28,
-	MarginY = 100,
-}
+--[[
+	Neo phải TÍNH LẠI MỖI LẦN GỌI, không được là bảng hằng nữa (2026-08-21).
+
+	`MarginY` giờ đến từ `Theme.ClusterTopMargin()` — mốc dọc DÙNG CHUNG với cột phải, để hai
+	bên màn hình luôn bắt đầu cùng một độ cao ("đối xứng", user chốt). Giá trị đó phụ thuộc
+	tỉ lệ màn hình và chiều cao topbar nên KHÔNG chốt được lúc require.
+]]
+local function anchor()
+	return {
+		X = "left" :: "left",
+		Y = "top" :: "top",
+		Width = COLUMN_W,
+		Height = COLUMN_H,
+		--[[
+			⚠️ HẰNG SỐ 28, KHÔNG phải `Theme.EdgeMargin()` (user chốt 2026-08-22).
+			Lề tự-tính chỉ áp cho HÀNG NGANG trên cùng — thử áp cho cả menu trái/cột phải một
+			vòng thì hai cụm bên bị đẩy 28 → 57 px và user bác ngay: "menu trái phải giữ nguyên
+			bản cũ". Hai cụm bên đã cân với vùng chạm ngón cái từ 2026-08-17, đừng đụng vào.
+		]]
+		MarginX = Theme.EDGE_MARGIN,
+		MarginY = Theme.ClusterTopMargin(),
+	}
+end
 
 --[[
 	VỊ TRÍ TÂM HUY HIỆU WINS trong toạ độ thiết kế 1920×1080.
@@ -125,7 +154,7 @@ local ANCHOR = {
 	Lấy đúng neo của cụm rồi cộng offset của icon cúp (đặt tại (0,3), cỡ 56×56 ⇒ tâm (28, 31)).
 ]]
 function LeftMenu.GetWinsBadgeCenter(): Vector2
-	local origin = Responsive.AnchorPos(ANCHOR)
+	local origin = Responsive.AnchorPos(anchor())
 	return Vector2.new(origin.X.Offset + 28, origin.Y.Offset + 31)
 end
 
@@ -204,7 +233,9 @@ function LeftMenu.Build()
 	return New("Frame")({
 		BackgroundTransparency = 1,
 		ZIndex = 10,
-		Position = Responsive.Anchor(ANCHOR),
+		Position = Computed(function()
+			return Responsive.AnchorPos(anchor())
+		end),
 		Size = UDim2.fromOffset(COLUMN_W, COLUMN_H),
 		[Children] = {
 			makeWinsDisplay(),

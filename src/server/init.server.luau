@@ -8,6 +8,27 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServiceLocator =
 	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("ServiceLocator"))
 
+--[[
+	⚠️ PHẢI require TRƯỚC MỌI DỊCH VỤ — đây là chỗ ByteNet khởi động tiến trình server.
+
+	Lỗi đã dính (Error Report QA 2026-08-21, 2 lần, ngay lúc server vừa lên):
+	    bufferWriter:148 attempt to index nil with 'size'
+	    ← ProgressionService.SendSnapshot ← FriendService.updateFriendsCount
+
+	`nil` đó là `perPlayerReliable[player]` — kênh gửi riêng của một người chơi. ByteNet tạo
+	kênh trong `playerAdded`, mà `playerAdded` chỉ được nối vào `Players.PlayerAdded` lúc tiến
+	trình server của ByteNet khởi động (`process/server.luau`). Nếu tiến trình đó khởi động
+	muộn — nó khởi động ở lần require namespace ĐẦU TIÊN, tức là giữa vòng nạp dịch vụ — thì
+	người chơi vào đúng khe hở ấy KHÔNG có kênh, và mọi `sendTo` cho họ ném lỗi suốt phiên.
+
+	Kéo require lên trước vòng nạp là đóng khe hở xuống mức nhỏ nhất có thể từ phía game (đoạn
+	còn lại nằm trong chính ByteNet: giữa `Players:GetPlayers()` và `:Connect`). Đổi lại chỉ
+	tốn đúng một lần require sớm hơn vài mili giây.
+
+	KHÔNG được gỡ dòng này vì "không ai dùng biến đó" — tác dụng của nó là SIDE EFFECT.
+]]
+require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Network"):WaitForChild("GamePackets"))
+
 local ServicesFolder = script:WaitForChild("Services")
 
 print("--- [SERVER LOADING] Bắt đầu nạp các dịch vụ trên Server... ---")

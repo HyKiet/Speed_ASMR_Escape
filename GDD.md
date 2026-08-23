@@ -71,7 +71,15 @@ $$\text{Gain Per Tick} = \text{BaseStep} \times \text{Bucket}_{\text{Premium}} \
 4. **Xô Vận Hành (Live-Ops Boosts):** Buff tạm thời nhân liên hoàn.  
    $$\text{Bucket}_{\text{LiveOps}} = \text{PlaytimeBoost} \times \text{FriendsBoost} \times \text{ServerBoost}$$
    - *Playtime Boost:* Tăng dần theo thời gian online (Tối đa x4 ở phút 60).
-   - *Friends Boost:* +10% mỗi bạn bè trong server (Tối đa x1.5).
+   - *Friends Boost:* bảng DỒN VỀ ĐẦU (tính lại 2026-08-21) — 1 bạn = **x1.15 Speed + x1.10 Wins**,
+     2 = x1.25/x1.15, 3 = x1.35/x1.20, 4 = x1.45/x1.23, 5 = **x1.5 / x1.25** (trần).
+     Trần giữ nguyên như bản +10%/bạn cũ; chỉ đổi hình dạng đường cong. Lý do: rủ được 5 bạn
+     vào CÙNG một server gần như không xảy ra, nên bản tuyến tính dồn hết giá trị vào một mốc
+     không ai chạm tới, còn người bạn ĐẦU TIÊN — người duy nhất thật sự rủ được — chỉ đáng
+     x1.1. Xem khối lý do trong `FriendService`.
+     ⚠️ Trước 2026-08-21 phần **Wins hoàn toàn không được cài đặt**: HUD hứa x1.25 Wins mà
+     `AwardWins` chưa bao giờ đọc tới `FriendService`. Nay đã nối, phạm vi hẹp `stage`/`stage_x2`
+     như VIP / x2 Wins / Server Boost.
    - *Server Boost:* Mua bằng Robux toàn máy chủ (x2 Speed / x2 Wins).
 
 ---
@@ -216,11 +224,52 @@ Tại Bệ dừng chân, người chơi có **4 lựa chọn chiến lược**:
 | **Double Speed (x2)** | 3 R$ | `1900262644` | Nhân đôi tốc độ cày Speed cơ bản |
 | **Quad Speed (x4)** | 9 R$ | `1900160603` | Nhân 4 tốc độ cày Speed |
 | **Octa Speed (x8)** | 27 R$ | `1898810606` | Nhân 8 tốc độ cày Speed |
+| **Double Wins (x2)** | 399 R$ | `1940593812` | Nhân đôi Wins mỗi lần vượt Stage. Lý do giá & phạm vi: mục 7.A2 |
 | **VIP Membership** | 399 R$ | `1899686706` | x1.5 Speed · x1.25 Wins/stage · VIP Gold Trail x6 + Aura x6 · vé quay 8 phút (trần 5) · teleport miễn phí · tag `[VIP]`. Chi tiết & lý do cân bằng: mục 7.A1 |
 | **Auto-Rebirth** | 99 R$ | `1899434608` | Tự động Trùng sinh ngay khi đủ Level (có công tắc ON/OFF trong Rebirth modal) |
 | **Infinite Revives** | 249 R$ | `1930442093` | Hồi sinh tại chỗ **không giới hạn số lần** khi ngã Obby (thay cho Revive 19 R$/lần) |
 | **Extra Spin** | 149 R$ | *(In Dev)* | Quay Roulette 2 lượt cùng lúc, chọn ô tốt nhất |
 | **Infinite Revives** | 249 R$ | `1930442093` | Hồi sinh tại chỗ không giới hạn số lần khi ngã Obby |
+
+### A2. Double Wins (x2) — 399 R$ (2026-08-21, **ĐÃ TẠO & BẬT** — pass `1940593812`)
+
+> Trạng thái: **đang bán**. Pass `1940593812` (managed pricing bật), nút cầu vồng bảy sắc ở
+> cột phải HUD, server nhân đúng phạm vi `stage`/`stage_x2`.
+>
+> Cơ chế tắt an toàn vẫn còn: đặt `Config/Economy/Gamepass.DoubleWins = 0` thì nút TỰ ẨN và
+> server không nhân gì — dùng khi cần gỡ pass khỏi bán mà không phải đụng vào code.
+
+#### Vì sao 399 R$
+
+Món này cạnh tranh trực tiếp với **`DoubleWinCollectionPad` (49 R$ / lượt)**, nên giá phải trả
+lời được câu "mua bao nhiêu lần thì nên mua đứt":
+
+| Giá pass | Hoà vốn sau | Hệ quả |
+| :--- | :---: | :--- |
+| 249 R$ | 5 lượt | Gần như xoá sổ doanh thu pad, và làm VIP 399 R$ (chỉ x1.25 Wins) trông hớ |
+| **399 R$** | **~8 lượt** | Người chơi thường vẫn dùng pad; người cày nhiều mới mua đứt. Pad giữ được doanh thu |
+| 699 R$ | ~14 lượt | An toàn cho pad nhưng ít người mua — món whale |
+
+399 cũng **bằng đúng VIP Membership**, mà VIP chỉ cho x1.25 Wins trong một gói 7 quyền lợi ⇒
+hai món không dẫm chân nhau: ai chỉ cần Wins thì mua pass này, ai cần cosmetic + tiện nghi thì
+mua VIP. Đây là lần đầu shop có một món bán THUẦN bằng Wins.
+
+#### Phạm vi — y hệt VIP, và vì y hệt lý do
+
+Chỉ nhân ở `reason == "stage"` / `"stage_x2"` (`ProgressionService.AwardWins`). Đây là pass
+MẠNH NHẤT trong nhóm nhân Wins (x2, không phải x1.25) nên phạm vi càng phải chặt:
+
+- Nhân cả `product` ⇒ Ultra Wins Pack 1.299 R$ tự nhân đôi cho người có pass — **tự phá giá
+  món đắt nhất shop bằng một món rẻ hơn ba lần**.
+- Nhân `daily` / `roulette` / `code` ⇒ phá lại phép siết bảng điểm danh xuống 1.177 Wins/tuần
+  (mục 8.A1).
+
+#### Cộng dồn: có, thành x4
+
+`stage_x2` KHÔNG bị loại trừ, nên **có pass + dậm `DoubleWinCollectionPad` = x4 Wins**. Đây là
+ý đồ, không phải sơ suất: nếu chặn, pad 49 R$ trở thành nút chết với đúng nhóm khách đã chi
+nhiều nhất. Cộng dồn tiếp với group chest (+10%), VIP (x1.25), Server Boost và event — cùng
+cách mọi hệ số Wins khác đang cộng dồn.
 
 ### A1. VIP Membership — Thiết kế lại (2026-08-12, **ĐÃ TRIỂN KHAI**)
 

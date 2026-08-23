@@ -69,16 +69,20 @@ Theme.PRESS_SCALE = Tokens.PRESS_SCALE
 	          ├─ UIScale  ← phóng quanh TÂM ⇒ đều 4 góc
 	          └─ Children (mọi thứ nhìn thấy)
 ]]
-function Theme.MakeZoomHost(props: {
-	Size: UDim2,
-	Position: UDim2?,
-	AnchorPoint: Vector2?,
-	LayoutOrder: number?,
-	ZIndex: number?,
-	Visible: any?,
-	Zoom: { Hovered: any, Scale: number?, Pressed: any? },
-	Children: { any },
-})
+function Theme.MakeZoomHost(
+	props: {
+		Size: UDim2,
+		-- `any?` chứ không phải `UDim2?`: chồng dọc bên phải truyền vào một `Computed` (vị trí ô
+		-- đổi khi ô khác ẩn/hiện) — xem `Theme.RightColumnLayout`.
+		Position: any?,
+		AnchorPoint: Vector2?,
+		LayoutOrder: number?,
+		ZIndex: number?,
+		Visible: any?,
+		Zoom: { Hovered: any, Scale: number?, Pressed: any? },
+		Children: { any },
+	}
+)
 	local visualChildren: { any } = { Theme.HoverZoom(props.Zoom.Hovered, props.Zoom.Scale, props.Zoom.Pressed) }
 	for _, child in props.Children do
 		table.insert(visualChildren, child)
@@ -276,6 +280,58 @@ Theme.SPEED_PASS_TIERS = {
 		colorA = Color3.fromRGB(255, 92, 78),
 		colorB = Color3.fromRGB(178, 10, 40),
 	}, -- đỏ
+}
+
+--[[
+	NÚT x2 WINS — pass đơn, không có bậc (user chốt 2026-08-21).
+
+	Khác `SPEED_PASS_TIERS` ở chỗ đó: speed có ba bậc nên nút promo xoay vòng qua bậc rẻ nhất
+	chưa sở hữu; Wins chỉ có MỘT pass nên nút chỉ có hai trạng thái — chưa mua thì hiện, mua
+	rồi thì ẩn.
+
+	Màu XANH LÁ vàng: cột phải đang có cam/tím/đỏ (speed) và xanh dương (Custom Speed). Xanh lá
+	là màu duy nhất còn trống, và nó cũng là màu của cúp Wins trên badge góc trái nên đọc ra
+	ngay là "món này về Wins" mà không cần đọc chữ.
+
+	⚠️ `passId` lấy từ `Constants.GAMEPASS_IDS.DoubleWins` — hiện là 0 (chưa tạo trên Creator
+	Dashboard). Nút tự ẩn khi id = 0; xem khối lý do giá 399 R$ trong `Config/Economy/Gamepass`.
+]]
+--[[
+	══ NÚT x2 WINS — TÍM HOÀNG GIA → HỒNG SEN (user chốt 2026-08-22) ════════════════════════
+
+	⚠️ BẢN CẦU VỒNG BẢY SẮC ĐÃ BỊ BÁC — ĐỪNG DỰNG LẠI.
+	Thử hai vòng (2026-08-21): bản bão hoà cao thì chặng chàm/tím tối tới mức chữ trắng chìm;
+	bản pastel "tươi sáng hơn" thì bảy chặng nhạt đều nhau nên mất luôn tương phản trong-nút và
+	nhìn ra vệt xà phòng. Kết luận: bảy chặng trên một ô rộng 214 px là quá nhiều màu — mỗi
+	chặng chỉ được ~30 px, mắt không đọc ra "cầu vồng", chỉ đọc ra "loang lổ".
+
+	Bản này đi ngược lại: BA chặng, MỘT dải màu liền mạch tím → hồng.
+	  • Vì sao tím-hồng chứ không phải vàng/lục: cột phải đã có cam (x2 Speed) ngay trên và xanh
+	    dương (Custom Speed) ngay dưới. Tím-hồng là khoảng trống duy nhất còn lại trên vòng màu,
+	    nên nút này nổi lên mà không đánh nhau với hai hàng xóm. Nó cũng là tông "cao cấp" quen
+	    thuộc trong simulator — đúng vai món đắt nhất cột.
+	  • Vì sao icon cúp VÀNG hợp: vàng là màu bổ túc của tím, nên cúp bật hẳn lên khỏi nền thay
+	    vì chìm như khi nền có sẵn chặng vàng (bản cầu vồng cũ).
+	  • Rotation 20° chứ không phải 0: hơi chéo cho ra vệt sáng kiểu satin trên một ô thấp, còn
+	    0 (ngang thuần) nhìn phẳng như thanh tiến trình.
+	  • Cả ba chặng giữ độ sáng ≥ 60% và không kênh nào < 96 ⇒ chữ trắng viền đen đọc được đều.
+	  • KHÔNG chạy hoạt ảnh trượt gradient. Nó đẹp nhưng là một phép ghi thuộc tính mỗi frame
+	    trên HUD, mà máy yếu (Redmi A2+) đang nghẽn CPU.
+
+	`colorA` giữ lại làm màu nền phẳng (frame đầu, trước khi UIGradient vẽ) và cho chỗ nào cần
+	MỘT màu đại diện.
+]]
+Theme.WINS_PASS = {
+	id = "wins_x2",
+	label = "x2 Wins",
+	priceRobux = 399,
+	colorA = Color3.fromRGB(178, 96, 255),
+	gradient = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(150, 84, 255)), -- tím hoàng gia
+		ColorSequenceKeypoint.new(0.55, Color3.fromRGB(214, 96, 246)), -- tím hồng
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 118, 190)), -- hồng sen
+	}),
+	gradientRotation = 20,
 }
 
 Theme.SHOP_CATALOG = {
@@ -1171,6 +1227,15 @@ export type SurfaceProps = {
 	BorderColor: any?,
 	Color: any?,
 	ColorB: any?,
+	--[[
+		Dải màu NHIỀU CHẶNG, thay cho cặp `Color`/`ColorB` hai chặng.
+
+		Có mặt vì cặp hai màu không diễn tả nổi cầu vồng: `ColorSequence.new(a, b)` chỉ nhận
+		đúng hai keypoint. Truyền `Gradient` thì nó THẮNG `ColorB` (nếu lỡ truyền cả hai), còn
+		`Color` vẫn được dùng làm màu nền phẳng phía dưới cho frame đầu tiên trước khi gradient
+		vẽ đè lên — nên vẫn nên đặt `Color` bằng một màu trong dải.
+	]]
+	Gradient: ColorSequence?,
 	-- Độ trong của phần MÀU (không phải của viền). Cần cho mấy ô nền tối mờ như đồng hồ đếm
 	-- ngược Starter Pack hay bảng chú thích Playtime.
 	FillTransparency: number?,
@@ -1340,7 +1405,15 @@ function Theme.MakeSurface(props: SurfaceProps)
 	local fillChildren: { any } = {
 		Theme.MakeCorner(radius),
 	}
-	if props.ColorB ~= nil then
+	if props.Gradient ~= nil then
+		table.insert(
+			fillChildren,
+			New("UIGradient")({
+				Color = props.Gradient,
+				Rotation = props.GradientRotation or 90,
+			})
+		)
+	elseif props.ColorB ~= nil then
 		table.insert(fillChildren, Theme.MakeGradientDynamic(props.Color, props.ColorB, props.GradientRotation))
 	end
 	if props.Studs ~= false then
@@ -2063,73 +2136,363 @@ end
 	Giờ tất cả ăn chung MỘT bảng slot: cùng một mép phải, cùng bề rộng cột, chỉ khác `y`.
 	Đổi thứ tự hay chiều cao một món = sửa đúng một dòng ở đây.
 
-	THỨ TỰ (user chốt 2026-08-15):
-	    Starter Pack → Spin → Playtime Boost → Custom Speed → x2 Speed
-	Ba món ĐỒNG HỒ nằm liền nhau ở trên (Starter Pack đếm lùi 48h, Spin đếm lùi vé free,
-	Playtime đếm lên) — chúng là cùng một loại thông tin nên đứng chung một cụm, mắt đọc một
-	lần là xong. Hai món BẤM ĐỂ MUA/CHỈNH (Custom Speed, x2 Speed) tách xuống dưới thành cụm
-	thứ hai, và vì nằm thấp hơn nên ngón cái trên mobile với tới dễ nhất.
+	THỨ TỰ (user chốt 2026-08-21 — thay bản một-chồng-5-ô của 2026-08-15):
+	    HÀNG NGANG trên cùng : Starter Pack → Spin → Playtime Boost
+	    CỘT DỌC bên dưới     : x2/x4/x8 Speed → x2 Wins → Custom Speed
 
-	Vì sao MỘT CHỒNG lại đúng chuẩn: trên mobile ngón cái phải với tới dải này dễ nhất, và mắt
-	quét một cột thẳng nhanh hơn quét bốn cụm rải rác — đó là lý do gần như mọi simulator lớn
-	đều xếp cột phải theo kiểu này.
+	Ba món ĐỒNG HỒ vẫn đứng chung một cụm (Starter Pack đếm lùi 48h, Spin đếm lùi vé free,
+	Playtime đếm lên) — cùng một loại thông tin, mắt đọc một lần là xong — nhưng nằm NGANG ở
+	mép trên vì chúng là "ngó rồi bấm", không phải thứ chỉnh liên tục. Ba ô ĐIỀU KHIỂN/MUA
+	xuống dưới thành cột dọc, chỗ ngón cái phải với tới dễ nhất.
 
-	⚠️ Số ở đây là ĐỈNH của ô, tính từ đỉnh chồng. Muốn đổi thứ tự thì đổi ĐÚNG bảng này, đừng
-	đổi thứ tự các khối trong `RightPanel.Build` — vị trí đọc từ bảng, không từ thứ tự khai báo.
-	Chiều cao thực tế từng ô: starterPack 186, spin 130, playtime 110, customSpeed 118,
-	speedPromo 70. Khe hở giữa các ô ≈ 10–14px.
+	Vì sao KHÔNG còn là một chồng 5 ô: chồng cũ cao 654 design px và cái đuôi của nó đè lên nút
+	nhảy mobile (đo 801×392: nút nhảy y 244..314, ô x2 Speed 260..283) — vấn đề đã ghi ở
+	lề trên của cụm phải, với kết luận "phải bớt một ô khỏi cột". Tách hai tầng đưa đáy
+	cụm về 510 design px và giải phóng hẳn góc phải-dưới cho nút nhảy + nút SLIDE mới.
+
+	⚠️ Số trong `TOP_ROW`/`RIGHT_STACK` là MÉP của ô tính từ mốc của tầng đó. Muốn đổi thứ tự
+	thì đổi ĐÚNG hai bảng ấy, đừng đổi thứ tự các khối trong `RightPanel.Build` /
+	`TopRightRow.Build` — vị trí đọc từ bảng, không từ thứ tự khai báo.
+	Chiều cao thực tế: starterPack 186, spin 130, playtime 110, speedPromo 70, winsPromo 70,
+	customSpeed 118.
 ]]
-Theme.RIGHT_COLUMN_WIDTH = 286
--- Lề tính từ mép PHẢI của màn hình (bản vẽ: x = 1920 − 20 − 286 = 1614).
-Theme.RIGHT_COLUMN_MARGIN = 20
+-- Bề rộng CỘT DỌC = đúng bề rộng của ô rộng nhất trong cột (214). Trước đây là 286 và mỗi ô
+-- phải tự cộng `RIGHT_COLUMN_WIDTH - 214` để căn phải; giờ cột ôm sát nội dung nên offset đó
+-- biến mất. Vị trí ngang trên màn hình KHÔNG đổi: 286 − 214 = 72 vốn đã bị cộng lại ở từng ô.
+Theme.RIGHT_COLUMN_WIDTH = 214
+-- Chiều cao chồng dọc KHÔNG còn là hằng số: nó phụ thuộc ô nào đang hiện. Xem
+-- `Theme.RightColumnLayout` — đủ ba ô thì ra đúng 312 như bảng cũ.
 --[[
-	Lề TRÊN, hạ 20 → 10 ngày 2026-08-17 (user: "vướng nút nhảy").
+	══ MỘT CON SỐ LỀ DUY NHẤT CHO CẢ BA CỤM (user chốt 2026-08-21: "đối xứng") ══════════════
 
-	Cột phải vốn ĐÃ neo sát mép trên nên không còn chỗ kéo lên — cách duy nhất để nhấc ô cuối
-	(nút x2 Speed) khỏi nút nhảy là rút ngắn chính cái chồng. Hạ lề trên 10 và siết ba khe hở
-	trong `RIGHT_STACK` là tất cả những gì lấy được mà không đụng tới thiết kế của các ô.
+	Menu trái, hàng ngang trên, cột phải — cả ba dùng ĐÚNG hai hằng số dưới đây. Trước hôm nay
+	menu trái là 28 còn cột phải là 12, nên hai bên màn hình lệch nhau 16 design px và mắt đọc
+	ra ngay là "không đối xứng".
 
-	⚠️ Đo ở 801×392: nút nhảy chiếm y 244..314 px thật, ô x2 Speed nằm 260..283 — hai thứ này
-	CHỒNG NHAU và phần rút ngắn ở đây chỉ kéo được ~7 px. Muốn tách hẳn thì phải bớt một ô khỏi
-	cột (hoặc đổi thứ tự để ô cuối là ô ít bấm nhất) — đó là quyết định thiết kế, không phải
-	chuyện của hệ responsive.
+	28 (lấy theo menu trái) chứ không phải 12: 12 là con số tôi siết hôm nay để cụm phải ôm sát
+	góc, nhưng khi nó phải khớp với bên trái thì bên trái mới là mốc — menu trái đã được cân
+	với vùng chạm ngón cái từ 2026-08-17.
+
+	Lề NGANG tính từ `Screen().SafeRight` / `Screen().Left` (đã trừ tai thỏ). Lề DỌC tính từ
+	`Screen().Top` (đã cộng topbar). Hai thứ này phải tách riêng — xem đầu `Responsive`.
 ]]
-Theme.RIGHT_COLUMN_TOP_MARGIN = 10
+Theme.EDGE_MARGIN = 28
 
--- Khoảng cách từ ĐỈNH chồng tới đỉnh từng ô (design px).
--- 2026-08-17: siết ba khe 10 → 6 để ô cuối (x2 Speed) nhấc lên khỏi nút nhảy. Cộng với lề trên
--- hạ 20 → 10, cả chồng ngắn lại 22 design px.
-Theme.RIGHT_STACK = {
-	starterPack = 0, -- cao 186
-	spin = 192, -- cao 130
-	playtime = 328, -- cao 110
-	customSpeed = 444, -- cao 118 (kết thúc ở 562)
-	-- ⚠️ Khe trước ô này phải ≥ 22px: badge giá Robux của nút x2 nhô LÊN 22px trên mép nút
-	-- (xem `MakePriceLabel` trong RightPanel). Hẹp hơn là badge đè lên đáy panel Custom Speed —
-	-- hai ô này cùng rộng 214 và cùng mép trái nên chồng nhau rất rõ.
-	speedPromo = 584, -- cao 70 (khe 22 giữ nguyên: 562 + 22 = 584)
+--[[
+	══ LỀ NGANG TỰ TÍNH — THEO TỈ LỆ MÀN HÌNH, TAI THỎ ĐƯỢC HẤP THỤ ═════════════════════════
+
+	User hỏi thẳng (2026-08-22): "tại sao không code tự động căn lề sao cho hợp lý được".
+	Câu trả lời: hằng số `EDGE_MARGIN` = 28 design px BAO GIỜ CŨNG cho ra cùng MỘT TỈ LỆ trên
+	mọi máy (28 × scale px thật ÷ bề rộng thật = luôn 1,46%) — nghe thì "đã tự động" rồi.
+	Nhưng nó KHÔNG phải thứ mắt thấy, vì có thêm một số hạng thứ hai không đi qua `scale`:
+
+	    khoảng cách THẬT tới mép phải = TAI THỎ (px thật, phần cứng) + 28 × scale
+
+	Đo thật 2026-08-22:
+	    PC   1919×1080, tai thỏ   0 px  ⇒  0 + 28  =  28 px thật  (1,5% bề rộng)
+	    iPad 1180×820,  tai thỏ   0 px  ⇒  0 + 17  =  17 px thật  (1,4%)  ← "sát cạnh quá"
+	    iPhone 844×390, tai thỏ ~44 px  ⇒ 44 + 10  =  54 px thật  (6,4%)  ← "rất đẹp"
+
+	Tức máy CÓ tai thỏ được tặng thêm một cái lề rộng mà máy không có thì không — và cái lề
+	tặng thêm ấy mới đúng là thứ user khen. Đó là lý do "cùng một con số" vẫn ra ba kiểu.
+
+	Cách chữa: lấy MỐC là tỉ lệ bề rộng màn hình, rồi HẤP THỤ tai thỏ vào trong mốc đó thay vì
+	cộng dồn lên trên nó:
+
+	    lề mong muốn = max(EDGE_MARGIN, RATIO × bề rộng)
+	    lề vẽ ra     = max(0, lề mong muốn − tai thỏ)
+	    ⇒ khoảng cách tới mép VẬT LÝ = max(lề mong muốn, tai thỏ) — bằng nhau trên MỌI máy.
+
+	`RATIO = 0.03` chọn để bám ca điện thoại mà user khen: 3% × 1919 = 58 px trên PC, 35 px
+	trên iPad, còn iPhone thì tai thỏ (44) đã lớn hơn 3% × 844 = 25 nên nó GIỮ NGUYÊN y hệt
+	hiện tại. Đúng yêu cầu "lấy vị trí trên mobile làm chuẩn".
+
+	⚠️ Phải là max chứ không phải cộng. Cộng thì iPhone thành 44 + 25 = 69 px — chính là kiểu
+	lệch mà cả khối này đang đi chữa, chỉ đổi chiều.
+]]
+Theme.EDGE_MARGIN_RATIO = 0.03
+
+function Theme.EdgeMargin(): number
+	local screen = Responsive.Screen()
+	-- Bề rộng bị tai thỏ chiếm, quy về design px. Trên máy không có tai thỏ = 0.
+	local notch = math.max(0, screen.Right - screen.SafeRight)
+	local want = math.max(Theme.EDGE_MARGIN, screen.Width * Theme.EDGE_MARGIN_RATIO)
+	return math.max(0, want - notch)
+end
+
+--[[
+	Lề TRÊN của hai cụm bám mép (menu trái và cột phải).
+
+	100 là số của menu trái, chốt 2026-08-17 vì lý do rất cụ thể: căn giữa theo chiều dọc thì
+	hai hàng nút cuối đè lên vòng joystick của mobile (đo 801×392: joystick y 241..315, cụm
+	căn giữa trải 126..332). Cột phải giờ dùng chung số này để hai bên khởi đầu cùng một mốc.
+]]
+Theme.CLUSTER_TOP_MARGIN = 100
+-- Khe tối thiểu giữa đáy HÀNG NGANG và đỉnh hai cụm bám mép.
+Theme.TOP_ROW_CLEARANCE = 16
+-- Alias cũ — không còn chỗ nào đọc, giữ để khỏi vỡ script ngoài. Cụm mới dùng .
+Theme.RIGHT_COLUMN_MARGIN = Theme.EDGE_MARGIN
+
+--[[
+	══ GÓC PHẢI-TRÊN GIỜ CÓ HAI TẦNG (user chốt 2026-08-21) ═══════════════════════════════
+
+	Trước đây cột phải là MỘT chồng dọc 5 ô cao 654 design px, và cái đuôi của nó đè lên nút
+	nhảy của mobile — vấn đề đã ghi ngay ở lề trên cụm phải bên trên, kèm kết
+	luận "muốn tách hẳn thì phải bớt một ô khỏi cột, đó là quyết định thiết kế". Nay user đã
+	ra quyết định đó, và còn thêm nút SLIDE mobile (`Movement/MobileSlideButton`) vào đúng
+	vùng ấy nên không thể trì hoãn thêm.
+
+	Tầng 1 — HÀNG NGANG sát mép trên (`TOP_ROW`): StarterPack · Spin · Playtime.
+	          Ba món này đều là "ngó rồi bấm", không phải thứ điều chỉnh liên tục.
+	Tầng 2 — CỘT DỌC bên dưới (`RIGHT_STACK`): x2/x4/x8 Speed · x2 Wins · Custom Speed.
+	          Ba ô ĐIỀU KHIỂN, nằm trong tầm ngón cái phải.
+
+	Kết quả: đáy cụm phải từ 654 → 510 design px, hết chồng lên nút nhảy lẫn nút SLIDE.
+]]
+
+-- Hàng ngang: offset X tính từ mép TRÁI của hàng. Chiều cao hàng = ô cao nhất (StarterPack 186).
+-- Ba ô CĂN TRÊN cùng một mốc y để ba cái icon thẳng hàng mắt; phần thân thấp hơn của Spin
+-- (130) và Playtime (110) để thừa xuống dưới, không sao vì bên dưới là khe hở.
+--[[
+	⚠️ KHE HỞ Ở ĐÂY PHẢI TÍNH THEO HÀO QUANG, KHÔNG THEO Ô.
+
+	Đo lần đầu ở 1304×801 với khe 8px: hào quang của StarterPack đè lên bánh xe Spin. Lý do là
+	`MakeSunburst` của thẻ đó rộng `IMAGE_SIZE + 120 = 240` nhưng tâm đặt ở giữa ẢNH (x = 66),
+	nên nó trải từ −54 tới 186 — tức tràn 54px ra ngoài ô 132 về mỗi bên. Ô kế tiếp phải bắt
+	đầu SAU mốc 186 đó, không phải sau mốc 132.
+
+	Spin cũng có badge số vé nhô ra ngoài mép phải (tâm x = 102, bán kính 19 ⇒ tới 121).
+
+	Khe hở thật: StarterPack→Spin 32 · Spin→Playtime 24.
+]]
+Theme.TOP_ROW = {
+	starterPack = 0, -- rộng 132 (hào quang trải −54..186)
+	spin = 164, -- rộng 120 (badge vé tới 121)
+	playtime = 304, -- rộng 120 (kết thúc ở 424)
+}
+Theme.TOP_ROW_WIDTH = 424
+Theme.TOP_ROW_HEIGHT = 186
+
+--[[
+	══ CHỒNG DỌC GIỜ TỰ SẮP XẾP + NEO GIỮA MÀN HÌNH (user chốt 2026-08-21, chiều) ═══════════
+
+	Ba ô trong cột — x2/x4/x8 Speed · x2 Wins · Custom Speed — KHÔNG phải lúc nào cũng hiện
+	đủ ba: nút speed biến mất khi người chơi đã mua cả ba bậc, nút Wins biến mất ngay khi mua
+	(và cả khi pass chưa được tạo trên Dashboard). Bảng toạ độ CỐ ĐỊNH cũ để lại đúng một cái
+	LỖ ở chỗ ô vừa biến mất — đo được ngay trong phiên 2026-08-21: pass Wins id = 0 nên cột
+	hở 55 px thật giữa x2 Speed và Custom Speed, nhìn ra ngay là HUD hỏng chứ không ai đọc
+	thành "ô này ẩn".
+
+	Vì vậy toạ độ giờ được TÍNH, không phải tra bảng: `RightColumnLayout` nhận vào ô nào đang
+	hiện rồi xếp chồng khít nhau và trả về cả chiều cao thật của chồng. `RightPanel` đưa chiều
+	cao đó cho `RightColumnOrigin` để neo — nên mua một pass là cả cụm tự co lại và tự căn lại
+	giữa màn hình, không còn lỗ.
+
+	VÌ SAO NEO GIỮA (thay cho "ngay dưới hàng ngang"): chồng cao thay đổi theo số ô hiện, mà
+	neo mép trên thì mọi thay đổi dồn hết xuống ĐÁY — tức là về phía nút nhảy + nút SLIDE của
+	mobile, đúng chỗ vừa mới dọn xong. Neo GIỮA chia đôi phần co lại cho cả hai đầu, và còn
+	đối xứng với cụm menu trái (cũng neo giữa) nên hai bên màn hình cân nhau.
+
+	⚠️ KHE TRƯỚC MỖI Ô CÓ BADGE PHẢI ≥ 22: badge giá Robux nhô LÊN 22px trên mép nút (xem
+	`MakePriceLabel` trong RightPanel). Ô đầu chồng cũng cần 22 đó, nếu không badge bị cắt bởi
+	mép trên của Frame gốc. Ô KHÔNG có badge chỉ cần khe 10.
+
+	Kết quả trùng khít bảng cũ khi hiện đủ ba ô: 22 · 114 · 194, tổng cao 312.
+]]
+Theme.RIGHT_STACK_SLOTS = {
+	{ name = "speedPromo", height = 70, badge = true },
+	{ name = "winsPromo", height = 70, badge = true },
+	{ name = "customSpeed", height = 118, badge = false },
+}
+-- Nới 22 → 32 và 10 → 20 ngày 2026-08-21 (user: "tăng khoảng cách giữa HUD"). Sàn vẫn là 22
+-- vì badge giá Robux nhô LÊN 22px trên mép nút; 32 cho badge thở thêm 10px.
+Theme.RIGHT_STACK_BADGE_GAP = 32
+Theme.RIGHT_STACK_GAP = 20
+
+export type RightStackLayout = {
+	Height: number,
+	Y: { [string]: number },
 }
 
--- Vị trí góc TRÁI-TRÊN của một ô trong chồng. Mọi ô dùng `AnchorPoint (0, 0)` và tự căn phải
--- bên trong bề rộng cột, nên ô hẹp hơn cột vẫn thẳng mép phải.
-function Theme.RightSlotPosition(slot: string): UDim2
-	--[[
-		Bám GÓC PHẢI-TRÊN màn hình, cách mép 20 design px mỗi chiều.
+--[[
+	Xếp chồng dọc theo ĐÚNG những ô đang hiện.
 
-		`Responsive.Screen().Top` đã cộng sẵn chiều cao topbar Roblox, nên trên PC (topbar 36) ra
-		đúng y = 56 như bản vẽ, còn trên điện thoại (topbar 58) cột tự tụt xuống dưới topbar thay
-		vì chui vào dưới nó. Đây chính là lý do lề và inset phải TÁCH RIÊNG: lề co theo `scale`,
-		còn topbar là vật lý nên không co.
-	]]
-	local origin = Responsive.AnchorPos({
-		X = "right",
-		Y = "top",
-		Width = Theme.RIGHT_COLUMN_WIDTH,
-		Height = 688,
-		MarginX = Theme.RIGHT_COLUMN_MARGIN,
-		MarginY = Theme.RIGHT_COLUMN_TOP_MARGIN,
-	})
-	return UDim2.fromOffset(origin.X.Offset, origin.Y.Offset + (Theme.RIGHT_STACK[slot] or 0))
+	`visible[slot] == false` ⇒ ô đó không chiếm chỗ. Toạ độ trả về cho ô ẩn vẫn hợp lệ (bằng
+	vị trí con trỏ hiện tại) để `RightPanel` không phải xử lý `nil` — ô đang `Visible = false`
+	thì nằm ở đâu cũng không ai thấy.
+]]
+function Theme.RightColumnLayout(visible: { [string]: boolean }): RightStackLayout
+	local y: { [string]: number } = {}
+	local cursor = 0
+	local first = true
+	for _, slot in Theme.RIGHT_STACK_SLOTS do
+		if visible[slot.name] then
+			if slot.badge then
+				cursor += Theme.RIGHT_STACK_BADGE_GAP
+			elseif not first then
+				cursor += Theme.RIGHT_STACK_GAP
+			end
+			first = false
+			y[slot.name] = cursor
+			cursor += slot.height
+		else
+			y[slot.name] = cursor
+		end
+	end
+	return { Height = cursor, Y = y }
+end
+
+-- Khoảng cách giữa hàng ngang và chồng dọc. GIỮ LẠI vì `TutorialController`/spotlight vẫn đo
+-- theo nó; bản thân chồng dọc không còn dùng số này từ khi neo giữa màn hình.
+Theme.TOP_ROW_GAP = 12
+
+--[[
+	══ HÀNG NGANG ĐỨNG CÙNG DẢI VỚI TOPBAR (user chốt 2026-08-21, lần 2) ════════════════════
+
+	Yêu cầu: "vị trí nó phải tương tự như TopbarPlus". Tức là hàng này KHÔNG nằm dưới topbar
+	nữa — nó nằm TRONG dải topbar, y như mấy icon Ẩn-UI / Cài-đặt ở góc trái.
+
+	Vì vậy đây là cụm DUY NHẤT neo vào `Screen().TopEdge` (mép trên vật lý) chứ không phải
+	`Screen().Top` (đã né topbar). Mọi cụm khác vẫn phải dùng `Top` — đừng chép công thức này
+	sang chỗ khác, nó sẽ chui xuống dưới topbar.
+
+	Căn giữa phần ICON trong dải topbar:
+	    band   = Top − TopEdge = chiều cao topbar quy về design px
+	    offset = max(0, (band − ICON_HEIGHT) / 2)
+
+	MỘT công thức cho mọi máy (bản hai-chế-độ đã bị bác — xem `TopRowOriginY`):
+	  • Điện thoại — band ~151 design px (58 px thật ÷ scale 0.383), icon 100 ⇒ offset 25.5,
+	    icon nằm gọn GIỮA dải topbar, đúng ngang hàng icon TopbarPlus. Đây là ca user nhắm tới.
+	  • PC/iPad — band 58–94, icon 100 ⇒ offset kẹp về 0, hàng bắt đầu ngay mép trên màn hình
+	    và thò xuống dưới dải topbar. Không có gì bị che: vùng topbar bên PHẢI trống hoàn toàn.
+	    ⚠️ Nhưng "ngay mép trên" = 0 px thì user bác: "quá sát cạnh trên". Xem `TOP_ROW_MIN_TOP_RATIO`.
+
+	KHÔNG đụng Roblox: icon hệ thống + TopbarPlus đều nằm bên TRÁI (`TopbarInset.Min.X` = 208
+	đo trên PC), hàng này bám mép phải an toàn.
+]]
+-- Chiều cao phần ICON của hàng (thân dưới là chữ/đồng hồ, được phép thò xuống ngoài dải).
+Theme.TOP_ROW_ICON_HEIGHT = 100
+--[[
+	Toạ độ y của HÀNG NGANG — MỘT chế độ duy nhất, lấy ĐIỆN THOẠI làm chuẩn.
+
+	⚠️ BẢN HAI CHẾ ĐỘ ĐÃ BỊ BÁC — ĐỪNG DỰNG LẠI.
+	Bản 2026-08-21 chiều có nhánh "icon không vừa dải topbar ⇒ đặt ngay DƯỚI topbar, cách 14".
+	Đo lại bản đó trên PC 1919×1080: hàng ngang bắt đầu ở y = 71 px thật, trong khi dải topbar
+	chỉ cao 58 — tức nó rơi hẳn xuống dưới topbar, cách mép trên màn hình 71 px. Trên điện
+	thoại (scale nhỏ nên dải quy ra ~151 design px) nhánh kia thắng và hàng nằm ở ~10 px thật.
+	Chênh 7 lần. Đó đúng là phản hồi của user 2026-08-22: "trên PC cách cạnh màn hình quá xa".
+
+	Nay chỉ còn một công thức, và nó cho ra "sát mép trên" trên mọi máy:
+
+	    y = TopEdge + max(0, (dải topbar − ICON_HEIGHT) / 2)
+
+	  • Điện thoại — dải ~151 > icon 100 ⇒ icon nằm gọn GIỮA dải, ngang hàng icon TopbarPlus.
+	    Không đổi một pixel so với hiện tại. Đây là ca user khen "rất đẹp".
+	  • PC/iPad — dải 58–94 < icon 100 ⇒ kẹp về 0, hàng bắt đầu ĐÚNG mép trên màn hình và thò
+	    xuống dưới dải topbar. Trước đây tôi tránh chuyện này vì sợ topbar che mất nửa trên —
+	    nhưng đo ra là KHÔNG có gì để che: `TopbarInset.Min.X` = 208 nghĩa là icon hệ thống lẫn
+	    TopbarPlus đều nằm bên TRÁI, còn hàng này bám mép PHẢI (x 1467..1891 trên PC). Vùng
+	    topbar bên phải hoàn toàn trống.
+]]
+--[[
+	Khe TỐI THIỂU giữa mép trên màn hình và hàng ngang, tính theo TỈ LỆ CHIỀU CAO màn hình.
+
+	Vì sao tỉ lệ chứ không phải hằng design px: y hệt lý do ở `EdgeMargin` cho chiều ngang —
+	nhưng ở đây nguồn lệch là dải topbar (58 px THẬT trên mọi máy, nên quy về design px thì
+	phình to trên máy scale nhỏ). Kết quả: điện thoại được dải topbar đẩy xuống ~25 design px
+	còn PC thì kẹp về 0 = dính sát cạnh. Đó đúng là "chỉnh cũng chưa đạt, quá sát cạnh trên".
+
+	0.022 lấy từ chính ca điện thoại user khen: khe ~9 px thật trên màn cao 390 = 2,3%. Nhân
+	lên: PC 1080 → 24 px thật, iPad → ~18 px thật. Và vì `max`, điện thoại KHÔNG đổi một pixel
+	(dải topbar ở đó vốn đã cho 25 design > 24).
+]]
+Theme.TOP_ROW_MIN_TOP_RATIO = 0.022
+
+function Theme.TopRowOriginY(): number
+	local screen = Responsive.Screen()
+	local band = screen.Top - screen.TopEdge
+	local centered = (band - Theme.TOP_ROW_ICON_HEIGHT) * 0.5
+	return screen.TopEdge + math.max(centered, screen.Height * Theme.TOP_ROW_MIN_TOP_RATIO)
+end
+
+-- Vị trí góc TRÁI-TRÊN của một ô trong HÀNG NGANG trên cùng.
+function Theme.TopRowSlotPosition(slot: string): UDim2
+	local x = Responsive.Screen().SafeRight - Theme.TOP_ROW_WIDTH - Theme.EdgeMargin()
+	return UDim2.fromOffset(x + (Theme.TOP_ROW[slot] or 0), Theme.TopRowOriginY())
+end
+
+--[[
+	Góc TRÁI-TRÊN của CHỒNG DỌC — bám mép phải, NEO GIỮA theo chiều dọc.
+
+	`height` là chiều cao THẬT của chồng ở thời điểm này (`RightColumnLayout(...).Height`), nên
+	cột luôn nằm đúng giữa màn hình dù đang hiện 1, 2 hay 3 ô. Truyền hằng số vào đây là mất
+	toàn bộ lý do tồn tại của nó — xem khối "CHỒNG DỌC GIỜ TỰ SẮP XẾP" bên trên.
+
+	Trả về gốc của cả cột chứ không phải của từng ô: `RightPanel` neo một Frame duy nhất ở đây
+	rồi đặt từng ô bằng `UDim2.fromOffset(0, layout.Y[<slot>])`. Mọi ô rộng đúng bằng cột (214)
+	nên không còn offset căn phải bên trong nữa.
+]]
+--[[
+	══ MỘT MỐC DỌC DUY NHẤT CHO CẢ HAI CỤM BÊN (user chốt 2026-08-21: "đối xứng") ═══════════
+
+	Menu trái và cột phải đọc CHUNG hàm này, nên chúng KHÔNG BAO GIỜ lệch nhau — trên mọi máy,
+	mọi tỉ lệ. Trước đây mỗi bên tự tính một kiểu và mắt đọc ra ngay là hai cụm bắt đầu ở hai
+	độ cao khác nhau.
+
+	`math.max` không phải phòng hờ: nó giữ cho hai cụm không chui lên dưới HÀNG NGANG.
+	  • Vế 1 — `Top + CLUSTER_TOP_MARGIN`: mốc gốc của menu trái (né joystick mobile).
+	  • Vế 2 — đáy hàng ngang + khe: chỉ tính phần hàng ngang THẬT SỰ chồng theo chiều ngang,
+	    tức Spin/Playtime (cao nhất 130), KHÔNG phải cả `TOP_ROW_HEIGHT` = 186. 186 là chiều
+	    cao của thẻ StarterPack, mà thẻ đó nằm ở mép TRÁI hàng (x 0..132) — đo được ở 1304×801:
+	    StarterPack x 997..1087 còn cột phải x 1139..1284, hai khối không hề chạm nhau. Lấy
+	    186 là đẩy cả hai cụm xuống thêm 56 design px vì một khối không liên quan.
+
+	Hệ quả trên từng máy:
+	  • Điện thoại — hàng ngang nằm TRONG dải topbar nên vế 1 thắng ⇒ đúng mốc 100 như cũ,
+	    ràng buộc joystick không đổi một chút nào.
+	  • PC/iPad — hàng ngang phải xuống dưới topbar nên vế 2 thắng ⇒ CẢ HAI cụm cùng tụt
+	    xuống bằng nhau. Vẫn đối xứng, chỉ là bắt đầu thấp hơn.
+]]
+Theme.TOP_ROW_OVERLAP_HEIGHT = 130 -- ô cao nhất trong hàng ngang có chồng ngang với cột phải (Spin)
+
+function Theme.ClusterTopY(): number
+	local screen = Responsive.Screen()
+	local belowTopRow = Theme.TopRowOriginY() + Theme.TOP_ROW_OVERLAP_HEIGHT + Theme.TOP_ROW_CLEARANCE
+	return math.max(screen.Top + Theme.CLUSTER_TOP_MARGIN, belowTopRow)
+end
+
+-- Lề DỌC quy về dạng `MarginY` của `Responsive.AnchorPos` (đo từ `Screen().Top`).
+function Theme.ClusterTopMargin(): number
+	return Theme.ClusterTopY() - Responsive.Screen().Top
+end
+
+--[[
+	══ CỘT PHẢI SOI GƯƠNG MENU TRÁI (user chốt 2026-08-21, lần 3) ══════════════════════════
+
+	Yêu cầu: "vị trí ngay giữa menu trái, đối xứng qua". Tức là **TÂM khớp TÂM**, không phải
+	đỉnh khớp đỉnh.
+
+	Bản trước căn ĐỈNH: hai cụm cùng bắt đầu ở một mốc, nhưng cột phải chỉ cao ~342 còn menu
+	trái cao 528, nên cột phải dồn hết lên trên — nhìn ra là lệch chứ không phải soi gương.
+	Đối xứng qua trục dọc giữa màn hình = hai cụm CÙNG TÂM theo chiều dọc.
+
+	    tâm menu trái = ClusterTopY + LEFT_MENU_HEIGHT/2
+	    đỉnh cột phải = tâm đó − chiều cao cột/2
+
+	`height` là chiều cao THẬT của cột lúc này (đổi khi người chơi mua pass và một ô biến mất)
+	— nên cột tự căn lại mỗi lần đổi mà vẫn luôn cùng tâm với menu trái.
+
+	⚠️ `math.max(…, ClusterTopY())` là chốt chặn: mua hết pass thì cột chỉ còn Custom Speed
+	(118) và tâm-khớp-tâm sẽ đẩy đỉnh nó lên cao hơn cả mốc chung — chui thẳng vào HÀNG NGANG.
+	Trường hợp đó bỏ soi gương, ưu tiên không chồng lấn.
+]]
+function Theme.RightColumnOrigin(height: number): UDim2
+	local screen = Responsive.Screen()
+	local top = Theme.ClusterTopY()
+	local mirrored = top + (Theme.LEFT_MENU_HEIGHT - height) * 0.5
+	-- ⚠️ `EDGE_MARGIN` chứ KHÔNG phải `EdgeMargin()` — xem lý do ở `LeftMenu.anchor`. Hai cụm
+	-- bên phải giữ đúng lề cũ 28; chỉ HÀNG NGANG trên cùng mới dùng lề tự-tính.
+	return UDim2.fromOffset(screen.SafeRight - Theme.RIGHT_COLUMN_WIDTH - Theme.EDGE_MARGIN, math.max(top, mirrored))
 end
 
 Theme.TOP_MARGIN = 16

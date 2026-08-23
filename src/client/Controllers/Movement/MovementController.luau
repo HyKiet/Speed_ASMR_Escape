@@ -214,6 +214,24 @@ end
 -- ─────────────────────────────────────────────────────────────────────
 -- INPUT
 -- ─────────────────────────────────────────────────────────────────────
+--[[
+	CỬA VÀO DUY NHẤT của lệnh slide. Phím [C], nút L3 tay cầm và nút SLIDE cảm ứng
+	(`Movement/MobileSlideButton`) đều đi qua đây — kiểm tra điều kiện nằm ở MỘT chỗ, không
+	có bản copy nào lệch pha khi `MovementSlide.CanStart` đổi luật.
+
+	Trả về `true` nếu cú slide thật sự bắt đầu, để nút cảm ứng biết có nên nháy phản hồi hay
+	không (bấm lúc đang cooldown / đang trên không thì nút phải im, không "ăn" cú bấm rồi
+	chẳng có gì xảy ra).
+]]
+function MovementController.TrySlide(): boolean
+	local session = activeSession()
+	if session and MovementSlide.CanStart(session) then
+		MovementSlide.Begin(session)
+		return true
+	end
+	return false
+end
+
 local function onInputBegan(input: InputObject, gameProcessed: boolean)
 	if gameProcessed then
 		return -- đang gõ chat / bấm UI
@@ -222,10 +240,7 @@ local function onInputBegan(input: InputObject, gameProcessed: boolean)
 	if kc ~= Keys.Slide and kc ~= GamepadKeys.Slide then
 		return
 	end
-	local session = activeSession()
-	if session and MovementSlide.CanStart(session) then
-		MovementSlide.Begin(session)
-	end
+	MovementController.TrySlide()
 end
 
 -- ─────────────────────────────────────────────────────────────────────

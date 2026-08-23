@@ -5,6 +5,23 @@ local Gamepass = {
 	DoubleSpeed = 1900262644, -- X2 Speed (3 R$)
 	QuadSpeed = 1900160603, -- X4 Speed (9 R$)
 	OctaSpeed = 1898810606, -- X8 Speed (27 R$)
+	--[[
+		X2 WINS — pass mới 2026-08-21, giá 399 R$ (user chốt). ID đã tạo trên Creator
+		Dashboard cùng ngày và dán vào bên dưới; managed pricing đang bật.
+
+		⚠️ Cơ chế an toàn vẫn còn: id = 0 thì nút "x2 Wins" ở cột phải (`HUD/Hud/RightPanel`)
+		TỰ ẨN và `ProgressionService` không nhân gì cả. Đừng gỡ hai chỗ kiểm tra đó — chúng là
+		thứ giữ cho pass chưa tạo không thành một cái nút chết.
+
+		Vì sao 399 R$: `DoubleWinCollectionPad` đang thu 49 R$ MỖI LẦN chốt Wins x2, nên pass
+		vĩnh viễn hoà vốn sau ~8 lần dùng — người chơi thường vẫn dùng pad, người cày nhiều mới
+		mua pass, và pad không bị xoá sổ doanh thu. 399 cũng bằng VIP Membership, mà VIP chỉ cho
+		x1.25 Wins trong một gói 7 quyền lợi ⇒ hai món không dẫm chân nhau.
+
+		CỘNG DỒN với pad x2 (user chốt): có pass + dậm pad = x4. Cùng cách Server Boost / VIP /
+		event đang cộng dồn — xem `ProgressionService.AwardWins`.
+	]]
+	DoubleWins = 1940593812, -- X2 Wins (399 R$)
 	VIPMembership = 1899686706, -- VIP Membership (399 R$)
 	AutoRebirth = 1899434608, -- Auto-Rebirth (99 R$)
 	-- ExtraSpin ĐÃ GỠ (2026-07-31): lượt quay bán bằng Dev Product 1/5/10 Spins

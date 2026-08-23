@@ -46,7 +46,21 @@ local groups: { [string]: SoundGroup } = {}
 -- ⚠️ Kênh `sfx` KHÔNG còn slider trong Settings (gỡ 2026-08-09) nhưng PHẢI giữ nguyên nhóm:
 -- mọi Sound không phải nhạc và không phải tiếng sàn đều chảy qua đây, bỏ nhóm đi là slider
 -- Master mất quyền với tiếng UI, toast, level-up và bẫy zone. Nó đứng yên ở 1.
-local levels: { [string]: number } = { master = 1, music = 1, asmr = 1, sfx = 1 }
+--[[
+	MẶC ĐỊNH KÊNH NHẠC = 0.35, KHÔNG PHẢI 1 (2026-08-22, user).
+
+	`BgmController.BGM_VOLUME` giờ là âm lượng BÌNH THƯỜNG của một Sound 2D (0.45) chứ không
+	còn là 0.025 — con số cũ nhỏ tới mức nhạc thành ra không tồn tại. Chỗ cân bằng với tiếng
+	sàn ASMR chuyển về ĐÂY, tức về một thanh trượt người chơi kéo được, thay vì bị chôn trong
+	một hằng số mà chỉ lập trình viên mới với tới.
+
+	0.35 × 0.45 ≈ 0.16 hiệu dụng. Tiếng sàn ASMR phát ở 0.5–1.15 (3D, RollOff 70) nên ở cự ly
+	chân người nhạc nằm khoảng 1/5 tiếng sàn: nghe rõ là có nhạc, không giành chỗ với ASMR.
+	Người muốn nhạc to cứ kéo lên 1 (0.45 hiệu dụng — đúng mức nhạc nền game thường).
+]]
+AudioMixController.DEFAULT_MUSIC = 0.35
+
+local levels: { [string]: number } = { master = 1, music = AudioMixController.DEFAULT_MUSIC, asmr = 1, sfx = 1 }
 
 local function applyAll()
 	local master = levels.master
@@ -118,6 +132,10 @@ function AudioMixController.Init()
 		group.Parent = SoundService
 		groups[name] = group
 	end
+	-- ⚠️ BẮT BUỘC: trước 2026-08-22 mọi kênh mặc định là 1 nên "dựng group xong là xong".
+	-- Nay `music` mặc định 0.35 — không gọi `applyAll` ở đây thì mức mặc định chỉ có hiệu lực
+	-- sau lần đầu người chơi kéo slider, tức là không bao giờ với đa số người chơi.
+	applyAll()
 end
 
 function AudioMixController.Start()

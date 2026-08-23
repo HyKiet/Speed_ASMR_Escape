@@ -8,6 +8,7 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local Janitor = require(ReplicatedStorage.Packages.Janitor)
 local Tokens = require(script.Parent.Tokens)
+local AudioMixController = require(script.Parent.Parent.Effects.AudioMixController)
 
 local Tween = Fusion.Tween
 local Value = Fusion.Value
@@ -138,6 +139,22 @@ State.viewportSize = Value(Vector2.new(1920, 1080))
 ]]
 State.guiInsetTop = Value(0)
 
+--[[
+	Bề rộng vùng KHÔNG DÙNG ĐƯỢC ở mép PHẢI màn hình (px thật) — tai thỏ / Dynamic Island /
+	viền bo của điện thoại khi xoay ngang.
+
+	`GetGuiInset()` chỉ trả về inset DỌC nên nó mù hoàn toàn với chuyện này: cụm nào bám mép
+	phải sẽ chui thẳng vào dưới tai thỏ trên iPhone nằm ngang, mà trên PC lại không tái hiện
+	được (luôn = 0) nên rất dễ tưởng là "đã sát góc rồi".
+
+	Nguồn: `GuiService.TopbarInset` — một `Rect` mô tả DẢI TOPBAR DÙNG ĐƯỢC. Đo trên PC:
+	`208, 0, 1304, 58` với viewport 1304 ⇒ `Max.X` chạm đúng mép phải (thừa 0). Trên máy có
+	tai thỏ, `Max.X` lùi vào trong đúng bằng phần bị che.
+
+	⚠️ CHỈ dùng cho mép PHẢI (`Screen().SafeRight`). `Min.X` = 208 là chỗ Roblox để nút menu
+	của CHÍNH NÓ, không phải vùng bị che — lấy nó làm lề trái sẽ đẩy cụm trái vào giữa màn hình.
+]]
+State.safeInsetRight = Value(0)
 
 --[[
 	Popup lên cấp đang hiện hay không.
@@ -352,7 +369,10 @@ State.nightMode = Value(false)
 
 -- ── Bàn trộn âm thanh (0..1, khớp AudioMixController.SetVolume) ──────────────
 State.volMaster = Value(1)
-State.volMusic = Value(1)
+-- Nhạc KHÔNG mặc định 100%: xem `AudioMixController.DEFAULT_MUSIC` — mức cân với tiếng sàn
+-- ASMR nằm ở đó, và phải require chứ không chép số, nếu không slider hiển thị một đằng còn
+-- SoundGroup kêu một nẻo.
+State.volMusic = Value(AudioMixController.DEFAULT_MUSIC)
 State.volAsmr = Value(1)
 -- ĐÃ GỠ 2026-08-09: `volSfx` (slider "UI & Effects") và `muteOnBlur`. Kênh `sfx` trong
 -- AudioMixController vẫn còn và đứng yên ở 1 — chỉ thanh trượt bị bỏ.

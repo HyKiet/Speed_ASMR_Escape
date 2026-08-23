@@ -33,6 +33,47 @@ local MAX_ACTIVE = 1500
 local ANIM_HZ = 1 / 30 -- máy yếu: animate 30fps là đủ mượt
 local WET = Color3.fromRGB(176, 148, 104)
 
+--[[
+	NHỊP BƯỚC — SẢI CHÂN CO GIÃN THEO TỐC ĐỘ (2026-08-21).
+
+	Bug user báo: "âm thanh sàn cát Lobby khác hệ thống âm thanh của game, kiểu như nó qua
+	trái rồi qua phải". Đúng, và khác ở ĐÚNG MỘT CHỖ — cách chốt lúc nào là một bước chân.
+
+	Bản cũ ở đây: `st.dist >= 2.0 and st.cd <= 0`, với `st.cd = 0.09` sau mỗi tiếng. Sải
+	chân là HẰNG SỐ 2.0 studs nên nhịp = tốc-độ/2 bước/giây, và trên 22 WS thì cái cooldown
+	0.09s ghim cứng nhịp ở 11 tiếng/giây bất kể người chơi đi nhanh chậm ra sao. Vì
+	`SoundPool.playStep` đảo tai Trái ↔ Phải mỗi tiếng, 11 tiếng/giây = một dao động stereo
+	5,5 Hz đều tăm tắp — nghe ra ngay là "qua trái rồi qua phải" chứ không còn là bước chân.
+
+	Còn các sàn của game (`Engine/SquishFloor`, `Butter`, `GummySquish`) dùng công thức:
+	    stride = max(STRIDE_MIN, speed / STRIDE_DIV)
+	tức sải chân DÀI RA theo tốc độ, nên nhịp tiệm cận STRIDE_DIV bước/giây và luôn bám theo
+	chuyển động thật của chân thay vì gõ nhịp metronome. Đây là "hệ thống âm thanh của game"
+	mà user so sánh — sàn cát Lobby là sàn DUY NHẤT còn sót lại chưa chuyển.
+
+	Số lấy đúng bằng `Butter` (2.4 / 14) + trần 15 tiếng/giây của SquishFloor, KHÔNG chế số
+	mới: mục tiêu là giống hệt phần còn lại, không phải hay hơn.
+]]
+local STRIDE_MIN = 2.4
+local STRIDE_DIV = 14
+local MAX_STEP_RATE = 15
+
+--[[
+	ĐỘ RỘNG STEREO = 0 — TIẾNG CÁT PHÁT GIỮA HAI TAI (user báo lần 2, 2026-08-21).
+
+	Nhịp bước đã khớp với game (khối STRIDE_* ngay trên) mà user vẫn nghe ra "qua trái qua
+	phải". Đúng, vì nhịp không phải nguyên nhân duy nhất: **thời lượng nghe** mới là thứ tách
+	sàn này khỏi mọi sàn khác. Sàn zone dài vài chục studs, chạy 100–250 WS là qua trong chưa
+	tới 2 giây; sàn cát trải kín sảnh Lobby, người chơi đứng và đi trên nó hàng phút giữa nền
+	âm yên tĩnh. Bất kỳ mức đảo tai nào nghe liên tục lâu như vậy cũng thành cái máy đảo kênh.
+
+	Nên riêng sàn này tắt hẳn pan. KHÔNG hạ mặc định trong `SoundPool.playStep` — các sàn zone
+	đã được user nghe và chốt ở ±0.85, đây là ngoại lệ của MỘT sàn chứ không phải đổi ý về
+	binaural. Muốn trả lại một chút bề rộng thì nâng số này (0.25 ≈ 1,1 stud lệch ⇒ ~4° ở
+	camera thứ ba), đừng đụng vào SoundPool.
+]]
+local PAN_SCALE = 0
+
 -- Hình dạng crater theo độ sâu chuẩn hoá d (0..1): trả về (offsetY, wetRatio).
 -- d nhỏ = phần viền phồng lên (RIM), d lớn = lòng chảo lún xuống (−DEPTH).
 local function shape(d: number): (number, number)
@@ -96,7 +137,14 @@ function KineticSandLive.attach(model, engine)
 			return
 		end
 		local id = math.random() < 0.25 and DIRT or CRUNCH[math.random(#CRUNCH)]
-		SoundPool.playStep(id, root.Position, 0.4 + ratio * 0.3, 0.9 + ratio * 0.3 + (math.random() * 0.14 - 0.07), 70)
+		SoundPool.playStep(
+			id,
+			root.Position,
+			0.4 + ratio * 0.3,
+			0.9 + ratio * 0.3 + (math.random() * 0.14 - 0.07),
+			70,
+			PAN_SCALE
+		)
 	end
 
 	-- Đóng dấu crater bán kính R quanh (px,pz): mỗi ô trong tầm nhận biên độ amp theo khoảng cách.
@@ -149,7 +197,7 @@ function KineticSandLive.attach(model, engine)
 				local speed = Vector3.new(vel.X, 0, vel.Z).Magnitude
 
 				if not st then
-					st = { dist = 0, last = pos, cd = 0, side = 1, idle = 0 }
+					st = { dist = 0, last = pos, lastStepT = now, side = 1, idle = 0 }
 					stampCrater(pos.X, pos.Z, now, ratio)
 					crunch(root, math.max(ratio, 0.3))
 				end
@@ -175,13 +223,15 @@ function KineticSandLive.attach(model, engine)
 					stampCrater(pos.X, pos.Z, now, 0)
 				end
 
-				st.cd = math.max(0, st.cd - dt)
 				local d = pos - st.last
 				st.last = pos
 				st.dist += Vector3.new(d.X, 0, d.Z).Magnitude
-				if st.dist >= 2.0 and st.cd <= 0 then
+				-- Xem khối STRIDE_* ở đầu file: sải chân dài ra theo tốc độ, KHÔNG cooldown
+				-- cố định (cooldown chính là thứ biến nhịp bước thành metronome đảo tai).
+				local stride = math.max(STRIDE_MIN, speed / STRIDE_DIV)
+				if st.dist >= stride and (now - st.lastStepT) >= 1 / MAX_STEP_RATE then
 					st.dist = 0
-					st.cd = 0.09
+					st.lastStepT = now
 					if speed > 0.5 and speed <= 26 then
 						-- đi bộ: đặt vết so le sang trái/phải theo hướng đi
 						st.side = -st.side

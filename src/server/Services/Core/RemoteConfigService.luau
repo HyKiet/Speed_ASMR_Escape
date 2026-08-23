@@ -55,6 +55,31 @@ local values: { [string]: any } = table.clone(DEFAULTS)
 local configService: any = nil
 local lastFetchOk = false
 
+--[[
+	══ HÃM SPAM CẢNH BÁO CỦA CHÍNH ROBLOX ═════════════════════════════════════════════════
+
+	Đo trên Error Report của QA ngày 2026-08-21: **396 warning** — nhiều gấp 20 lần mọi thứ
+	khác cộng lại — nội dung `ConfigService: Config value not found for key "..."`. Chia ra
+	đúng 4 key × 99 lần refresh (60 s/lần ≈ 99 phút uptime).
+
+	KHÔNG phải lỗi của code này: 4 key chưa được tạo trên Creator Hub, `refresh()` đã xử lý
+	nil đúng và fallback đúng. Cái warn đó do CHÍNH `snapshot:GetValue()` in ra từ bên trong
+	engine, nên `pcall` không nuốt được — không có cách nào tắt từ phía gọi.
+
+	Vấn đề thật không phải hiệu năng mà là **che mất lỗi thật**: bảng Error Report xếp theo
+	số lần, nên 396 dòng vô hại này đẩy mọi lỗi đáng đọc xuống dưới.
+
+	Cách hãm: key nào trả nil thì ghi nhớ, và chỉ THỬ LẠI mỗi `MISSING_REPROBE_EVERY` lần
+	refresh. Vẫn tự nhận ra khi bạn tạo key trên dashboard (chậm nhất ~10 phút), mà số warning
+	tụt còn 1/10.
+
+	⚠️ Cách chữa TRIỆT ĐỂ vẫn là tạo 4 key trên Creator Hub → Configs. Khối này chỉ hạ tiếng
+	ồn xuống, không làm cho việc đó thành không cần thiết.
+]]
+local MISSING_REPROBE_EVERY = 10
+local missingKeys: { [string]: boolean } = {}
+local refreshCount = 0
+
 local function getRaw(key: string): any
 	local fallback = DEFAULTS[key]
 	if fallback == nil then
@@ -135,15 +160,27 @@ local function refresh(): boolean
 		return false
 	end
 
+	refreshCount += 1
+	local reprobeMissing = refreshCount % MISSING_REPROBE_EVERY == 1
+
 	for key, fallback in DEFAULTS do
+		-- Key đã biết là chưa tạo: bỏ qua hẳn lượt này để engine khỏi in warning (xem khối
+		-- "HÃM SPAM CẢNH BÁO" bên trên). Giá trị vẫn là fallback, hành vi không đổi.
+		if missingKeys[key] and not reprobeMissing then
+			values[key] = fallback
+			continue
+		end
+
 		local readOk, value = pcall(function()
 			return snapshot:GetValue(key)
 		end)
 		-- Key chưa tạo trên dashboard trả về nil — đó là chuyện BÌNH THƯỜNG, không phải lỗi:
 		-- cứ dùng mặc định cho tới khi bạn tạo nó.
 		if readOk and value ~= nil and typeof(value) == typeof(fallback) then
+			missingKeys[key] = nil
 			values[key] = value
 		else
+			missingKeys[key] = value == nil or not readOk
 			values[key] = fallback
 		end
 	end

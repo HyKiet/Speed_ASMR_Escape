@@ -250,6 +250,17 @@ function ZoneLod.RadiusSq(baseRadius: number): number
 end
 
 --[[
+	WalkSpeed hiện tại của người chơi, lấy từ cùng cái cache mà `RadiusSq` dùng (cập nhật qua
+	`GetPropertyChangedSignal`, KHÔNG đọc Humanoid mỗi frame).
+
+	Dùng cho bẫy kích theo người chơi (Zone 15 bẫy 2 & 3): bán kính kích của chúng cũng phải
+	tính bằng GIÂY-tới-nơi chứ không phải studs, y hệt lý do của `RadiusSq`.
+]]
+function ZoneLod.WalkSpeed(): number
+	return walkSpeed
+end
+
+--[[
 	Vật ở XA thì có được phép cập nhật ở frame này không?
 
 	`nextFar` là mốc thời gian riêng của từng controller (giữ trong biến local của nó).

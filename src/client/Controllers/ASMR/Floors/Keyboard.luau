@@ -169,6 +169,45 @@ local PULSE = 0.14
 local SAMPLE_STEP = 1.4
 local MAX_SAMPLES = 40
 local MAX_SOUNDS_PER_FRAME = 8
+--[[
+	LÒ XO PHÍM — VÌ SAO PHẢI TÍCH PHÂN GIẢM CHẤN KIỂU ẨN (bug "phím nảy liên tục", video
+	test.mp4 quay trên Redmi A2+, 2026-08-21).
+
+	Vòng tích phân ở cuối file kẹp `step = min(dt, 1/30)`. Trên máy khoẻ (60fps) step =
+	0,0167 nên không sao, nhưng máy yếu tụt xuống ≤ 30fps là step chạm trần 0,0333 — và ở
+	đúng đó, sơ đồ Euler nửa-ẩn cũ VỠ:
+
+	    v += (k·(target − x) − d·v)·h        với k = 1400, d = 42, h = 1/30
+	    ⇒ hệ số nhân của v là (1 − d·h) = 1 − 1,4 = −0,4   (đổi dấu mỗi bước!)
+	    ⇒ trị riêng của ma trận (x, v): λ = 0,31 và λ = −1,27
+
+	|λ| = 1,27 > 1 nghĩa là biên độ NHÂN LÊN 1,27 lần mỗi frame — phân kỳ, không phải dao
+	động tắt dần. Hai hậu quả, và cả hai đều thấy trong video:
+
+	  1. NHÌN: `rec.depth` phóng to vô hạn, chỉ có biến `depth` dùng để ghi CFrame mới bị
+	     `math.clamp(-0.12, 1.08)` — nên phím nhảy giữa hai đầu kẹp mỗi frame, đúng cái
+	     "nảy liên tục" user thấy.
+	  2. LAG (nặng hơn): điều kiện nhả `|depth| < 0.004` KHÔNG BAO GIỜ đúng nữa, phím không
+	     bao giờ rời `activeKeys`. Mỗi phím người chơi từng dẫm qua sẽ ghi CFrame mãi mãi,
+	     mỗi frame, tới hết phiên. Chạy hết Zone 1 + Zone 15 là hàng nghìn phím kẹt như vậy
+	     ⇒ máy yếu vào vòng xoáy tử thần: fps thấp → lò xo vỡ → thêm phím kẹt → fps thấp hơn.
+	     Đây chính là phần "Redmi lag khá nhiều" mà máy khoẻ không dính vì không bao giờ
+	     chạm trần step.
+
+	CÁCH SỬA: giải phần giảm chấn theo kiểu ẨN — chia cho (1 + d·h) thay vì nhân (1 − d·h).
+	Hệ số này luôn nằm trong (0, 1) với mọi h > 0 nên không đời nào đổi dấu.
+
+	ĐO LẠI (mô phỏng 200 frame, giữ phím lún — đỉnh lún, 1.0 = chạm đáy):
+	                      60fps            30fps
+	    explicit (cũ)     1,043            3,4 × 10²⁰   ← phân kỳ
+	    implicit (mới)    1,184            1,259
+	    exp(−d·h)         1,204            1,556
+	Chọn `implicit` vì nó vọt lố ÍT NHẤT trong hai bản ổn định. Phần vọt lố thêm so với bản
+	cũ (1,043 → 1,184) không nhìn thấy được: dòng ghi CFrame vốn đã kẹp `depth` ở 1,08, tức
+	chênh 0,03 stud so với trước.
+
+	Chi phí: 0 — vẫn một phép chia thay cho một phép nhân, không thêm vòng lặp con.
+]]
 local PRESS_K, PRESS_D = 1400, 42
 -- RELEASE_D 13→30 (ratio 0.36→0.83): phím nhả 1 nhịp nảy mềm thay vì rung 3-4 nhịp
 -- ("nhấp nhấp nảy nảy" khi đứng/lướt trên phím — bug report 2026-07-19)
@@ -451,9 +490,17 @@ function Keyboard.attach(model, engine)
 			if pressed and rec.settled then
 				continue
 			end
-			local acc = k * (target - rec.depth) - d * rec.vel
-			rec.vel += acc * step
+			-- Giảm chấn ẨN (xem khối dài ở hằng số PRESS_K): chia cho (1 + d·h), KHÔNG nhân
+			-- (1 − d·h) — đó là dòng làm phím nảy vĩnh viễn ở fps thấp.
+			rec.vel = (rec.vel + k * (target - rec.depth) * step) / (1 + d * step)
 			rec.depth += rec.vel * step
+			-- LƯỚI AN TOÀN: kẹp CHÍNH `rec.depth` (bản cũ chỉ kẹp biến tạm dùng để ghi CFrame,
+			-- nên trạng thái thật vẫn phóng đi được và phím không bao giờ đủ điều kiện nhả).
+			-- Giới hạn rộng hơn biên nảy quá đà hợp lệ (−0.12 … 1.08) nên không cắt mất độ nảy.
+			if rec.depth < -0.5 or rec.depth > 1.5 then
+				rec.depth = math.clamp(rec.depth, -0.5, 1.5)
+				rec.vel = 0
+			end
 			if pressed and math.abs(1 - rec.depth) < 0.008 and math.abs(rec.vel) < 0.06 then
 				rec.depth = 1
 				rec.vel = 0

@@ -2,7 +2,8 @@
 --[[
 	ClientSettingsController.luau — Hai chế độ hiển thị bật/tắt từ nút Cài đặt trên topbar.
 
-	  • Performance Mode — dồn hết những thứ ngốn GPU nhất của game này xuống mức tối thiểu.
+	  • Performance Mode — cắt những thứ ngốn CPU/GPU nhất do GAME tạo ra.
+	    ⚠️ KHÔNG đụng tới ánh sáng và màu (user chốt 2026-08-22) — xem khối 2 và khối 4.
 	  • Night Mode      — chuyển cảnh sang ban đêm.
 
 	MỌI thay đổi đều CLIENT-ONLY (Lighting/Terrain đổi trên client không replicate) và đều
@@ -40,11 +41,30 @@ local function applyPerformance(on: boolean)
 	--    nguồn ngốn fill-rate lớn nhất khi đông người).
 	CosmeticVisualController.SetOthersEnabled(not on)
 
-	-- 2. Post-processing: Bloom/SunRays/DepthOfField/Blur đều là full-screen pass.
+	--[[
+		2. Post-processing — CHỈ tắt loại LÀM MỜ, giữ nguyên loại quyết định ÁNH SÁNG/MÀU.
+
+		⚠️ BẢN "TẮT SẠCH POSTEFFECT" ĐÃ BỊ BÁC (user 2026-08-22): "không thích Performance Mode
+		ở chỗ nó giảm ánh sáng của game, hãy chỉnh lại giữ nguyên ánh sáng."
+
+		Lighting của game có 5 post-effect, và chúng KHÔNG cùng vai trò:
+		    ColorCorrection  Contrast 0.14 · Saturation 0.22  → toàn bộ bản sắc màu của map
+		    Bloom            Intensity 0.38 · Threshold 1.15  → quầng sáng, mắt đọc là "sáng"
+		    SunRays          Intensity 0.10                   → nắng, rất nhẹ
+		    SpeedBlur        BlurEffect                       → hiệu ứng tốc độ, thuần điện ảnh
+		    CinematicDoF     DepthOfFieldEffect               → thuần điện ảnh
+		Tắt sạch cả 5 là tắt luôn 3 cái đầu — đó chính là chỗ "giảm ánh sáng".
+
+		Và lý do KỸ THUẬT để giữ, không chỉ vì thẩm mỹ: đo 2026-08-22 bằng MicroProfiler,
+		**CPU 17,25 ms > GPU 13,65 ms** (ngân sách 60 fps = 16,67 ms) — game nghẽn CPU, GPU
+		còn dư. Post-effect là chi phí GPU. Hi sinh chúng là trả bằng hình ảnh để mua thứ
+		đang KHÔNG thiếu. Mấy khối còn lại của hàm này (bóng, cosmetic, nhãn phím) mới là
+		phần cắt việc của CPU, và chúng được giữ nguyên.
+	]]
 	if on then
 		table.clear(savedEffects)
 		for _, child in Lighting:GetDescendants() do
-			if child:IsA("PostEffect") then
+			if child:IsA("BlurEffect") or child:IsA("DepthOfFieldEffect") then
 				savedEffects[child] = child.Enabled
 				child.Enabled = false
 			end
@@ -89,23 +109,39 @@ local function applyPerformance(on: boolean)
 		end
 	end
 
-	-- 4. Ánh sáng môi trường (IBL) — tính lại mỗi frame cho từng bề mặt.
-	--    ⚠️ ĐÃ THỬ và BỎ: `UserGameSettings.SavedQualityLevel`. Roblox chặn game script ghi
-	--    thuộc tính này (đo lại sau khi ghi vẫn là QualityLevel10) — đừng phí công thêm lần nữa.
-	if on then
-		if savedPerformance.envDiffuse == nil then
-			savedPerformance.envDiffuse = Lighting.EnvironmentDiffuseScale
-			savedPerformance.envSpecular = Lighting.EnvironmentSpecularScale
-		end
-		Lighting.EnvironmentDiffuseScale = 0
-		Lighting.EnvironmentSpecularScale = 0
-	elseif savedPerformance.envDiffuse ~= nil then
-		Lighting.EnvironmentDiffuseScale = savedPerformance.envDiffuse
-		Lighting.EnvironmentSpecularScale = savedPerformance.envSpecular
-	end
+	--[[
+		4. Ánh sáng môi trường (IBL) — tính lại mỗi frame cho từng bề mặt.
+
+		⚠️⚠️ ĐÃ ĐO LẠI 2026-08-22, KẾT LUẬN DỨT ĐIỂM — ĐỪNG THỬ LẦN THỨ BA:
+		**Game script KHÔNG THỂ kéo thanh Graphics Quality của Roblox.** Không phải "ghi không
+		ăn" như ghi chú cũ đoán — engine chặn thẳng, kèm lỗi rõ ràng:
+
+		    UserGameSettings.SavedQualityLevel   = ... → "The current thread cannot set
+		                                                  'render quality level' (lacking
+		                                                  capability RobloxScript)"
+		    UserGameSettings.GraphicsQualityLevel     → cả ĐỌC lẫn GHI đều lacking RobloxScript
+		    UserGameSettings.GraphicsOptimizationMode → như trên
+
+		(Ghi chú cũ còn sai một chỗ nhỏ: kiểu enum đúng là `Enum.SavedQualitySetting`, không
+		phải `Enum.QualityLevel` — nên phép thử cũ hỏng vì SAI KIỂU trước cả khi chạm tới rào
+		quyền, và tưởng nhầm là "ghi không ăn".)
+
+		⇒ Chỉ NGƯỜI CHƠI mới kéo được thanh đó. Việc của mình là cắt phần của GAME, và cắt
+		  đúng chỗ CPU đang thiếu — xem khối 2 để biết vì sao KHÔNG cắt thêm bên GPU nữa.
+
+		══ 4. ÁNH SÁNG MÔI TRƯỜNG (IBL) — ĐÃ BỎ, ĐỪNG THÊM LẠI ═══════════════════════════
+
+		Bản cũ ép `EnvironmentDiffuseScale` 0.55 → 0 và `EnvironmentSpecularScale` 0.40 → 0.
+		Đó là **thủ phạm chính** của "Performance Mode làm giảm ánh sáng của game" (user bác
+		2026-08-22): IBL là ánh sáng bầu trời hắt lên MỌI bề mặt, tắt nó là cả map tối và bẹt
+		đi ngay lập tức, thấy rõ hơn hẳn mấy post-effect.
+
+		Và nó cũng là chi phí GPU, mà GPU đang còn dư (13,65 / 16,67 ms) — trả bằng ánh sáng
+		để mua thứ không thiếu. Bỏ hẳn.
+	]]
 
 	-- ⚠️ Chỉ xoá kho SAU KHI mọi khối đã đọc xong. Bản đầu `table.clear` ngay trong khối
-	-- nước ⇒ khối ánh sáng phía dưới đọc ra nil và không bao giờ khôi phục được.
+	-- nước ⇒ khối phía dưới đọc ra nil và không bao giờ khôi phục được.
 	if not on then
 		table.clear(savedPerformance)
 	end
@@ -129,6 +165,23 @@ local function applyPerformance(on: boolean)
 			end
 		end
 	end
+
+	--[[
+		⚠️⚠️ KHÔNG THÊM "7. hạ RenderFidelity mesh" — ĐÃ THỬ VÀ HỎNG (2026-08-22).
+
+		Ý tưởng: đặt cả 1542 MeshPart của Workspace về `RenderFidelity.Performance` (đúng thứ
+		mức graphics thấp nhất của Roblox làm với mesh), kèm móc `DescendantAdded` cho mesh
+		stream vào sau.
+
+		Viết xong CHẠY ĐƯỢC và đọc lại thấy đủ 1542/1542 = Performance — nhìn như thành công.
+		Nhưng engine in ra **hàng trăm dòng** `Cannot change SolidModel RenderFidelity during
+		Run-Time`: thuộc tính phía Lua đổi, còn LOD thật thì KHÔNG. Mesh đã nạp xong là chốt
+		LOD, đổi lúc chạy không có tác dụng.
+
+		⇒ Bài học chung: **đọc-lại-thấy-đúng KHÔNG chứng minh được là có tác dụng.** Phải xem
+		  cả Output. Đây là lần thứ hai trong cùng một ngày dính đúng kiểu này (lần kia là
+		  `SavedQualityLevel` ở khối 4).
+	]]
 end
 
 function ClientSettingsController.SetPerformanceMode(enabled: boolean)

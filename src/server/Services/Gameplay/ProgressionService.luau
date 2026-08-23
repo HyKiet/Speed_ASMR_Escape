@@ -30,6 +30,7 @@ type Session = {
 	requestTimes: { [string]: number },
 	gamepassMultiplier: number?,
 	vipMultiplier: number?,
+	doubleWinsMultiplier: number?,
 	autoRebirthOwned: boolean?,
 	activePadId: string,
 	activePadStep: number,
@@ -67,6 +68,7 @@ local function getSession(player: Player): Session
 		requestTimes = {},
 		gamepassMultiplier = nil,
 		vipMultiplier = nil,
+		doubleWinsMultiplier = nil,
 		activePadId = "pad_1",
 		activePadStep = Constants.BASE_SPEED_GAIN,
 		treadmillId = "treadmill_1",
@@ -177,6 +179,31 @@ local function computeVipMultiplier(player: Player): number
 
 	local multiplier = if ownsPass(player, Constants.GAMEPASS_IDS.VIPMembership) then 1.5 else 1
 	session.vipMultiplier = multiplier
+	return multiplier
+end
+
+--[[
+	Gamepass x2 Wins (399 R$). Cache theo session giống VIP và vì đúng lý do đó: hàm này chạy
+	mỗi lần chốt Wins ở pad, mà `ownsPass` là một lời gọi web.
+
+	Trả 1 khi pass chưa được tạo trên Creator Dashboard (`DoubleWins == 0`) — `ownsPass` với id
+	0 luôn false nên nhánh này chỉ là chốt chặn cho rõ ý, không phải sửa lỗi.
+]]
+local DOUBLE_WINS_MULTIPLIER = 2
+
+local function computeDoubleWinsMultiplier(player: Player): number
+	local passId = Constants.GAMEPASS_IDS.DoubleWins
+	if passId <= 0 then
+		return 1
+	end
+
+	local session = getSession(player)
+	if session.doubleWinsMultiplier then
+		return session.doubleWinsMultiplier
+	end
+
+	local multiplier = if ownsPass(player, passId) then DOUBLE_WINS_MULTIPLIER else 1
+	session.doubleWinsMultiplier = multiplier
 	return multiplier
 end
 
@@ -530,6 +557,40 @@ function ProgressionService.AwardWins(player: Player, amount: number, reason: st
 		end
 	end
 
+	--[[
+		GAMEPASS x2 WINS (399 R$, thêm 2026-08-21).
+
+		CÙNG PHẠM VI với VIP/Server Boost/event ở trên — `stage` và `stage_x2`, không gì khác.
+		Lý do y hệt và đáng nhắc lại vì đây là pass MẠNH NHẤT trong nhóm (x2 chứ không phải
+		x1.25): nhân cả `product` là gói Ultra Wins Pack 1.299 R$ tự nhân đôi cho người có
+		pass — tự phá giá chính món đắt nhất shop bằng một món rẻ hơn ba lần.
+
+		CỘNG DỒN với pad x2 (user chốt): `reason == "stage_x2"` KHÔNG bị loại trừ ở đây, nên
+		người có pass mà dậm `DoubleWinCollectionPad` thì ăn x4. Đó là ý đồ — nếu chặn, pad
+		49 R$ thành nút chết với đúng nhóm khách đã chi nhiều nhất.
+
+		Đọc qua `computeDoubleWinsMultiplier` (cache theo session, xoá trong
+		`RefreshGamepassCache`) chứ không `ownsPass` trực tiếp: hàm này chạy mỗi lần chốt Wins
+		ở pad, gọi web API tại đó là treo cả pad.
+	]]
+	if reason == "stage" or reason == "stage_x2" then
+		finalWins = math.max(1, math.floor(finalWins * computeDoubleWinsMultiplier(player)))
+	end
+
+	--[[
+		RỦ BẠN — hệ số Wins (2026-08-21).
+
+		⚠️ Trước hôm nay bảng chú thích trên HUD hứa "x1.25 Wins" mà ĐOẠN NÀY KHÔNG TỒN TẠI:
+		`AwardWins` chưa bao giờ đọc tới `FriendService`. Người chơi rủ được bạn vào rồi vẫn
+		nhận đúng số Wins như cũ. Đây là chỗ trả lời cho lời hứa đó.
+
+		Cùng phạm vi hẹp `stage`/`stage_x2` với VIP / x2 Wins / Server Boost / event — lý do
+		đã ghi đầy đủ ở khối VIP bên trên, không nhắc lại.
+	]]
+	if FriendService and (reason == "stage" or reason == "stage_x2") then
+		finalWins = math.max(1, math.floor(finalWins * FriendService.GetFriendsWinsMultiplier(player)))
+	end
+
 	-- Wins Boost (server/personal) chỉ áp cho thưởng vượt ải — không nhân đôi gói mua/daily/roulette.
 	if ServerBoostService and (reason == "stage" or reason == "stage_x2") then
 		finalWins = math.floor(finalWins * ServerBoostService.GetWinsMultiplier(player))
@@ -598,6 +659,7 @@ function ProgressionService.RefreshGamepassCache(player: Player)
 	local session = getSession(player)
 	session.gamepassMultiplier = nil
 	session.vipMultiplier = nil
+	session.doubleWinsMultiplier = nil
 	session.autoRebirthOwned = nil
 	sendSnapshot(player)
 end

@@ -82,8 +82,93 @@ function Zone15Traps.SweepOffset(now: number, index: number): number
 end
 
 --=====================================================================================
+-- KÍCH HOẠT THEO NGƯỜI CHƠI (2026-08-22, user) — dùng chung cho BẪY 2 và BẪY 3.
+--
+-- Trước đây hai bẫy này chạy theo NHỊP VÒNG LẶP của đồng hồ server: chúng mở/đóng mãi mãi
+-- bất kể có ai hay không. Ở tốc độ Stage 15 (234 WS) người chơi tới nơi ở một pha ngẫu
+-- nhiên — có lượt đi lọt không cần làm gì, có lượt chết mà chẳng hiểu vì sao. Bẫy không
+-- DẠY được điều gì vì nó chẳng phản ứng với người chơi.
+--
+-- Giờ bẫy NGỦ (sàn kín, đi được) cho tới khi người chơi lại gần thì:
+--     nhấp nháy ĐỎ (WarnSeconds) → trượt mở (OpenSeconds) → giữ hở (HoldSeconds)
+--     → trượt về (CloseSeconds) → nghỉ (RearmSeconds) → sẵn sàng kích lại.
+--
+-- MẤU CHỐT LÀ BÁN KÍNH KÍCH TÍNH BẰNG GIÂY, KHÔNG PHẢI STUDS: `TriggerRadius(walkSpeed)`
+-- = quãng đường người chơi đi trong `LeadSeconds`. Nên với MỌI tốc độ, bẫy luôn bắt đầu
+-- nháy đúng ~0.95 giây trước khi họ tới, và mặt sàn biến mất ngay lúc họ đặt chân lên nếu
+-- họ cứ thế lao tới. Muốn qua thì phải NHÌN: thấy nháy đỏ là ghìm lại, đợi tấm trượt về
+-- rồi băng qua trong cửa sổ an toàn (`RearmSeconds` + `WarnSeconds` ≈ 1.75s).
+--
+-- ⚠️ Đây là trạng thái CỤC BỘ TỪNG CLIENT (bẫy 2 & 3 không có một dòng logic server nào —
+-- chúng giết gián tiếp bằng cách để người chơi rơi xuống KillBlockGlobal). Nghĩa là mỗi
+-- người thấy bẫy phản ứng với CHÍNH MÌNH, và người đứng xem thấy lệch pha với người đang
+-- chạy. Đó là đánh đổi CÓ CHỦ Ý: đổi lại là 0 byte replication và bẫy công bằng với từng
+-- người, thay vì một nhịp chung mà ai vào đúng pha xấu thì chịu.
+--=====================================================================================
+Zone15Traps.Trigger = {
+	-- Người chơi còn ngần này GIÂY nữa thì tới bẫy ⇒ kích. Phải > WarnSeconds, phần dư
+	-- (0.4s) là khoảng người chơi còn kịp phanh nếu họ đang để mắt.
+	LeadSeconds = 0.95,
+	-- Kẹp hai đầu: người mới (WalkSpeed 16) vẫn phải thấy bẫy động từ xa; người 1000+ WS thì
+	-- không kích bẫy từ nửa zone bên kia.
+	MinRadius = 110,
+	MaxRadius = 460,
+
+	WarnSeconds = 0.55,
+	OpenSeconds = 0.30,
+	HoldSeconds = 1.50,
+	CloseSeconds = 0.50,
+	RearmSeconds = 1.20,
+
+	BlinkHz = 15,
+	-- Đỏ báo động, dùng cho CẢ hai bẫy (bẫy 3 trước đây dùng cam 255,92,48 — chưa đủ hét lên).
+	ColorAlarm = Color3.fromRGB(255, 38, 38),
+}
+
+local TR = Zone15Traps.Trigger
+
+-- Tổng thời gian một lượt kích, tính từ lúc bắt đầu nháy tới lúc tấm về chỗ.
+Zone15Traps.ARMED_SPAN = TR.WarnSeconds + TR.OpenSeconds + TR.HoldSeconds + TR.CloseSeconds
+
+-- Bán kính kích (studs) ứng với tốc độ hiện tại. Xem khối lý do ở trên.
+function Zone15Traps.TriggerRadius(walkSpeed: number): number
+	return math.clamp(walkSpeed * TR.LeadSeconds, TR.MinRadius, TR.MaxRadius)
+end
+
+-- `elapsed` = giây kể từ lúc bẫy được kích. 0 = sàn kín (đi được), 1 = mở hết (khe hở).
+function Zone15Traps.ArmedAlpha(elapsed: number): number
+	local t = elapsed - TR.WarnSeconds
+	if t <= 0 then
+		return 0
+	end
+	if t < TR.OpenSeconds then
+		return smooth(t / TR.OpenSeconds)
+	end
+	t -= TR.OpenSeconds
+	if t < TR.HoldSeconds then
+		return 1
+	end
+	t -= TR.HoldSeconds
+	if t < TR.CloseSeconds then
+		return 1 - smooth(t / TR.CloseSeconds)
+	end
+	return 0
+end
+
+-- 0..1 cường độ nháy đỏ (chỉ màu, không ảnh hưởng va chạm). Nháy MẠNH DẦN về cuối để đoạn
+-- cuối cùng trước khi sàn mở là đoạn chói nhất — người chơi đọc được "sắp rồi" chứ không chỉ
+-- "đang có gì đó nhấp nháy".
+function Zone15Traps.ArmedWarn(elapsed: number, now: number): number
+	if elapsed < 0 or elapsed >= TR.WarnSeconds then
+		return 0
+	end
+	local ramp = 0.35 + 0.65 * (elapsed / TR.WarnSeconds)
+	return ramp * (0.5 + 0.5 * math.sin(now * (2 * math.pi * TR.BlinkHz) * 0.5))
+end
+
+--=====================================================================================
 -- BẪY 2 — SHIFT BRIDGE: 2 tấm sàn lấp khe đã cắt sẵn trên đường chạy, trượt NGANG ra
--- khỏi lối đi theo nhịp. Tấm rời chỗ mà người chơi vẫn chạy tới = rơi xuống biển.
+-- khỏi lối đi khi người chơi tới gần. Tấm rời chỗ mà người chơi vẫn chạy tới = rơi xuống biển.
 --=====================================================================================
 Zone15Traps.Shuttle = {
 	MarkerName = "Trap2",
@@ -94,42 +179,25 @@ Zone15Traps.Shuttle = {
 	PadSize = Vector3.new(50, 4, 54), -- X dọc hướng chạy, Z ngang hành lang
 	PadYOffset = -2, -- mặt tấm ngang mặt sàn (marker đặt ngang mặt sàn)
 
-	-- Dir = chiều trượt ngang (±); Phase tính bằng GIÂY. Tấm gặp sau lệch pha đúng thời gian
-	-- chạy từ tấm trước sang (47.7 studs ÷ 234) → giữ tốc độ là qua được cả hai.
+	-- Dir = chiều trượt ngang (±); Delay = giây TRỄ so với lúc bẫy được kích. Tấm gặp sau mở
+	-- muộn đúng thời gian chạy từ tấm trước sang (47.7 studs ÷ 234) → hai tấm mở nối đuôi
+	-- nhau theo đúng nhịp chân người chơi, không phải mở đồng loạt.
 	Pads = {
-		{ Offset = -24, Dir = 1, Phase = 0 },
-		{ Offset = 24, Dir = -1, Phase = 47.7 / 234 },
+		{ Offset = -24, Dir = 1, Delay = 0 },
+		{ Offset = 24, Dir = -1, Delay = 47.7 / 234 },
 	},
 	Amplitude = 60, -- tấm rộng 72, hành lang rộng 48 → trượt 60 là rời hẳn lối đi
 
-	Cycle = 4.2,
-	-- Mốc tỉ lệ: nằm yên tại chỗ (an toàn 1.43s) → trượt ra → nằm ngoài → trượt về
-	InEnd = 0.34,
-	OutEnd = 0.48,
-	AwayEnd = 0.86,
-
 	Color = Color3.fromRGB(96, 214, 255),
-	ColorWarn = Color3.fromRGB(255, 138, 64),
 }
 
 local SH = Zone15Traps.Shuttle
 
--- 0 = nằm đúng chỗ (đi được), 1 = trượt ra hết (khe hở).
-function Zone15Traps.ShuttleAlpha(now: number, index: number): number
-	local p = ((now - SH.Pads[index].Phase) % SH.Cycle) / SH.Cycle
-	if p < SH.InEnd then
-		return 0
-	elseif p < SH.OutEnd then
-		return smooth((p - SH.InEnd) / (SH.OutEnd - SH.InEnd))
-	elseif p < SH.AwayEnd then
-		return 1
-	end
-	return 1 - smooth((p - SH.AwayEnd) / (1 - SH.AwayEnd))
-end
-
 -- Độ dời NGANG của tấm thứ i (studs, theo trục bề ngang hành lang).
-function Zone15Traps.ShuttleOffset(now: number, index: number): number
-	return SH.Pads[index].Dir * SH.Amplitude * Zone15Traps.ShuttleAlpha(now, index)
+-- `elapsed` = giây kể từ lúc CỤM được kích; mỗi tấm tự trừ phần trễ của nó.
+function Zone15Traps.ShuttleOffset(elapsed: number, index: number): number
+	local pad = SH.Pads[index]
+	return pad.Dir * SH.Amplitude * Zone15Traps.ArmedAlpha(elapsed - pad.Delay)
 end
 
 --=====================================================================================
@@ -137,7 +205,8 @@ end
 -- Cả làn trượt NGANG ra khỏi đường như một khối, hai làn về hai phía ngược nhau:
 --   Obby_Open1 (Z 3481, phía trái theo hướng chạy +X) → trượt -Z
 --   Obby_Open2 (Z 3517, phía phải)                    → trượt +Z
--- Hai làn mở CÙNG LÚC → mất sạch mặt cầu 170 studs trong ~1.7s. Có 0.7s nhấp nháy báo trước.
+-- Hai làn mở CÙNG LÚC → mất sạch mặt cầu 170 studs. Kích khi người chơi tới gần, có
+-- `Trigger.WarnSeconds` nhấp nháy đỏ báo trước (xem khối KÍCH HOẠT THEO NGƯỜI CHƠI ở trên).
 --=====================================================================================
 Zone15Traps.SplitFloor = {
 	-- Dir = chiều trượt theo trục Z cục bộ của từng làn.
@@ -147,39 +216,10 @@ Zone15Traps.SplitFloor = {
 	},
 	Slide = 40, -- làn rộng 36 → trượt 40 là rời hẳn khỏi đường chạy
 
-	Cycle = 5.0,
-	-- Mốc tính bằng GIÂY trong chu kỳ
-	WarnStart = 2.6,
-	OpenStart = 3.3,
-	OpenFull = 3.65,
-	CloseStart = 4.65,
-
-	ColorWarn = Color3.fromRGB(255, 92, 48),
+	ColorWarn = TR.ColorAlarm,
 }
 
 local F = Zone15Traps.SplitFloor
-
--- 0 = khép kín, 1 = mở hết.
-function Zone15Traps.SplitAlpha(now: number): number
-	local t = now % F.Cycle
-	if t < F.OpenStart then
-		return 0
-	elseif t < F.OpenFull then
-		return smooth((t - F.OpenStart) / (F.OpenFull - F.OpenStart))
-	elseif t < F.CloseStart then
-		return 1
-	end
-	return 1 - smooth((t - F.CloseStart) / (F.Cycle - F.CloseStart))
-end
-
--- 0..1 cường độ cảnh báo (chỉ dùng cho màu, không ảnh hưởng va chạm).
-function Zone15Traps.SplitWarn(now: number): number
-	local t = now % F.Cycle
-	if t < F.WarnStart or t >= F.OpenStart then
-		return 0
-	end
-	return (t - F.WarnStart) / (F.OpenStart - F.WarnStart)
-end
 
 --=====================================================================================
 -- DỰNG HÌNH HỌC — dùng chung cho server (runtime) và Studio Edit (bake vào map).

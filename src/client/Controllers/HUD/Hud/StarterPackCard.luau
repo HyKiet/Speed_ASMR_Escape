@@ -85,27 +85,19 @@ function StarterPackCard.Build()
 	return New("Frame")({
 		BackgroundTransparency = 1,
 		--[[
-			Neo theo ĐÚNG công thức của RightPanel (x = 1608, y = 355 ở tỉ lệ đầy đủ; bám mép
-			phải khi màn hình hẹp) rồi suy ra chỗ đứng:
-			  • x: cụm Spin nằm ở RightPanel + 166. Lùi trái thêm 12 + bề rộng icon ⇒ icon luôn
-			    sát bên trái cụm Spin, không bao giờ đè lên dù màn hình co thế nào.
-			  • y: ngang cụm Spin, nhưng THẤP HƠN 12px. Đỉnh cụm Spin nằm ở RightPanel − 302,
-			    tức là mép trên của nó bị mép màn hình cắt vài pixel (đo trong Studio: y = −5).
-			    Cụm Spin chịu được vì trên cùng của nó chỉ là nền; icon này thì có băng "−90%"
-			    dán sát mép trên — cắt vào đó là cắt đúng con số bán hàng.
-			KHÔNG đọc AbsolutePosition của RightPanel — đó là pixel màn hình thật, còn icon này
-			sống trong lớp đã bị UIScale co lại.
-		]]
-		--[[
-			Ô ĐẦU TIÊN của chồng cột phải (xem `Theme.RIGHT_STACK`). Trước đây file này tự chép
-			lại công thức neo của `RightPanel` rồi cộng thêm hai offset tay (+166-12, -290) —
-			mỗi lần đổi kích thước panel bên kia là icon này lệch mà không ai nhớ ra.
+			Ô ĐẦU TIÊN (trái nhất) của HÀNG NGANG góc phải-trên — xem `Theme.TOP_ROW`.
 
-			Căn PHẢI trong bề rộng cột để thẳng mép với mọi ô còn lại, kể cả khi icon hẹp hơn cột.
+			2026-08-21: hàng ngang thay cho chồng dọc cũ; trước đó ô này là ô đầu của
+			`Theme.RIGHT_STACK` và phải tự cộng offset căn phải. Giờ bảng `TOP_ROW` đã giữ sẵn
+			offset X nên ở đây không còn phép cộng tay nào.
+
+			Vẫn giữ nguyên nguyên tắc cũ: KHÔNG tự chép lại công thức neo của panel bên cạnh
+			(bản trước-2026-08-15 làm thế và lệch mỗi lần ô kia đổi cỡ), và KHÔNG đọc
+			`AbsolutePosition` của panel khác — đó là pixel màn hình thật, còn icon này sống
+			trong lớp đã bị `UIScale` co lại.
 		]]
 		Position = Computed(function()
-			local slot = Theme.RightSlotPosition("starterPack")
-			return slot + UDim2.fromOffset(Theme.RIGHT_COLUMN_WIDTH - ICON_WIDTH, 0)
+			return Theme.TopRowSlotPosition("starterPack")
 		end),
 		Size = UDim2.fromOffset(ICON_WIDTH, ICON_HEIGHT),
 		Visible = Shared.Available,

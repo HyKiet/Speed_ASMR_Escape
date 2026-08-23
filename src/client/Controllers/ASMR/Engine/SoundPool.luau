@@ -27,6 +27,21 @@ local SoundPool = {}
 -- Sàn như vậy khai báo `Floor.voices = { [id] = n }`, xem SoundPool.init.
 local VOICES_PER_ID = 4
 local EAR_OFFSET = 4.5 -- studs lệch sang bên tai theo RightVector camera (binaural pan)
+--[[
+	TRẦN GÓC PAN (2026-08-21).
+
+	`EAR_OFFSET` là khoảng cách TUYỆT ĐỐI (studs), nhưng tai nghe ra GÓC chứ không nghe ra
+	studs: cùng 4.5 studs lệch ngang thì ở camera thứ ba (≈15 studs) chỉ là ~17°, còn khi
+	người chơi zoom sát/vào góc nhìn thứ nhất (CameraMinZoomDistance = 0.5, xem
+	`Effects/SpeedVFXController`) thì listener nằm ngay trên đầu nhân vật và 4.5 studs lệch
+	ngang thành gần 90° — audio engine đổ trọn tiếng sang MỘT bên tai. Bước chân đảo tai
+	luân phiên lúc đó không còn là "binaural", nó là tiếng nhảy hẳn trái ↔ hẳn phải.
+
+	Kẹp offset theo khoảng cách tới listener: offset ≤ d × MAX_PAN_TAN ⇒ góc pan không bao
+	giờ vượt ~18°. Ở camera thứ ba bình thường (d ≥ 14) phép kẹp KHÔNG đụng gì (14 × 0.325 =
+	4.55 > 4.5), nên mọi sàn giữ nguyên cảm giác đã chốt; nó chỉ hạ tay khi camera lại gần.
+]]
+local MAX_PAN_TAN = 0.325 -- tan(18°)
 
 type Voice = { sound: Sound, anchor: Attachment }
 type Bank = { voices: { Voice }, cursor: number, size: number }
@@ -178,15 +193,43 @@ function SoundPool.playPanned(
 	end
 	local cam = workspace.CurrentCamera
 	local right = if cam then cam.CFrame.RightVector else Vector3.xAxis
-	fire(v, basePos + right * (pan * EAR_OFFSET), volume, speed, maxDist)
+	-- Xem khối `MAX_PAN_TAN`: kẹp theo khoảng cách tới listener để góc pan có trần.
+	local ear = EAR_OFFSET
+	if cam then
+		ear = math.min(ear, (cam.CFrame.Position - basePos).Magnitude * MAX_PAN_TAN)
+	end
+	fire(v, basePos + right * (pan * ear), volume, speed, maxDist)
 end
 
--- Binaural bước chân dùng CHUNG cho mọi sàn: tự đảo tai Trái ↔ Phải mỗi lần gọi
--- (mọi adapter chỉ cần đổi play() → playStep()).
+--[[
+	Binaural bước chân dùng CHUNG cho mọi sàn: tự đảo tai Trái ↔ Phải mỗi lần gọi
+	(mọi adapter chỉ cần đổi play() → playStep()).
+
+	`panScale` (tuỳ chọn, mặc định 1) — ĐỘ RỘNG stereo của riêng một sàn.
+
+	Vì sao cần knob theo TỪNG SÀN chứ không một số chung: mức đảo tai đọc ra là "êm" hay là
+	"ngoáy trái-phải" phụ thuộc vào việc người chơi nghe nó BAO LÂU, chứ không phụ thuộc con số.
+	Sàn trong zone dài vài chục studs — chạy 100–250 WS thì nghe chưa tới 2 giây rồi sang sàn
+	khác, ±0.85 ở đó là chi tiết ASMR đúng như đã chốt. Sàn cát Lobby thì trải 5.180 ô kín cả
+	sảnh, người chơi đứng/đi trên nó HÀNG PHÚT trong lúc nền âm hoàn toàn yên tĩnh — cùng một
+	±0.85 nghe liên tục vài phút thì não ngừng nghe ra "bước chân" và bắt đầu nghe ra cái máy
+	đảo kênh. Đây là lý do user báo riêng sàn Lobby, hai lần, dù mọi sàn dùng chung một hàm.
+
+	⚠️ 0 = tắt hẳn pan (phát ngay dưới chân, giữa hai tai). Đừng đổi mặc định 1 ở đây để "sửa
+	một thể cho mọi sàn" — các sàn zone đã được user nghe và chốt.
+]]
 local stepSide = false
-function SoundPool.playStep(id: number, basePos: Vector3, volume: number, speed: number, maxDist: number?)
+function SoundPool.playStep(
+	id: number,
+	basePos: Vector3,
+	volume: number,
+	speed: number,
+	maxDist: number?,
+	panScale: number?
+)
 	stepSide = not stepSide
-	SoundPool.playPanned(id, basePos, volume, speed, if stepSide then 0.85 else -0.85, maxDist)
+	local swing = 0.85 * (panScale or 1)
+	SoundPool.playPanned(id, basePos, volume, speed, if stepSide then swing else -swing, maxDist)
 end
 
 return SoundPool

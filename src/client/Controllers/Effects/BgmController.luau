@@ -7,12 +7,23 @@ local TweenService = game:GetService("TweenService")
 
 local BgmController = {}
 
--- ÂM LƯỢNG NHẠC NỀN (hạ 0.04 → 0.025 ngày 2026-08-05).
--- Game này bán trải nghiệm ASMR: tiếng sàn mới là nội dung, nhạc chỉ là nền. Nhạc lại
--- thiệt thòi ngược: nó là Sound 2D gắn thẳng vào SoundService nên KHÔNG suy giảm theo
--- khoảng cách — lúc nào cũng đúng âm lượng này — trong khi mọi tiếng ASMR là 3D và tụt
--- dần. Vì vậy con số nghe thì bé nhưng trên thực tế nhạc vẫn đủ sức che tiếng sàn.
-local BGM_VOLUME = 0.025
+--[[
+	ÂM LƯỢNG GỐC CỦA NHẠC NỀN — 0.025 → 0.45 (2026-08-22, user: "nhạc khá nhỏ, chỉnh về mức
+	bình thường").
+
+	Con số 0.025 cũ ra đời từ một lập luận đúng ("nhạc là Sound 2D không suy giảm theo khoảng
+	cách nên nó át tiếng sàn ASMR") nhưng đã đi quá xa: tiếng sàn phát ở 0.5–1.15, nhạc ở
+	0.025 là thấp hơn ~30 lần — không phải "nền", mà là im lặng.
+
+	Giờ ĐÂY là mức BÌNH THƯỜNG của một Sound 2D (Sound.Volume mặc định của Roblox là 0.5), còn
+	việc CÂN với tiếng sàn ASMR chuyển sang `AudioMixController.DEFAULT_MUSIC` (0.35) — tức là
+	thành một thanh trượt trong Cài đặt mà người chơi kéo được, thay vì một hằng số chôn ở đây.
+	Nghe thực tế = 0.45 × 0.35 ≈ 0.16.
+
+	⚠️ ĐỔI SỐ NÀY THÌ PHẢI XEM LẠI `AudioMixController.DEFAULT_MUSIC`: hai con số nhân với
+	nhau mới ra thứ người chơi nghe, sửa một mình con số này là lệch cả cán cân với ASMR.
+]]
+local BGM_VOLUME = 0.45
 
 -- PLAYLIST (thay 2 bài ngày 2026-08-05 theo yêu cầu user).
 -- Nguồn: APMOfficial (APM Music) — đây là thư viện NHẠC chính hãng trên Roblox.

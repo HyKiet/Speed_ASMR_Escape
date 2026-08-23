@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
@@ -92,7 +93,7 @@ function FriendsHud.Build()
 				Size = UDim2.fromOffset(70, 20),
 				Text = Computed(function()
 					local mult = State.GetSnapshot().friendsMultiplier or 1
-					return "Boost: x" .. mult
+					return "Boost: x" .. Format.Multiplier(mult)
 				end),
 				MaxTextSize = 13,
 				ZIndex = 5,
@@ -111,7 +112,7 @@ function FriendsHud.Build()
 					Theme.MakeOutlineLabel({
 						Position = UDim2.fromOffset(16, 16),
 						Size = UDim2.fromOffset(388, 64),
-						Text = "Invite friends to get up to x1.5 Speed and x1.25 Wins! (+10% Speed per friend)",
+						Text = "Invite friends: 1 friend = x1.15 Speed + x1.10 Wins, up to x1.5 Speed + x1.25 Wins with 5!",
 						MaxTextSize = 22,
 						TextWrapped = true,
 						TextYAlignment = Enum.TextYAlignment.Top,
@@ -132,7 +133,7 @@ function FriendsHud.Build()
 						Size = UDim2.fromOffset(388, 28),
 						Text = Computed(function()
 							local mult = State.GetSnapshot().friendsMultiplier or 1
-							return "Speed Boost: x" .. mult
+							return "Speed Boost: x" .. Format.Multiplier(mult)
 						end),
 						TextColor3 = Color3.fromRGB(255, 222, 62),
 						MaxTextSize = 26,

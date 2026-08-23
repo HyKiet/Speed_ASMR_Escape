@@ -3,7 +3,7 @@
 	Khi player chạm PadPart trong Workspace.MultiplierPads.Pad_{N}:
 	  - Nếu TotalWins >= requiredWins: set ActivePadId attribute (client tô màu vàng/xanh)
 	  - Nếu chưa đủ: gửi toast "Need X Wins"
-	Pad mặc định = pad_1 (free) khi player join.
+	Pad mặc định khi player join = pad CAO NHẤT mà số Wins hiện tại với tới (2026-08-22).
 
 	── MỞ KHOÁ LÀ TRẠNG THÁI, KHÔNG PHẢI CỘT MỐC (chốt 2026-08-10, user) ─────────────────
 	Trước đây `HighestPadIndex` là cột mốc VĨNH VIỄN: đạt 15 Wins một lần là giữ Pad 3 mãi
@@ -101,11 +101,22 @@ local function enforcePad(player: Player, announce: boolean)
 
 	local current = activeIndex(player)
 
-	-- Chưa chọn pad nào (vừa vào game) → pad_1 như cũ. ⚠️ KHÔNG phát thẳng pad cao nhất đang
-	-- đủ điều kiện: hàm này chỉ được phép HẠ, không được tặng — người chơi vẫn phải tự đi tới
-	-- pad mà đứng lên, đó là cả nghi thức của khu Multiplier Pads.
+	--[[
+		Chưa chọn pad nào (vừa vào game) → phát THẲNG pad cao nhất đang đủ Wins.
+
+		⚠️ Đảo luật 2026-08-22 (user). Trước đây chỗ này áp cứng pad_1 với lý do "người chơi
+		phải tự đi tới pad mà đứng lên mới là nghi thức của khu Multiplier Pads". Nghi thức đó
+		chỉ đúng LẦN ĐẦU: `ActivePadId` là attribute (không nằm trong ProfileStore) nên thoát
+		game vào lại là mất sạch, và người chơi 200k Wins bị ném về +1/step mà không có một
+		dòng nào báo — họ tưởng game hỏng hoặc mất tiến trình.
+
+		Đây KHÔNG phải "tặng": `eligible` được tính lại từ Wins HIỆN TẠI mỗi lần gọi, đúng cái
+		mức mà chính họ đi lên pad kia cũng sẽ nhận được. Wins tụt là vòng canh bên dưới vẫn hạ
+		xuống như cũ. Người chơi mới có 0 Wins ⇒ eligible = 1 ⇒ vẫn là pad_1, tutorial bước 2
+		("đi tới Pad 2") không đổi một chút nào.
+	]]
 	if current == 0 then
-		applyPad(player, Constants.MULTIPLIER_PADS[1])
+		applyPad(player, Constants.MULTIPLIER_PADS[eligible])
 		ProgressionService.SendSnapshot(player)
 		return
 	end

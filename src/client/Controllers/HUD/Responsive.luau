@@ -78,7 +78,19 @@ export type DeviceClass = "phone" | "tablet" | "desktop" | "console"
 export type Screen = {
 	Left: number,
 	Top: number,
+	--[[
+		Mép trên VẬT LÝ của màn hình, CHƯA cộng chiều cao topbar.
+
+		`Top` là "chỗ an toàn để bắt đầu vẽ, đã né topbar" — đúng cho 99% cụm. `TopEdge` dành
+		cho đúng một trường hợp: cụm cố ý nằm NGANG HÀNG với topbar (hàng StarterPack/Spin/
+		Playtime — user chốt 2026-08-21 là phải đứng cùng dải với icon TopbarPlus).
+		Hiệu `Top - TopEdge` chính là chiều cao topbar quy về design px.
+	]]
+	TopEdge: number,
 	Right: number,
+	-- Mép phải AN TOÀN = `Right` trừ phần bị tai thỏ che. Mọi cụm bám mép phải phải dùng số
+	-- này; `Right` giữ nguyên nghĩa "mép phải vật lý" cho các phép đo khác.
+	SafeRight: number,
 	Bottom: number,
 	Width: number,
 	Height: number,
@@ -152,6 +164,11 @@ function Responsive.Recompute()
 	local scale, class = Responsive.Solve(viewport, Responsive.IsTouch())
 
 	State.guiInsetTop:set(GuiService:GetGuiInset().Y)
+	-- Phần mép PHẢI bị tai thỏ che (xem `State.safeInsetRight`). `TopbarInset.Max.X` là mép
+	-- phải của dải topbar DÙNG ĐƯỢC; trên máy không có tai thỏ nó bằng đúng bề rộng viewport
+	-- nên số này ra 0 và không cụm nào xê dịch.
+	local topbar = GuiService.TopbarInset
+	State.safeInsetRight:set(math.max(0, viewport.X - topbar.Max.X))
 	State.viewportSize:set(viewport)
 	State.viewportScale:set(scale)
 	Responsive.deviceClass:set(class)
@@ -177,11 +194,14 @@ function Responsive.Screen(): Screen
 	local left = (Tokens.DESIGN_WIDTH - visibleWidth) * 0.5
 	local top = (Tokens.DESIGN_HEIGHT - visibleHeight) * 0.5
 	local insetDesign = State.guiInsetTop:get() / scale
+	local safeRightDesign = State.safeInsetRight:get() / scale
 
 	return {
 		Left = left,
 		Top = top + insetDesign,
+		TopEdge = top,
 		Right = left + visibleWidth,
+		SafeRight = left + visibleWidth - safeRightDesign,
 		Bottom = top + visibleHeight,
 		Width = visibleWidth,
 		Height = visibleHeight - insetDesign,
@@ -224,7 +244,7 @@ function Responsive.AnchorPos(props: AnchorProps): UDim2
 	if props.X == "left" then
 		x = s.Left + (props.MarginX or 0)
 	elseif props.X == "right" then
-		x = s.Right - props.Width - (props.MarginX or 0)
+		x = s.SafeRight - props.Width - (props.MarginX or 0)
 	else
 		x = s.Left + (s.Width - props.Width) * 0.5
 	end

@@ -24,6 +24,14 @@ local States = MovementConfig.States
 
 local MovementSlide = {}
 
+--[[
+	Tên attribute đặt trên `Humanoid` khi người chơi đang trượt.
+
+	HỢP ĐỒNG CÔNG KHAI — `Zones/Zone5SlideController` (và mọi cổng bắt buộc slide sau này) đọc
+	đúng hằng số này. Đổi tên ở đây thì phải đổi cả bên đó; đừng gõ chuỗi tay ở nơi khác.
+]]
+MovementSlide.SLIDING_ATTRIBUTE = "SESliding"
+
 function MovementSlide.Setup(session: Session)
 	local cfg = MovementConfig.Slide
 
@@ -119,9 +127,22 @@ function MovementSlide.Begin(session: Session)
 	session.slideInitialSpeed = session.slideSpeed
 
 	-- Hạ HipHeight để thu nhỏ hồ sơ va chạm (chui cổng/laser thấp).
-	-- ⚠️ Zone5SlideController nhận biết "đang slide" qua HipHeight < 1.6 — xem MovementConfig.
 	session.originalHipHeight = session.humanoid.HipHeight
 	session.humanoid.HipHeight = session.originalHipHeight * cfg.HipHeightFactor
+
+	--[[
+		CỜ "ĐANG SLIDE" TƯỜNG MINH — đọc bởi các cổng bắt buộc slide (`Zone5SlideController`).
+
+		⚠️ ĐỪNG quay lại kiểu suy ra từ `HipHeight < 1.6`. Bug user báo 2026-08-21: HipHeight
+		lúc slide = HipHeight đứng × 0.5, mà avatar cao (Rthro) có HipHeight đứng > 3.2 ⇒ slide
+		xong vẫn > 1.6 ⇒ cổng Zone 5 tính là đứng thẳng và giết người chơi, không cách nào qua.
+		Một ngưỡng TUYỆT ĐỐI áp lên một đại lượng TỈ LỆ THEO AVATAR thì luôn sai với ai đó.
+
+		Attribute chứ không phải biến module: cổng nằm ở controller khác, và attribute không
+		tạo phụ thuộc require hai chiều giữa Movement/ và Zones/. Client tự đọc nhân vật của
+		chính mình nên chuyện attribute không replicate lên server là không liên quan.
+	]]
+	session.humanoid:SetAttribute(MovementSlide.SLIDING_ATTRIBUTE, true)
 
 	local maxForce = session.root.AssemblyMass * cfg.MaxAccel
 	session.slideVelocity.MaxAxesForce = Vector3.new(maxForce, 0, maxForce) -- Y bỏ trống cho trọng lực
@@ -210,6 +231,7 @@ function MovementSlide.Stop(session: Session, hardStop: boolean?)
 	session.slideVelocity.Enabled = false
 	session.slideParticles.Enabled = false
 	session.humanoid.HipHeight = session.originalHipHeight
+	session.humanoid:SetAttribute(MovementSlide.SLIDING_ATTRIBUTE, false)
 	session.lastSlideClock = os.clock()
 
 	if hardStop then

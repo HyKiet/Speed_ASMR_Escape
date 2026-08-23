@@ -11,6 +11,9 @@ local MAX_SPEED = 120 -- Tốc độ đạt mốc FOV cao nhất
 local MIN_FOV = 70 -- FOV mặc định
 local MAX_FOV = 110 -- FOV tối đa (Zoom góc rộng ra)
 
+-- Vạch tốc độ bay ở đâu so với camera (60 studs phía trước) — cố định, xem vòng RenderStepped.
+local ATTACH_OFFSET = Vector3.new(0, 0, -60)
+
 local speedAttachment = nil
 local speedParticles = nil
 
@@ -20,7 +23,7 @@ function SpeedVFXController.SetupVFX()
 	-- 1. Tạo Attachment đặt xa 60 stud ở phía trước Camera
 	speedAttachment = Instance.new("Attachment")
 	speedAttachment.Name = "SpeedVFXAttachment"
-	speedAttachment.CFrame = CFrame.new(0, 0, -60)
+	speedAttachment.CFrame = CFrame.new(ATTACH_OFFSET)
 	speedAttachment.Parent = camera
 
 	-- 2. Cấu hình ParticleEmitter (Hạt Gió / Speed Lines)
@@ -81,8 +84,11 @@ function SpeedVFXController.Start()
 		if speedAttachment and speedAttachment.Parent ~= camera then
 			speedAttachment.Parent = camera
 		end
-		if speedAttachment then
-			speedAttachment.CFrame = CFrame.new(0, 0, -60)
+		-- GHI KHI KHÁC, không ghi mù mỗi frame: Attachment này không bao giờ đổi chỗ (offset
+		-- cố định trong không gian camera), nên 60 lượt ghi/giây chỉ để đặt lại đúng giá trị
+		-- cũ — mỗi lượt vẫn làm bẩn transform của camera và bắn signal thay đổi.
+		if speedAttachment and speedAttachment.Position ~= ATTACH_OFFSET then
+			speedAttachment.CFrame = CFrame.new(ATTACH_OFFSET)
 		end
 
 		--[[
@@ -94,7 +100,13 @@ function SpeedVFXController.Start()
 			cho việc đó (xem hiệu ứng mở modal trong `HUD/Modals/Manager`).
 		]]
 		local modalFovBoost = tonumber(Workspace:GetAttribute("ModalFovBoost")) or 0
-		camera.FieldOfView = MIN_FOV + modalFovBoost
+		local wantFov = MIN_FOV + modalFovBoost
+		-- Cũng chỉ ghi khi lệch. `FieldOfView` là thuộc tính làm hỏng ma trận chiếu: ghi lại
+		-- nó mỗi frame buộc engine dựng lại frustum + tính lại culling, và đây là vòng chạy
+		-- TRƯỚC bước camera của Roblox mỗi khung hình — chỗ tệ nhất để thêm việc thừa.
+		if camera.FieldOfView ~= wantFov then
+			camera.FieldOfView = wantFov
+		end
 
 		if not character then
 			return

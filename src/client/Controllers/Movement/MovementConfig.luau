@@ -232,9 +232,11 @@ MovementConfig.Slide = {
 	MaxDuration = 1.6,
 	Cooldown = 0.35,
 
-	-- ⚠️ HỢP ĐỒNG VỚI Zone5SlideController: nó nhận biết "đang slide" bằng
-	-- `humanoid.HipHeight < 1.6`. HipHeight đứng của R15 ≈ 2.0 nên hệ số 0.5 cho ra 1.0.
-	-- Đổi số này phải kiểm lại cổng bắt buộc slide ở Zone 5.
+	-- Hạ hồ sơ va chạm còn một nửa khi trượt (R15 chuẩn: 2.0 → 1.0).
+	-- ⚠️ 2026-08-21: `Zone5SlideController` KHÔNG còn suy ra "đang slide" từ HipHeight nữa
+	-- (ngưỡng tuyệt đối 1.6 giết chết mọi avatar Rthro cao — xem khối lý do trong file đó).
+	-- Nó đọc `MovementSlide.SLIDING_ATTRIBUTE`, nên số này giờ thuần tuý là chuyện hình học
+	-- vật lý: đổi nó chỉ ảnh hưởng chui khe THẬT, không ảnh hưởng cổng nào.
 	HipHeightFactor = 0.5,
 
 	-- Cho bẻ lái nhẹ trong lúc trượt.

@@ -18,6 +18,7 @@ local WinsFlight = require(script.Parent.WinsFlight)
 local Manager = require(script.Parent.Modals.Manager)
 local LeftMenu = require(script.Parent.Hud.LeftMenu)
 local RightPanel = require(script.Parent.Hud.RightPanel)
+local TopRightRow = require(script.Parent.Hud.TopRightRow)
 local BottomHud = require(script.Parent.Hud.BottomHud)
 local BoostHud = require(script.Parent.Hud.BoostHud)
 local StarterPackCard = require(script.Parent.Hud.StarterPackCard)
@@ -72,6 +73,7 @@ local function buildGui()
 					}),
 					LeftMenu.Build(),
 					RightPanel.Build(),
+					TopRightRow.Build(),
 					BottomHud.Build(),
 					BoostHud.Build(),
 					StarterPackCard.Build(),

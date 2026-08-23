@@ -36,8 +36,11 @@
 ]]
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+
+local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 
 local StreamPrefetchController = {}
 
@@ -117,8 +120,23 @@ function StreamPrefetchController.Start()
 		end)
 	end)
 
+	--[[
+		TẢI TRƯỚC THEO LỆNH SERVER — dùng cho hồi sinh / revive / teleport.
+
+		Khác hẳn vòng nhìn-trước bên trên: vòng đó đoán theo HƯỚNG CHẠY, còn cái này là server
+		nói thẳng "người này sắp xuất hiện ở đây". Không đi qua `inFlight`/`lastFetchPos` vì nó
+		không được phép bị bỏ nhịp — bỏ nhịp là người chơi đứng chờ địa hình.
+	]]
+	GamePackets.prefetchAround.listen(function(data)
+		task.spawn(function()
+			pcall(function()
+				localPlayer:RequestStreamAroundAsync(Vector3.new(data.x, data.y, data.z), REQUEST_TIMEOUT)
+			end)
+		end)
+	end)
+
 	print(
-		("[StreamPrefetch] sẵn sàng — nhìn trước %.1fs (ở 250 WS = %d studs)"):format(
+		("[StreamPrefetch] sẵn sàng — nhìn trước %.1fs (ở 250 WS = %d studs) + tải trước theo lệnh server"):format(
 			LOOKAHEAD_SECONDS,
 			math.floor(250 * LOOKAHEAD_SECONDS)
 		)

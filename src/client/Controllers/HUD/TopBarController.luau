@@ -157,6 +157,30 @@ local function isTopbarPlusGui(gui: Instance): boolean
 	return gui.Name:sub(1, 6) == "Topbar"
 end
 
+--[[
+	CẦN ĐIỀU KHIỂN ĐƯỢC MỚI CHƠI ĐƯỢC (bug user báo 2026-08-21).
+
+	Trên mobile, nút NHẢY và cần điều khiển di chuyển KHÔNG nằm trong CoreGui — `PlayerModule`
+	tự dựng một ScreenGui tên `TouchGui` (bên trong là `TouchControlFrame` chứa `JumpButton`
+	và `DynamicThumbstickFrame`) rồi cắm thẳng vào **PlayerGui**. Vòng quét bên dưới tắt mọi
+	LayerCollector trong PlayerGui, nên nó vơ luôn cả cụm điều khiển: bấm "Ẩn giao diện" là
+	người chơi mobile đứng chôn chân, không nhảy không đi được, và cũng không có cách nào
+	đoán ra vì nút topbar vẫn còn đó.
+
+	"Ẩn giao diện" là để quay phim/chụp ảnh — HUD của game phải biến mất, còn ĐIỀU KHIỂN thì
+	không: đó là thứ duy nhất giữ cho người chơi vẫn chơi được trong lúc quay. Roblox cũng
+	theo đúng nguyên tắc này (`CoreGuiType.Backpack/Health/PlayerList` tắt được, cụm điều
+	khiển cảm ứng thì không).
+
+	Khớp theo TIỀN TỐ `Touch`: tuỳ phiên bản PlayerModule mà có thêm `TouchGui`, `TouchJump`,
+	`TouchControlFrame`… — liệt kê tay là kiểu gì cũng sót ở lần Roblox cập nhật kế tiếp.
+	`SpeedEscapeTouchControls` là ScreenGui nút SLIDE mobile của chính mình
+	(`Movement/MobileSlideButton`): cũng là ĐIỀU KHIỂN, nên ở lại cùng nút nhảy.
+]]
+local function isTouchControlGui(gui: Instance): boolean
+	return gui.Name:sub(1, 5) == "Touch" or gui.Name == "SpeedEscapeTouchControls"
+end
+
 -- CoreGui bị tắt khi ẩn giao diện. **Chat KHÔNG có trong danh sách** (yêu cầu 2026-07-29:
 -- người chơi vẫn phải chat được khi đang quay video / chụp ảnh).
 local CORE_GUI_TO_HIDE = {
@@ -177,7 +201,7 @@ local function applyHidden(hide: boolean)
 	end
 
 	for _, gui in playerGui:GetChildren() do
-		if gui:IsA("LayerCollector") and not isTopbarPlusGui(gui) then
+		if gui:IsA("LayerCollector") and not isTopbarPlusGui(gui) and not isTouchControlGui(gui) then
 			if hide then
 				if gui.Enabled then
 					suppressed[gui] = true
@@ -210,12 +234,31 @@ end
 function TopBarController.Init()
 	localPlayer:WaitForChild("PlayerGui")
 
-	-- 1. Nút ẩn giao diện. `oneClick(false)` (mặc định) ⇒ bấm lần nữa là bỏ chọn, đúng kiểu
-	--    công tắc; trạng thái "đang chọn" cũng chính là dấu hiệu giao diện đang bị ẩn.
+	--[[
+		1. Nút ẩn giao diện. `oneClick(false)` (mặc định) ⇒ bấm lần nữa là bỏ chọn, đúng kiểu
+		   công tắc; trạng thái "đang chọn" cũng chính là dấu hiệu giao diện đang bị ẩn.
+
+		⚠️ `autoDeselect(false)` — ĐỪNG GỠ (bug user 2026-08-21: "bật ẩn UI rồi bấm khoá màn
+		hình thì UI hiện lại, và ngược lại").
+
+		TopbarPlus mặc định `deselectWhenOtherIconSelected = true` cho MỌI icon
+		(`Packages/_Index/…/topbarplus/src/init.lua`, dòng 236), và ở dòng 384 nó nghe
+		`anyIconSelected`: hễ một icon được chọn thì mọi icon khác có cờ đó tự bỏ chọn. Mặc
+		định này hợp lý cho MENU — kiểu radio, mỗi lúc mở một bảng. Nhưng Ẩn-giao-diện và
+		Khoá-camera là hai CÔNG TẮC ĐỘC LẬP: bật cái này không có lý do gì tắt cái kia.
+
+		Đây là lý do triệu chứng đối xứng một cách kỳ lạ (bật A rồi bấm B thì A tắt, và ngược
+		lại) — không phải hai lỗi, mà là một cơ chế radio dùng nhầm chỗ. Vì việc bỏ chọn đi qua
+		đúng `bindEvent("deselected")` nên `setHidden(false)`/`setCameraLocked(false)` chạy
+		thật, không có lỗi nào in ra.
+
+		Phải tắt cờ ở CẢ HAI icon: dòng 384 chỉ bỏ chọn khi cả hai bên đều còn bật cờ.
+	]]
 	Icon.new()
 		:setName("HideUiIcon")
 		:setImage(ICON_HIDE)
 		:setCaption("Ẩn giao diện")
+		:autoDeselect(false)
 		:bindEvent("selected", function()
 			setHidden(true)
 		end)
@@ -252,10 +295,9 @@ function TopBarController.Init()
 		phương hướng giữa lúc đang nhảy — và ở game này tốc độ 100–250 WS thì mất phương hướng
 		nửa giây là rơi.
 
-		Cách khoá: `DevTouchCameraMode = Follow` (và bản Computer tương ứng) — camera TỰ BÁM SAU
-		LƯNG theo hướng chạy, đúng thứ người chơi obby muốn. Đây là chế độ có sẵn của Roblox nên
-		không phải tự viết vòng lặp camera đè lên camera mặc định (cách đó luôn giật khi hai bên
-		cùng ghi CFrame mỗi frame).
+		Cách khoá: shift lock TỰ DỰNG — nhân vật xoay theo camera mỗi frame. Toàn bộ cơ chế và
+		lý do KHÔNG dùng `DevTouchCameraMode` nằm ở khối "SHIFT LOCK TỰ DỰNG" đầu file; đừng
+		đọc mỗi khối này rồi đi tìm `DevTouchCameraMode` trong code, nó đã bị gỡ từ 2026-08-14.
 
 		`oneClick(false)` (mặc định): đây là CÔNG TẮC, trạng thái "đang chọn" của icon chính là
 		dấu hiệu camera đang khoá — khác với nút Cài đặt vốn chỉ mở modal rồi thôi.
@@ -274,10 +316,15 @@ function TopBarController.Init()
 		lại. Rời khỏi diện mobile mà nút đang bật thì TỰ NHẢ KHOÁ — không bao giờ để ai kẹt con
 		trỏ vì một cái nút vừa biến mất khỏi màn hình.
 	]]
-	local cameraLockIcon = Icon.new()
+	local cameraLockIcon = Icon
+		.new()
 		:setName("CameraLockIcon")
 		:setImage(ICON_CAMERA_LOCK)
 		:setCaption("Khoá camera")
+		-- Xem khối lý do dài ở `HideUiIcon`: hai công tắc độc lập, KHÔNG phải radio.
+		:autoDeselect(
+			false
+		)
 		:bindEvent("selected", function()
 			setCameraLocked(true)
 		end)
@@ -308,8 +355,12 @@ function TopBarController.Start()
 
 	-- ScreenGui dựng SAU khi đã ẩn (modal mở lần đầu, ReviveModal…) cũng phải tắt theo,
 	-- nếu không bấm ẩn xong mở modal là giao diện lòi ra lại.
+	-- ⚠️ Phải lọc y hệt `applyHidden`, kể cả cụm điều khiển cảm ứng: Roblox HUỶ RỒI DỰNG LẠI
+	-- `TouchGui` mỗi lần đổi kiểu điều khiển, nên bản dựng lại đi qua đúng nhánh này. Thiếu
+	-- `isTouchControlGui` ở đây thì lỗi "ẩn UI xong hết nhảy được" quay lại, chỉ khác là nó
+	-- chỉ xuất hiện khi người chơi đổi kiểu điều khiển giữa lúc đang ẩn — càng khó lần ra.
 	playerGui.ChildAdded:Connect(function(child)
-		if not isHidden or not child:IsA("LayerCollector") or isTopbarPlusGui(child) then
+		if not isHidden or not child:IsA("LayerCollector") or isTopbarPlusGui(child) or isTouchControlGui(child) then
 			return
 		end
 		task.defer(function()
