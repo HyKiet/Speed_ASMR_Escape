@@ -44,12 +44,28 @@ local MAX_WAIT_SECONDS = 20
 local MIN_SHOW_SECONDS = 1.6
 
 -- Chép tay từ HUD/Tokens (xem lý do ở đầu file).
-local FONT = Enum.Font.FredokaOne
 local INK = Color3.fromRGB(18, 18, 30)
 local GOLD = Color3.fromRGB(255, 205, 46)
 local GOLD_DEEP = Color3.fromRGB(255, 162, 28)
-local DIM = Color3.fromRGB(150, 156, 178)
-local SUNBURST = "rbxassetid://87577740080014"
+
+--[[
+	Ảnh nền tràn màn hình (2026-08-24). Cùng tấm art với thumbnail của game, cố ý: thứ người
+	chơi vừa bấm vào ở Home phải là thứ họ thấy ngay khi vào — không có một giây nào họ phải
+	tự hỏi "mình vào đúng game chưa".
+
+	⚠️ Asset ảnh trong game bị Roblox chặn cứng ở **1024×1024**. Ảnh to hơn vẫn upload được
+	nhưng engine tự bóp xuống, và nó bóp xấu hơn mình tự bóp. Xuất lại thì xuất đúng 1024
+	chiều rộng (1024×576 cho 16:9).
+
+	KHÔNG đưa ảnh này vào `PreloadAsync` ở bước 3: `PreloadAsync` CHẶN, mỗi asset thêm vào đó
+	là màn hình chờ dài thêm — mà cả file này tồn tại để RÚT NGẮN cảm giác chờ. Ảnh tự stream
+	về rồi mờ dần hiện ra (xem `IsLoaded` bên dưới), chờ nó là tự mâu thuẫn.
+]]
+local BACKGROUND = "rbxassetid://97656375918556"
+
+-- Lớp tối phủ lên ảnh. Ảnh thumbnail vốn rực rỡ và nhiều chi tiết; không có lớp này thì
+-- thanh vàng chìm vào nền và màn hình đọc ra như một ảnh chụp bị treo, không ra "đang tải".
+local SCRIM_TRANSPARENCY = 0.45
 
 local localPlayer = Players.LocalPlayer
 
@@ -74,12 +90,43 @@ bg.BackgroundColor3 = INK
 bg.BorderSizePixel = 0
 bg.Parent = gui
 
--- Nền chuyển sắc nhẹ: phẳng tuyệt đối trông như màn hình lỗi, một chút chiều sâu là đủ
--- để đọc ra "đây là màn hình có chủ đích".
+-- Nền chuyển sắc nhẹ NẰM DƯỚI ảnh: nó là thứ người chơi thấy trong khoảnh khắc ảnh chưa
+-- stream về, và là bản dự phòng vĩnh viễn nếu asset lỗi. Phẳng tuyệt đối trông như màn hình
+-- lỗi, một chút chiều sâu là đủ để đọc ra "đây là màn hình có chủ đích".
 local bgGradient = Instance.new("UIGradient")
 bgGradient.Color = ColorSequence.new(Color3.fromRGB(28, 28, 46), INK)
 bgGradient.Rotation = 90
 bgGradient.Parent = bg
+
+local photo = Instance.new("ImageLabel")
+photo.BackgroundTransparency = 1
+photo.Size = UDim2.fromScale(1, 1)
+photo.Image = BACKGROUND
+-- `Crop` chứ không phải `Stretch`: điện thoại và PC có tỉ lệ khác nhau, kéo giãn là méo mặt
+-- nhân vật. Crop cắt bớt mép và giữ nguyên tỉ lệ.
+photo.ScaleType = Enum.ScaleType.Crop
+-- Bắt đầu trong suốt rồi mờ dần hiện ra khi ảnh về tới nơi. Không có bước này thì ảnh "bụp"
+-- một cái giữa màn hình chờ — trông y như lỗi render.
+photo.ImageTransparency = 1
+photo.Parent = bg
+
+do
+	local function reveal()
+		if photo.IsLoaded then
+			TweenService:Create(photo, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { ImageTransparency = 0 }):Play()
+		end
+	end
+	-- Một connection, không có vòng lặp mỗi frame — đúng nguyên tắc ở đầu file.
+	photo:GetPropertyChangedSignal("IsLoaded"):Connect(reveal)
+	reveal() -- ảnh đã nằm sẵn trong cache (lần vào thứ hai) thì IsLoaded đúng ngay
+end
+
+local scrim = Instance.new("Frame")
+scrim.Size = UDim2.fromScale(1, 1)
+scrim.BackgroundColor3 = INK
+scrim.BackgroundTransparency = SCRIM_TRANSPARENCY
+scrim.BorderSizePixel = 0
+scrim.Parent = bg
 
 -- Cụm giữa: gom vào một Frame để fade/scale CẢ CỤM bằng đúng một tween.
 local center = Instance.new("Frame")
@@ -93,63 +140,14 @@ local centerScale = Instance.new("UIScale")
 centerScale.Scale = 0.94
 centerScale.Parent = center
 
--- Hào quang xoay sau chữ. Cùng asset với nút Shop nên màn chờ trông cùng một game.
-local halo = Instance.new("ImageLabel")
-halo.BackgroundTransparency = 1
-halo.AnchorPoint = Vector2.new(0.5, 0.5)
-halo.Position = UDim2.fromScale(0.5, 0.44)
-halo.Size = UDim2.fromScale(0.62, 0.62)
-halo.SizeConstraint = Enum.SizeConstraint.RelativeYY
-halo.Image = SUNBURST
-halo.ImageColor3 = GOLD
-halo.ImageTransparency = 0.88
-halo.Parent = center
-
-local title = Instance.new("TextLabel")
-title.BackgroundTransparency = 1
-title.AnchorPoint = Vector2.new(0.5, 0.5)
-title.Position = UDim2.fromScale(0.5, 0.44)
-title.Size = UDim2.fromScale(0.72, 0.13)
-title.Font = FONT
-title.Text = "+1 SPEED ESCAPE"
-title.TextColor3 = GOLD
-title.TextScaled = true
-title.Parent = center
-
-local titleGradient = Instance.new("UIGradient")
-titleGradient.Color = ColorSequence.new(GOLD, GOLD_DEEP)
-titleGradient.Rotation = 90
-titleGradient.Parent = title
-
-local titleStroke = Instance.new("UIStroke")
-titleStroke.Color = INK
-titleStroke.Thickness = 5
-titleStroke.Parent = title
-
--- Nhịp thở của tiêu đề: thứ duy nhất chuyển động liên tục. Mắt bám vào nó nên màn hình
--- không bao giờ trông như đã treo, kể cả khi thanh tiến trình đứng yên chờ mạng.
-local titleScale = Instance.new("UIScale")
-titleScale.Scale = 1
-titleScale.Parent = title
-
-local status = Instance.new("TextLabel")
-status.BackgroundTransparency = 1
-status.AnchorPoint = Vector2.new(0.5, 0.5)
-status.Position = UDim2.fromScale(0.5, 0.565)
-status.Size = UDim2.fromScale(0.6, 0.042)
-status.Font = FONT
-status.Text = "Loading world"
-status.TextColor3 = DIM
-status.TextScaled = true
-status.Parent = center
-
 --------------------------------------------------------------------------------
 -- Thanh tiến trình
 --------------------------------------------------------------------------------
 
 local barBg = Instance.new("Frame")
 barBg.AnchorPoint = Vector2.new(0.5, 0.5)
-barBg.Position = UDim2.fromScale(0.5, 0.645)
+-- Không còn chữ nào để nằm dưới ⇒ thanh về đúng giữa màn hình.
+barBg.Position = UDim2.fromScale(0.5, 0.5)
 barBg.Size = UDim2.fromScale(0.4, 0.024)
 barBg.BackgroundColor3 = Color3.fromRGB(40, 40, 62)
 barBg.BorderSizePixel = 0
@@ -183,37 +181,23 @@ barGradient.Parent = bar
 	về tiến trình: nó vẫn chỉ chạy khi có việc thật hoàn thành, chỉ là đi tới đó mượt hơn.
 ]]
 local BAR_TWEEN = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local function setProgress(alpha: number, text: string?)
+
+--[[
+	`label` KHÔNG còn hiện lên màn hình (nhãn trạng thái đã gỡ 2026-08-24), nhưng vẫn giữ
+	tham số: nó là thứ duy nhất cho biết màn hình chờ TREO Ở BƯỚC NÀO. Không có nó thì một
+	phiên chờ 20 giây chỉ để lại đúng một dòng "xong sau 20.0s" — không truy được gì.
+]]
+local lastStep = "start"
+local function setProgress(alpha: number, label: string?)
 	TweenService:Create(bar, BAR_TWEEN, { Size = UDim2.fromScale(math.clamp(alpha, 0, 1), 1) }):Play()
-	if text then
-		status.Text = text
+	if label then
+		lastStep = label
 	end
 end
 
 --------------------------------------------------------------------------------
 -- Hoạt ảnh nền (tween lặp — không tốn Lua mỗi frame)
 --------------------------------------------------------------------------------
-
--- Hào quang xoay đều. `math.huge` vòng lặp, engine tự chạy tới khi Instance bị huỷ.
-TweenService
-	:Create(halo, TweenInfo.new(14, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { Rotation = 360 })
-	:Play()
-
--- Nhịp thở tiêu đề: phóng nhẹ 1 ↔ 1.04, đảo chiều (reverses = true).
-TweenService
-	:Create(
-		titleScale,
-		TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Scale = 1.04 }
-	)
-	:Play()
-
--- Hào quang cũng thở, lệch pha với chữ để hai chuyển động không trùng nhịp.
-TweenService:Create(
-	halo,
-	TweenInfo.new(2.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-	{ ImageTransparency = 0.8 }
-):Play()
 
 -- Cụm giữa trôi vào: 0.94 → 1. Chỉ chạy một lần, tạo cảm giác màn hình "mở ra".
 TweenService:Create(centerScale, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
@@ -252,11 +236,15 @@ end
 --    hàng phút, mà phần lớn nằm ngoài tầm nhìn.
 setProgress(0.6, "Preparing interface")
 do
-	local toPreload: { Instance } = { halo }
+	local toPreload: { Instance } = {}
 	local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui")
 	if playerGui then
 		for _, d in playerGui:GetDescendants() do
-			if d:IsA("ImageLabel") or d:IsA("ImageButton") then
+			-- ⚠️ LOẠI TRỪ `photo` — nó nằm TRONG PlayerGui nên vòng quét này gom trúng nó.
+			-- Chờ ảnh nền của chính màn hình chờ là tự mâu thuẫn: `PreloadAsync` chặn, nên
+			-- màn hình chờ sẽ đứng thêm đúng bằng thời gian tải tấm ảnh mà nó đang hiển thị.
+			-- Ảnh tự stream về rồi mờ dần hiện ra qua `IsLoaded` (xem chỗ dựng `photo`).
+			if (d:IsA("ImageLabel") or d:IsA("ImageButton")) and d ~= photo then
 				table.insert(toPreload, d)
 			end
 		end
@@ -287,10 +275,8 @@ local FADE = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Cụm giữa phóng nhẹ ra trong lúc mờ: cảm giác "màn hình lùi ra sau" thay vì tắt phụt.
 TweenService:Create(centerScale, FADE, { Scale = 1.08 }):Play()
-TweenService:Create(title, FADE, { TextTransparency = 1 }):Play()
-TweenService:Create(status, FADE, { TextTransparency = 1 }):Play()
-TweenService:Create(titleStroke, FADE, { Transparency = 1 }):Play()
-TweenService:Create(halo, FADE, { ImageTransparency = 1 }):Play()
+TweenService:Create(photo, FADE, { ImageTransparency = 1 }):Play()
+TweenService:Create(scrim, FADE, { BackgroundTransparency = 1 }):Play()
 TweenService:Create(barBg, FADE, { BackgroundTransparency = 1 }):Play()
 TweenService:Create(barStroke, FADE, { Transparency = 1 }):Play()
 TweenService:Create(bar, FADE, { BackgroundTransparency = 1 }):Play()
@@ -300,4 +286,11 @@ fade:Play()
 fade.Completed:Wait()
 gui:Destroy()
 
-print(("[LoadingScreen] xong sau %.1fs"):format(os.clock() - startedAt))
+do
+	local elapsed = os.clock() - startedAt
+	print(("[LoadingScreen] xong sau %.1fs (bước cuối: %s)"):format(elapsed, lastStep))
+	-- Chạm trần chờ nghĩa là có bước không bao giờ xong — `lastStep` chỉ đúng chỗ đó.
+	if elapsed >= MAX_WAIT_SECONDS then
+		warn(("[LoadingScreen] CHẠM TRẦN %ds — kẹt ở bước %q"):format(MAX_WAIT_SECONDS, lastStep))
+	end
+end
