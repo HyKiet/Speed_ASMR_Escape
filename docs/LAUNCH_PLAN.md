@@ -1,6 +1,6 @@
 # Kế hoạch ra mắt — +1 Speed ASMR Escape
 
-> Chốt 2026-08-13 · **Cập nhật 2026-08-24** (số liệu Ads Manager thật + phí publish được miễn).
+> Chốt 2026-08-13 · **Cập nhật 2026-08-24** (ngưỡng tụt 500 → 250, số liệu Ads Manager thật, phí publish được miễn).
 > Bản trình bày: https://claude.ai/code/artifact/bcb5d0d1-c173-46e7-bbbd-aa5d46edca7f
 >
 > Vốn: **2.000.000 ₫** · Cửa sổ: **60 ngày**
@@ -15,7 +15,10 @@
 | Thêm mục 7: **Plays hay Engagement** | Trả lời dứt điểm bằng số thật, kèm chỗ bài devlog đọc sai |
 | GĐ 3 đổi từ "hai đợt cố định" sang **thăm dò rồi ngoại suy** | Chi phí mỗi highly engaged player là ẩn số. Đặt cược 40 credit vào một con số chưa ai đo là sai quy trình |
 | GĐ 0 cập nhật theo tình trạng code thật | AntiCheat đã bật rồi; hai mục kia thì **chưa** làm — xem mục 9 |
-| Mục 3 nói rõ hơn | Traffic quảng cáo bị loại khỏi tín hiệu, **nhưng** người do ads mang về mà hôm sau tự quay lại qua Home thì có tính |
+| **Ngưỡng Kids & Select 500 → 250** | Roblox hạ 50% từ **19/08/2026**. Đây là thay đổi lớn nhất của bản này — nó chia đôi phép tính ở GĐ 3 |
+| **Thêm: bar duy trì 25 HEP** | Vượt cửa KHÔNG phải là xong. Kế hoạch cũ hoàn toàn không có mục này |
+| **Rút lại** ghi chú "người quay lại có tính" | Đọc kỹ tài liệu Discovery: Roblox loại **cả người dùng** đã được ads mang về, không chỉ lượt vào đầu. Bản 2026-08-24 sáng nay tôi viết sai — xem mục 3 |
+| Sửa nguồn của bảng tín hiệu | Bảng chi tiết đến từ **Creator Hub → Discovery**, không phải bài DevForum. Bài DevForum chỉ nêu hai nhóm lớn |
 
 ---
 
@@ -31,30 +34,54 @@ Thêm một điểm của bản 06/2026 mà kế hoạch cũ chưa ghi: **mọi 
 
 ## 2. Bảng tín hiệu chính thức
 
+> Nguồn của bảng này là **Creator Hub → Discovery**, KHÔNG phải bài DevForum. Bài DevForum
+> "Boost Your Discovery" chỉ nêu hai nhóm lớn — *retention* và *monetization* — và cố ý không
+> đưa chi tiết kỹ thuật. Kế hoạch cũ ghi nhầm nguồn.
+
 **Quan trọng nhất**
-- Play-through rate — icon/thumbnail, thấy rồi có bấm không
-- First-play bounce rate — tín hiệu **âm**, vào rồi thoát ngay
-- Play days / user — đo ở cả ba mốc D1 · D2–7 · D8–28
-- Playtime / user — **trần 60 phút/ngày**, cày quá không tính thêm
+- **Play-through rate** — tỉ lệ người thấy game trong sort *Recommended For You* rồi bấm vào
+- **First-play bounce rate** — tín hiệu **âm**. Đo ở **hai mốc: dưới 60 giây và 61–180 giây**
+- **Play days / user** — số ngày duy nhất có chơi, đo ở cả ba mốc D1 · D2–7 · D8–28
+- **Playtime / user** — **trần 60 phút / người / game / ngày**, cày quá không tính thêm
 
 **Quan trọng**
-- Intentional co-play days — rủ bạn cùng chơi (game hiện gần như không có)
-- Qualified play sessions
+- Intentional co-play days / user — quay lại chơi cùng bạn qua join, lời mời, private server
+- Qualified play sessions / user — đã lọc bỏ lượt bấm nhầm
 - Spend days / user — số **ngày** có chi tiêu, nhiều lần nhỏ thắng một lần lớn
 - Robux spent / user
+
+Con số **60 giây** đáng để nhắm riêng: đó là ngưỡng bounce đầu tiên. Với game này nghĩa là
+**trong 60 giây đầu người chơi phải chạm được vào một sàn ASMR** — thứ khác biệt duy nhất so
+với hàng nghìn speed simulator khác. Màn hình chờ ~5,7 giây đã ăn 10% quỹ đó.
+
+Ngoài ra bài DevForum có một ý đáng giữ: Roblox nói **4 yếu tố** chi phối số lượt hiển thị
+Home mà một game nhận được — thay đổi trong gameplay, cập nhật thuật toán, mùa vụ của nền
+tảng, và **hiệu năng của đối thủ**. Ba cái sau bạn không điều khiển được. Nên khi lượt hiển
+thị tụt mà bạn không đổi gì, đừng vội kết luận là game hỏng.
 
 ## 3. Điều quan trọng nhất
 
 > Tất cả tín hiệu trên **chỉ đo người tới tự nhiên qua Home recommendations**.
 > Người vào từ quảng cáo, tìm kiếm, mạng xã hội đều **bị loại khỏi phép tính**.
 
-Nên tiền quảng cáo **không mua được thứ hạng đề xuất**. Nó mua được ba thứ:
+Câu chữ chính xác trong tài liệu Discovery:
+
+> *"Roblox doesn't count the engagement, monetization, or retention of **users first acquired
+> from ads**, curation, friends, search, social media, or any other source."*
+
+Nên tiền quảng cáo **không mua được thứ hạng đề xuất**. Nó mua được đúng hai thứ:
 
 1. **Dữ liệu creative** — thumbnail nào có tỉ lệ bấm cao, để áp cho traffic tự nhiên
-2. **Tư cách Kids & Select** — ngưỡng 500 người chơi gắn bó
-3. **Hạt giống gián tiếp** — người do ads mang về, nếu hôm sau **tự quay lại qua Home**, thì lần quay lại ĐÓ là organic và có tính
+2. **Tư cách Kids & Select** — ngưỡng người chơi gắn bó (mục 4)
 
-Điểm 3 là chỗ kế hoạch cũ nói quá tay ("ngân sách này không mua được, ở bất kỳ cách tiêu nào"). Nói cho đúng: **lượt vào đầu tiên không tính, lượt quay lại thì tính.** Nhưng nó chỉ có giá trị nếu game giữ được người — tức là nó khuếch đại chất lượng game chứ không thay thế được. Game rò rỉ người thì ads chỉ đổ tiền qua lỗ thủng nhanh hơn.
+⚠️ **RÚT LẠI điểm 3 của bản sáng 2026-08-24.** Sáng nay tôi thêm ý "người do ads mang về mà
+hôm sau tự quay lại qua Home thì lượt đó có tính", dựa trên một blog bên thứ ba. Đọc kỹ tài
+liệu gốc thì **sai**: Roblox loại **cả NGƯỜI DÙNG** đã được ads mang về (`users first
+acquired from ads`), không phải chỉ loại lượt vào đầu tiên. Một người vào lần đầu qua quảng
+cáo thì **retention của họ về sau cũng không được tính**.
+
+Kết luận cũ đứng nguyên và còn cứng hơn: ngân sách này không mua được thứ hạng, ở bất kỳ
+cách tiêu nào.
 
 ## 4. Cửa Kids & Select
 
@@ -65,13 +92,40 @@ Nên tiền quảng cáo **không mua được thứ hạng đề xuất**. Nó 
 | Cam kết tài chính | Phí một lần mỗi game **hoặc** Premium/Plus 2 tháng liên tiếp | **0 — đã Exempt** ✅ |
 | Giai đoạn thử | Game chỉ mở cho người age-checked **16+** trong lúc xét | — |
 | Xét an toàn | Roblox soi báo cáo kiểm duyệt và gameplay | — |
-| **Ngưỡng vượt cửa** | **500 lượt chơi duy nhất** từ highly engaged age-checked users, trong **60 ngày** | Xem GĐ 3 |
+| **Ngưỡng vượt cửa** | ~~500~~ → **250 lượt chơi duy nhất** từ highly engaged age-checked users, trong **60 ngày** | Xem GĐ 3 |
+| **Bar DUY TRÌ** | **25 highly engaged players** — phải giữ được sau khi đã vào | Vĩnh viễn |
+
+### ⭐ Ngưỡng tụt 500 → 250 từ 19/08/2026
+
+Roblox hạ **50%** ngưỡng vào Kids & Select. Đây là lần chỉnh thứ **ba trong hai tháng**:
+
+| Ngày | Thay đổi |
+|---|---|
+| 06/07/2026 | Nới định nghĩa "Highly Engaged Player" |
+| 16/07/2026 | Hạ bar **duy trì** xuống 25 |
+| **19/08/2026** | **Hạ ngưỡng vào từ 500 xuống 250** |
+
+Nhịp đó tự nó là một tín hiệu: Roblox đang **cố tình mở cửa cho game nhỏ**. Với kế hoạch này
+nó chia đôi mọi phép tính ở GĐ 3 — xem lại bảng cổng quyết định.
+
+⚠️ Phí Expedited Review **không** giảm theo (vẫn 100.000 R$ theo thảo luận trong bài). Đừng
+tính đường đó vào ngân sách 2 triệu.
 
 **"Highly engaged player"** = đạt đồng thời yêu cầu về tuổi tài khoản, thời gian chơi trong game bạn, và **có mua thứ gì đó ở bất kỳ đâu trên Roblox trong 60 ngày qua**. Họ **không cần mua gì trong game bạn**.
 
-⚠️ **Ngưỡng 500 đếm CẢ người tới tự nhiên, không chỉ người từ ads.** Đây là chỗ kế hoạch cũ ngầm hiểu sai thành "phải mua đủ 500 bằng credit". Không phải — ads chỉ là một trong hai nguồn, và với ngân sách này thì **nguồn phụ**. Xem phép tính ở GĐ 3.
+⚠️ **Ngưỡng 250 đếm CẢ người tới tự nhiên, không chỉ người từ ads.** Ads chỉ là một trong hai nguồn, và với ngân sách này thì **nguồn phụ**. Xem phép tính ở GĐ 3.
 
-**Tình trạng hiện tại (Creator Hub, cập nhật 18/08/2026):** `Highly engaged players — **Eligible** — 0`. Đã đủ tư cách tích luỹ, đồng hồ đang ở 0.
+### Vượt cửa KHÔNG phải là xong — bar duy trì 25
+
+Kế hoạch cũ hoàn toàn thiếu mục này. Sau khi vào được Kids & Select, game phải **giữ 25
+highly engaged players**; tụt dưới là mất tư cách. Hệ quả cho vận hành:
+
+- 250 là cuộc **chạy nước rút** 60 ngày; 25 là cuộc **chạy bền** vĩnh viễn
+- Đốt hết credit để chạm 250 rồi bỏ mặc game = vào cửa xong rơi ra ngay
+- Vì vậy nhịp update hằng tuần ở `docs/LIVEOPS.md` **không phải việc làm thêm** — nó chính là
+  thứ giữ con số 25 khỏi tụt. Theo dõi ở Creator Hub → **Audience Reach**
+
+**Tình trạng hiện tại (Creator Hub, 18/08/2026):** `Highly engaged players — **Eligible** — 0`. Đủ tư cách tích luỹ, đồng hồ ở 0. (Ảnh chụp ngày 18/08 nên nó vẫn hiện ngưỡng cũ — số thật giờ là 250.)
 
 Vì phí đã được miễn, **rớt ngưỡng giờ không mất gì ngoài credit đã tiêu** — không còn khoản 1.000 R$ nào bị treo 90 ngày. Cửa này rẻ hơn hẳn so với lúc lập kế hoạch.
 
@@ -129,9 +183,9 @@ Lấy tròn **75 credit**, chừa phần chênh tỉ giá. Kiểm giá thật �
 
 **Câu hỏi sai.** Tài liệu Roblox nói thẳng: Engagement tiếp cận **age-checked highly engaged players mà session của họ được tính vào ngưỡng Kids & Select**; Plays tiếp cận **người có khả năng mở game cao nhất, dùng khi muốn phân phối rộng hoặc muốn traffic ban đầu cho hệ đề xuất học**. Roblox còn khuyên: nếu mục tiêu là ngưỡng Kids & Select thì **dùng ngân sách RIÊNG cho Engagement, đừng rút từ ngân sách Plays**.
 
-Và TLDR của chính bài devlog đó cũng nói y hệt: *"want 500 engaged? Do engagement. Want more CCU from ads for the algo? Do plays."* — tức là **bài viết đồng ý với kế hoạch cũ**, không phản bác.
+Và TLDR của chính bài devlog đó cũng nói y hệt: *"want 500 engaged? Do engagement. Want more CCU from ads for the algo? Do plays."* — tức là **bài viết đồng ý với kế hoạch cũ**, không phản bác. (Bài viết trước 19/08 nên còn ghi 500; con số giờ là **250**, kết luận không đổi.)
 
-> **Engagement là con đường DUY NHẤT tới ngưỡng 500.** Plays không đóng góp một người nào vào đó.
+> **Engagement là con đường DUY NHẤT tới ngưỡng 250.** Plays không đóng góp một người nào vào đó.
 > Nên "Plays rẻ hơn nên chọn Plays" giống như nói "xe máy rẻ hơn máy bay nên bay bằng xe máy".
 
 ### 7.4. Nhưng số CPM đó lại đổi một thứ — THỨ TỰ
@@ -151,7 +205,7 @@ Engagement đắt hơn **3,45× mỗi lượt hiển thị**. Nghĩa là chạy 
 Không tiêu đồng credit nào trước khi xong.
 
 - [x] ~~Bật lại AntiCheat~~ — **đã xong**, `AntiCheatConfig.ENABLED = true`
-- [ ] ⚠️ **Nghiệm thu AntiCheat ở Zone 15** — `STAGE_EXTRA_ALLOWANCE` có `[12] [13] [14]` nhưng **không có `[15]`**, mà Zone 15 có SplitFloor + ShiftBridge tự dịch chuyển. Chạy tốc độ cao qua Zone 15 rồi soi log `[AntiCheat]`; thấy dòng nào thì thêm `[15] = <studs/s của sàn> + 60`. Test tay không bắt được lỗi này — triệu chứng là **giật ngược oan**, không phải hỏng
+- [x] ~~Nghiệm thu AntiCheat ở Zone 15~~ — **đã xong 2026-08-24**. `STAGE_EXTRA_ALLOWANCE[15] = 360`. Không lùa nhân vật chạy qua (teleport tay tự sinh strike giả) mà **vi phân số chính hàm sinh chuyển động**: `ShuttleOffset` đỉnh **299,9 studs/s**, SplitFloor 199,9 ⇒ 300 + 60 = 360
 - [x] ~~Tặng 1 vé quay chào mừng~~ — **đã xong 2026-08-24**. +1 vé ngay lần vào đầu, một lần cho mỗi tài khoản (cờ `WelcomeSpinGranted`). Hook Studio phát vé test đã gỡ để Studio khớp production. Đo: vào lần đầu badge = 1, vào lại lần hai vẫn = 1
 - [~] **Công thức rebirth — GIỮ NGUYÊN `50 + r*10`, user chốt 2026-08-24.** Sẽ viết công thức mới khi thiết kế World 2 và **chỉ áp cho World 2**
 
@@ -201,21 +255,24 @@ Kế hoạch cũ đặt cược 40 credit vào một con số chưa ai đo: **cr
 
 ```
 credit cho mỗi HEP        = 15 / H
-credit cần cho 500 người  = 500 × 15 / H  =  7500 / H
+credit cần cho 250 người  = 250 × 15 / H  =  3750 / H
 ```
 
-| H đo được sau 3 ngày | Ngoại suy để đủ 500 | Quyết |
+| H đo được sau 3 ngày | Ngoại suy để đủ **250** | Quyết |
 |---|---|---|
-| ≥ 190 | ≤ 40 credit | **Chạy tiếp GĐ 3b**, thừa sức |
-| 100 – 190 | 40 – 75 credit | Chạy tiếp, nhưng **500 phải trông cậy thêm vào traffic tự nhiên** |
-| < 100 | > 75 credit | **Dừng.** Ngân sách không mua nổi ngưỡng — dồn phần còn lại sang mục 10 |
+| **≥ 94** | ≤ 40 credit | **Chạy tiếp GĐ 3b**, thừa sức |
+| **50 – 94** | 40 – 75 credit | Chạy tiếp, nhưng 250 vẫn phải **trông cậy thêm traffic tự nhiên** |
+| **< 50** | > 75 credit | **Dừng.** Ngân sách không mua nổi ngưỡng — dồn phần còn lại sang mục 10 |
 
-⚠️ Con số này **không cần ads gánh hết**: ngưỡng 500 đếm cả người tới tự nhiên. Nên hàng H thứ hai không phải thất bại — nó nghĩa là ads lo một nửa, TikTok và giữ chân lo nửa còn lại.
+Đối chiếu để thấy ngưỡng mới dễ tới mức nào: với ngưỡng cũ 500, ba hàng trên lần lượt là
+**≥ 188 · 100–188 · < 100**. Việc Roblox hạ 50% **chia đôi bar phải vượt ở mọi hàng**.
+
+⚠️ Con số này **không cần ads gánh hết**: ngưỡng 250 đếm cả người tới tự nhiên. Nên hàng H thứ hai không phải thất bại — nó nghĩa là ads lo một nửa, TikTok và giữ chân lo nửa còn lại.
 
 **GĐ 3b — Đẩy (35 credit / 7 ngày)**
 
 - Chỉ chạy nếu cổng trên cho qua
-- **Engagement không tự dừng khi đạt ngưỡng** — theo dõi và tắt tay
+- **Engagement không tự dừng khi đạt ngưỡng** — theo dõi Audience Reach và tắt tay ngay khi chạm 250
 - Vì phí đã Exempt, dừng giữa chừng **không mất gì ngoài credit đã tiêu**
 
 ### Phân bổ
@@ -232,11 +289,12 @@ credit cần cho 500 người  = 500 × 15 / H  =  7500 / H
 
 | Mục tiêu | Cũ | **Mới** | Vì sao đổi |
 |---|---|---|---|
-| Vượt cửa Kids & Select trong 60 ngày | 45–60% | **50–65%** | Thêm 10 credit, phí Exempt (rớt không mất gì), và GĐ 3 giờ có cổng đo thay vì đặt cược |
+| Vượt cửa Kids & Select trong 60 ngày | 45–60% | **70–80%** | **Ngưỡng tụt 500 → 250** là lý do chính; cộng thêm 10 credit, phí Exempt (rớt không mất gì), và GĐ 3 giờ có cổng đo thay vì đặt cược |
+| **GIỮ được tư cách (bar 25) sau 3 tháng** | — | **55–70%** | Mục mới. Phụ thuộc nhịp update chứ không phụ thuộc credit — xem `docs/LIVEOPS.md` |
 | Đủ 30.000 R$ rút DevEx lần đầu trong 6 tháng | 30–40% | **30–40%** | Không đổi — vẫn phụ thuộc cửa trên |
 | Quảng cáo tự tạo tăng trưởng tự nhiên bền vững | < 5% | **< 10%** | Nhích lên vì điểm 3 mục 3 (người quay lại có tính), nhưng vẫn rất thấp |
 
-⚠️ **Các con số này giả định GĐ 0 đã xong.** Tình trạng 2026-08-24: vé chào mừng **đã xong**, rebirth **cố ý giữ nguyên** (đã tính vào bảng trên — nếu sửa cả rebirth thì cận trên nhích lên ~70%). Còn **3 mục chưa tick**, trong đó nặng nhất là **nghiệm thu AntiCheat Zone 15** và **mua thử 1 món trên Live**: món đầu có thể làm người chơi bị giật ngược oan giữa lúc chạy, món sau là đường tiền chưa từng chạy thật lần nào. Bỏ qua hai cái đó thì tụt dưới 20% — và đó là cách chắc chắn nhất để đốt 75 credit vô ích.
+⚠️ **Các con số này giả định GĐ 0 đã xong.** Tình trạng 2026-08-24: vé chào mừng ✅, AntiCheat Zone 15 ✅, rebirth **cố ý giữ nguyên** (đã trừ vào bảng trên — sửa cả rebirth thì cận trên nhích lên ~85%). Còn **2 mục**: **mua thử 1 món trên Live** (đường tiền chưa từng chạy thật lần nào) và **publish**. Bỏ qua món đầu là rủi ro lớn nhất còn lại — bán hàng hỏng mà không biết thì 75 credit đổ vào một cái quầy không thu được tiền.
 
 ## 10. Đòn bẩy thật sự không nằm trong 75 credit
 
@@ -244,7 +302,7 @@ credit cần cho 500 người  = 500 × 15 / H  =  7500 / H
 
 Điều này càng đúng hơn sau bản 06/2026: tín hiệu tính **trung bình trên mỗi người**, không phải tổng. Một game nhỏ mà người chơi ở lại sâu **không hề bị thiệt** so với game to. Đó là sân chơi mà một người làm game có thể thắng — và quảng cáo trả tiền không mua được nó.
 
-Nếu cổng GĐ 3a cho kết quả xấu (H < 100), **đừng cố đấm nốt 35 credit**. Giữ lại, và đọc `docs/LIVEOPS.md` — nhịp update hằng tuần cộng với video ngắn tạo ra đúng loại traffic mà thuật toán đếm, còn credit thì không.
+Nếu cổng GĐ 3a cho kết quả xấu (H < 50), **đừng cố đấm nốt 35 credit**. Giữ lại, và đọc `docs/LIVEOPS.md` — nhịp update hằng tuần cộng với video ngắn tạo ra đúng loại traffic mà thuật toán đếm, còn credit thì không.
 
 ## Nguồn
 
@@ -254,6 +312,7 @@ Nếu cổng GĐ 3a cho kết quả xấu (H < 100), **đừng cố đấm nốt
 - [Roblox Kids and Select](https://create.roblox.com/docs/production/publishing/kids-and-select) — Creator Hub
 - [Ads Manager](https://create.roblox.com/docs/production/promotion/ads-manager) — Creator Hub (định nghĩa Plays vs Engagement)
 - [Roblox Kids and Select Global Launch: Updates to Eligibility, Ads Manager, Expedited Review](https://devforum.roblox.com/t/roblox-kids-and-select-global-launch-upcoming-updates-to-eligibility-ads-manager-and-expedited-review/4685717/1) — DevForum
+- ⭐ [Highly Engaged Player Threshold Drops to 250](https://devforum.roblox.com/t/highly-engaged-player-threshold-drops-to-250/4820164) — DevForum, **19/08/2026** (500 → 250; bar duy trì 25 từ 16/07)
 - [New Engagement Campaigns Suspiciously Have 0 Plays](https://devforum.roblox.com/t/new-engagement-campaigns-for-ads-manager-suspiciously-have-0-plays/4686589) — DevForum, 06/2026 (đã Fixed)
 - [Developer Exchange](https://create.roblox.com/docs/production/monetization/developer-exchange) — Creator Hub
 - Ảnh chụp Ads Manager + Creator Hub của user, 2026-08-24 (bảng 7.1 và mục 4)

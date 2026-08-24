@@ -48,6 +48,26 @@ local AntiCheatConfig = {
 		[12] = 220, -- Wind Tunnel: gió dịch chuyển 180 studs/s (client-side CFrame)
 		[13] = 280, -- Spring Fling: lò xo văng người tốc độ cao
 		[14] = 210, -- Quạt gió: đẩy ngang tối đa 160 studs/s (nền 30 + phạt 130 khi thiếu chuẩn)
+		--[[
+			[15] — ShiftBridge + SplitFloor: sàn TRƯỢT NGANG ra khỏi lối đi, kéo theo người
+			đang đứng trên nó. 300 studs/s + 60 = 360.
+
+			Con số 300 KHÔNG phải ước lượng: vi phân số chính `Zone15Traps.ShuttleOffset`
+			(2026-08-24, bước 1/240 s) ra **299,9 studs/s** — đúng bằng phép tính tay
+			`biên độ 60 ÷ OpenSeconds 0,30 × 1,5` (hệ số 1,5 là đỉnh đạo hàm của smoothstep
+			`a²(3−2a)`). SplitFloor chậm hơn: biên độ 40 cùng 0,30 s ⇒ đỉnh 199,9.
+
+			⚠️ ĐO LẠI KHI ĐỔI BẤT KỲ SỐ NÀO SAU ĐÂY: `Shuttle.Amplitude`, `SplitFloor.Slide`,
+			`Trigger.OpenSeconds`, hoặc hàm `smooth`. Cách đo lại (không cần lùa nhân vật
+			chạy qua — teleport tay chỉ tự sinh strike giả):
+			    local Z = require(ReplicatedStorage.Shared.Config.Zones.Zone15Traps)
+			    -- lấy max |ShuttleOffset(t+h) − ShuttleOffset(t)| / h trên t ∈ [0, 4], h = 1/240
+			Rồi đặt allowance = đỉnh đo được + 60.
+
+			Vì sao rộng tay: bỏ sót allowance thì người chơi bị GIẬT NGƯỢC OAN giữa lúc chạy —
+			hỏng gameplay thật. Nới dư một chút chỉ làm anti-cheat lỏng hơn ở đúng một stage.
+		]]
+		[15] = 360,
 	} :: { [number]: number },
 
 	-- VI PHẠM TỐC ĐỘ (speed hack): vượt allowed × 1 → tính 1 strike.
