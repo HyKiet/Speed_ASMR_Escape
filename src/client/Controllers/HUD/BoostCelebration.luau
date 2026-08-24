@@ -33,8 +33,8 @@ local Value = Fusion.Value
 	Giờ tra bảng dựng thẳng từ config, nên thêm trail/aura mới là icon tự có, không phải sửa
 	file này nữa.
 ]]
-local REBIRTH_ICON = "rbxassetid://97340434418797"
-local FROZEN_BLOOM_ICON = "rbxassetid://108748255826046"
+local REBIRTH_ICON = "rbxassetid://93516152861311"
+local FROZEN_BLOOM_ICON = "rbxassetid://130089911413779"
 
 -- TÊN VIẾT HOA → icon. Dựng từ CHÍNH các nguồn đang bán món đó, không chép tay số nào:
 --   • `Theme.SHOP_CATALOG` — treadmill, VIP, Auto-Rebirth, Infinite Revives, gói Wins…

@@ -39,7 +39,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 19,
 		gamepassId = Gamepass.BlueAura,
 		robuxOnly = false,
-		icon = "rbxassetid://107552777272624",
+		icon = "rbxassetid://132040380389763",
 	},
 	{
 		id = "aura_fire",
@@ -49,7 +49,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 39,
 		gamepassId = Gamepass.RedAura,
 		robuxOnly = false,
-		icon = "rbxassetid://113845846916391",
+		icon = "rbxassetid://131361020227062",
 	},
 	{
 		id = "aura_lightning",
@@ -59,7 +59,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 69,
 		gamepassId = Gamepass.CyanAura,
 		robuxOnly = false,
-		icon = "rbxassetid://102006106200647",
+		icon = "rbxassetid://134705106325607",
 	},
 	{
 		id = "aura_void",
@@ -69,7 +69,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 119,
 		gamepassId = Gamepass.PurpleAura,
 		robuxOnly = false,
-		icon = "rbxassetid://114605089289156",
+		icon = "rbxassetid://94846064098198",
 	},
 	{
 		id = "aura_cosmic",
@@ -79,7 +79,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 199,
 		gamepassId = Gamepass.PinkAura,
 		robuxOnly = false,
-		icon = "rbxassetid://122735408670566",
+		icon = "rbxassetid://77645993840068",
 	},
 	--[[
 		ĐỘC QUYỀN SPEED ROULETTE (Legendary 1%) — KHÔNG bán bằng Wins lẫn Robux.
@@ -107,7 +107,7 @@ local Auras: { AuraConfig } = {
 		gamepassId = 0,
 		robuxOnly = false,
 		spinOnly = true,
-		icon = "rbxassetid://108748255826046",
+		icon = "rbxassetid://130089911413779",
 	},
 
 	--[[
@@ -137,9 +137,9 @@ local Auras: { AuraConfig } = {
 		gamepassId = 0,
 		robuxOnly = false,
 		dailyOnly = true,
-		icon = "rbxassetid://105776222512667",
+		icon = "rbxassetid://92528777617879",
 		sourceLabel = "VIP MEMBERSHIP",
-		sourceIcon = "rbxassetid://105776222512667",
+		sourceIcon = "rbxassetid://92528777617879",
 	},
 
 	-- Premium auras (Workspace.Lobby.AuraBase) — CHỈ mua bằng Robux.
@@ -155,7 +155,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 799,
 		gamepassId = Gamepass.RedHeartAura,
 		robuxOnly = true,
-		icon = "rbxassetid://137619666833331",
+		icon = "rbxassetid://72208480526626",
 	},
 	{
 		id = "Flame",
@@ -165,7 +165,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 499,
 		gamepassId = Gamepass.FlameAura,
 		robuxOnly = true,
-		icon = "rbxassetid://115012781363807",
+		icon = "rbxassetid://79725903286461",
 	},
 	{
 		id = "Dark",
@@ -175,7 +175,7 @@ local Auras: { AuraConfig } = {
 		priceRobux = 299,
 		gamepassId = Gamepass.DarkAura,
 		robuxOnly = true,
-		icon = "rbxassetid://128551455361742",
+		icon = "rbxassetid://111251654272993",
 	},
 }
 

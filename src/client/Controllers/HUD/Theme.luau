@@ -168,7 +168,7 @@ Theme.UI_ASSETS = {
 	Rebirth = "rbxassetid://103236589125008",
 	-- Dùng ở CẢ thẻ Shop lẫn hàng Auto-Rebirth trong RebirthModal — cùng một món thì phải
 	-- cùng một hình, nên để một chỗ duy nhất thay vì chép số vào hai file.
-	AutoRebirth = "rbxassetid://82096179394611",
+	AutoRebirth = "rbxassetid://116599779624658",
 	Shop = "rbxassetid://80843877229491",
 	Shoe = "rbxassetid://93408043939834",
 	Cosmetics = "rbxassetid://100080362113682",
@@ -179,12 +179,12 @@ Theme.UI_ASSETS = {
 	Daily = "rbxassetid://112157950151947",
 	Spin = "rbxassetid://115585087379442",
 	-- Icon gói Starter Pack "Rookie Rocket" (upload 2026-08-11).
-	StarterPack = "rbxassetid://139598685571792",
+	StarterPack = "rbxassetid://118307385804362",
 	-- Icon riêng của 3 Server Boost (upload 2026-08-07). Trước đây 3 món này mượn tạm
 	-- Lightning/Trophy/Sunburst nên trùng icon với gamepass tốc độ và banner rebirth.
-	BoostSpeed = "rbxassetid://79122550480905",
-	BoostWins = "rbxassetid://99513694252408",
-	BoostMega = "rbxassetid://77898277931791",
+	BoostSpeed = "rbxassetid://108295439371685",
+	BoostWins = "rbxassetid://96631783666619",
+	BoostMega = "rbxassetid://88436956071393",
 	Robux = "rbxasset://textures/ui/common/robux.png",
 	Sunburst = "rbxassetid://87577740080014",
 	Studs = "rbxassetid://6372755229",
@@ -258,7 +258,7 @@ Theme.SPEED_PASS_TIERS = {
 		label = "x2 Speed",
 		passId = 1900262644,
 		priceRobux = 3,
-		icon = "rbxassetid://137328765527756",
+		icon = "rbxassetid://89007198526675",
 		colorA = Color3.fromRGB(255, 186, 69),
 		colorB = Color3.fromRGB(255, 128, 38),
 	}, -- cam-vàng
@@ -267,7 +267,7 @@ Theme.SPEED_PASS_TIERS = {
 		label = "x4 Speed",
 		passId = 1900160603,
 		priceRobux = 9,
-		icon = "rbxassetid://137892906025365",
+		icon = "rbxassetid://124212547985593",
 		colorA = Color3.fromRGB(210, 130, 255),
 		colorB = Color3.fromRGB(110, 40, 220),
 	}, -- tím
@@ -276,7 +276,7 @@ Theme.SPEED_PASS_TIERS = {
 		label = "x8 Speed",
 		passId = 1898810606,
 		priceRobux = 27,
-		icon = "rbxassetid://135357984448018",
+		icon = "rbxassetid://77118250729956",
 		colorA = Color3.fromRGB(255, 92, 78),
 		colorB = Color3.fromRGB(178, 10, 40),
 	}, -- đỏ
@@ -395,7 +395,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "gamepass",
 			purchaseId = 1899686706,
 			accentColor = Color3.fromRGB(255, 204, 61),
-			icon = "rbxassetid://105776222512667",
+			icon = "rbxassetid://92528777617879",
 			sortOrder = 1,
 		},
 		{
@@ -435,7 +435,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "product",
 			purchaseId = 3608400621,
 			accentColor = Color3.fromRGB(85, 205, 255),
-			icon = "rbxassetid://131686958279369",
+			icon = "rbxassetid://109786606823805",
 			sortOrder = 1,
 		},
 		{
@@ -447,7 +447,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "product",
 			purchaseId = 3608400807,
 			accentColor = Color3.fromRGB(84, 176, 255),
-			icon = "rbxassetid://119911459960204",
+			icon = "rbxassetid://71260375145896",
 			sortOrder = 2,
 		},
 		{
@@ -459,7 +459,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "product",
 			purchaseId = 3608401003,
 			accentColor = Color3.fromRGB(145, 103, 255),
-			icon = "rbxassetid://133004632727402",
+			icon = "rbxassetid://102287210836157",
 			sortOrder = 3,
 		},
 		{
@@ -471,7 +471,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "product",
 			purchaseId = 3608401110,
 			accentColor = Color3.fromRGB(255, 91, 172),
-			icon = "rbxassetid://135507450226013",
+			icon = "rbxassetid://88773458641747",
 			sortOrder = 4,
 		},
 	},
@@ -485,7 +485,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "gamepass",
 			purchaseId = 1899470645,
 			accentColor = Color3.fromRGB(186, 90, 255),
-			icon = "rbxassetid://135635489009529",
+			icon = "rbxassetid://125890131155035",
 			sortOrder = 1,
 		},
 		{
@@ -497,7 +497,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "gamepass",
 			purchaseId = 1898588703,
 			accentColor = Color3.fromRGB(85, 170, 255),
-			icon = "rbxassetid://120071147013773",
+			icon = "rbxassetid://118419162433792",
 			sortOrder = 2,
 		},
 		{
@@ -509,7 +509,7 @@ Theme.SHOP_CATALOG = {
 			purchaseKind = "gamepass",
 			purchaseId = 1898528586,
 			accentColor = Color3.fromRGB(255, 215, 71),
-			icon = "rbxassetid://137611735467502",
+			icon = "rbxassetid://92023811476152",
 			sortOrder = 3,
 		},
 		{
@@ -530,7 +530,7 @@ Theme.SHOP_CATALOG = {
 				nhất game lại nhận đúng cái icon "không biết đây là gì".
 				⚠️ Banner chúc mừng đọc icon TỪ ĐÂY — sửa chỗ này là cả hai màn cùng đổi.
 			]]
-			icon = "rbxassetid://139907590369911",
+			icon = "rbxassetid://121765522869673",
 			sortOrder = 4,
 		},
 	},

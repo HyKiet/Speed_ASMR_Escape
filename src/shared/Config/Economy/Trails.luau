@@ -37,7 +37,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 19,
 		gamepassId = Gamepass.GreenTrail,
 		robuxOnly = false,
-		icon = "rbxassetid://111936705345914",
+		icon = "rbxassetid://135057221958381",
 	},
 	{
 		id = "trail_blue",
@@ -47,7 +47,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 39,
 		gamepassId = Gamepass.BlueTrail,
 		robuxOnly = false,
-		icon = "rbxassetid://130967571306430",
+		icon = "rbxassetid://106380337668909",
 	},
 	{
 		id = "trail_purple",
@@ -57,7 +57,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 79,
 		gamepassId = Gamepass.PurpleTrail,
 		robuxOnly = false,
-		icon = "rbxassetid://121735437317524",
+		icon = "rbxassetid://90479939703962",
 	},
 	{
 		id = "trail_red",
@@ -67,7 +67,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 129,
 		gamepassId = Gamepass.RedTrail,
 		robuxOnly = false,
-		icon = "rbxassetid://96298714277525",
+		icon = "rbxassetid://88771062481969",
 	},
 	{
 		id = "trail_rainbow",
@@ -77,7 +77,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 199,
 		gamepassId = Gamepass.RainbowTrail,
 		robuxOnly = false,
-		icon = "rbxassetid://135589691416097",
+		icon = "rbxassetid://119020716903431",
 	},
 	{
 		id = "trail_galaxy",
@@ -87,7 +87,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 299,
 		gamepassId = Gamepass.GalaxyTrail,
 		robuxOnly = false,
-		icon = "rbxassetid://75951946143733",
+		icon = "rbxassetid://139702123798339",
 	},
 
 	--[[
@@ -125,7 +125,7 @@ local Trails: { TrailConfig } = {
 		-- Icon riêng của trail, upload 2026-08-20 (asset "Streak Auora Trail" 75078805622702).
 		-- Đây là nguồn DUY NHẤT cho icon món này: CosmeticModal đọc thẳng từ đây, và DailyModal
 		-- cũng lấy từ đây thay vì icon trail chung — đổi một chỗ là cả hai nơi theo.
-		icon = "rbxassetid://75078805622702",
+		icon = "rbxassetid://119741491258467",
 	},
 
 	--[[
@@ -153,11 +153,11 @@ local Trails: { TrailConfig } = {
 		dailyOnly = true,
 		-- Icon riêng (upload 2026-08-11). Trước đó mượn tạm `UI_ASSETS.Trail` nên trong menu
 		-- Cosmetics nó trùng icon với mọi trail thường — món độc quyền mà không có mặt riêng.
-		icon = "rbxassetid://111904416531019",
+		icon = "rbxassetid://132539495389858",
 		-- Nguồn thật của món này là Starter Pack, không phải chuỗi điểm danh (xem ghi chú ở
 		-- `sourceLabel` trong type). Icon = ảnh gói, cùng ảnh đang hiện trên HUD.
 		sourceLabel = "STARTER PACK",
-		sourceIcon = "rbxassetid://139598685571792",
+		sourceIcon = "rbxassetid://118307385804362",
 	},
 
 	--[[
@@ -186,9 +186,9 @@ local Trails: { TrailConfig } = {
 		gamepassId = 0,
 		robuxOnly = false,
 		dailyOnly = true,
-		icon = "rbxassetid://105776222512667",
+		icon = "rbxassetid://92528777617879",
 		sourceLabel = "VIP MEMBERSHIP",
-		sourceIcon = "rbxassetid://105776222512667",
+		sourceIcon = "rbxassetid://92528777617879",
 	},
 
 	-- Premium trails (Workspace.Lobby.TrailBase) — CHỈ mua bằng Robux (đồng bộ với Premium
@@ -203,7 +203,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 399,
 		gamepassId = Gamepass.MysticVioletTrail,
 		robuxOnly = true,
-		icon = "rbxassetid://77136364491261",
+		icon = "rbxassetid://76017848818562",
 	},
 	{
 		id = "Golden Ray Trail",
@@ -213,7 +213,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 599,
 		gamepassId = Gamepass.GoldenRayTrail,
 		robuxOnly = true,
-		icon = "rbxassetid://97434068900616",
+		icon = "rbxassetid://95868885702495",
 	},
 	{
 		id = "Crimson Fury Trail",
@@ -223,7 +223,7 @@ local Trails: { TrailConfig } = {
 		priceRobux = 899,
 		gamepassId = Gamepass.CrimsonFuryTrail,
 		robuxOnly = true,
-		icon = "rbxassetid://109080391627505",
+		icon = "rbxassetid://127060496840058",
 	},
 }
 
