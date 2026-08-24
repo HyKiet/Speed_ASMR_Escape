@@ -152,8 +152,19 @@ Không tiêu đồng credit nào trước khi xong.
 
 - [x] ~~Bật lại AntiCheat~~ — **đã xong**, `AntiCheatConfig.ENABLED = true`
 - [ ] ⚠️ **Nghiệm thu AntiCheat ở Zone 15** — `STAGE_EXTRA_ALLOWANCE` có `[12] [13] [14]` nhưng **không có `[15]`**, mà Zone 15 có SplitFloor + ShiftBridge tự dịch chuyển. Chạy tốc độ cao qua Zone 15 rồi soi log `[AntiCheat]`; thấy dòng nào thì thêm `[15] = <studs/s của sàn> + 60`. Test tay không bắt được lỗi này — triệu chứng là **giật ngược oan**, không phải hỏng
-- [ ] **Sửa công thức rebirth** — vẫn đang là `50 + r*10`. `docs/ECONOMY_REVIEW.md` đề xuất `50 + r*3`. Bức tường rơi đúng rebirth 4–5 = **tuần thứ hai** = đúng mốc Ngày 8–28 mà thuật toán đo nặng nhất
-- [ ] **Tặng 1 vé quay chào mừng** — vẫn chưa có. Hiện chỉ Studio hook mới phát vé; người mới thật vào game có **0 vé** và phải chờ
+- [x] ~~Tặng 1 vé quay chào mừng~~ — **đã xong 2026-08-24**. +1 vé ngay lần vào đầu, một lần cho mỗi tài khoản (cờ `WelcomeSpinGranted`). Hook Studio phát vé test đã gỡ để Studio khớp production. Đo: vào lần đầu badge = 1, vào lại lần hai vẫn = 1
+- [~] **Công thức rebirth — GIỮ NGUYÊN `50 + r*10`, user chốt 2026-08-24.** Sẽ viết công thức mới khi thiết kế World 2 và **chỉ áp cho World 2**
+
+> ⚠️ **Hệ quả phải biết khi giữ nguyên rebirth.** `docs/ECONOMY_REVIEW.md` đo được bức tường
+> rơi vào rebirth 4–5, tức **tuần thứ hai** của người chơi chăm — trùng đúng mốc **Ngày 8–28**
+> mà thuật toán 2026 đo nặng nhất, và cũng nằm trọn trong cửa sổ 60 ngày của Kids & Select.
+> Đây không phải phản đối quyết định, chỉ là ghi rõ cái giá: chỉ số Ngày 8–28 của World 1 sẽ
+> yếu hơn mức game này có thể đạt, và mục 9 đã tính điều đó vào.
+>
+> 📌 **Lưu ý cho lúc làm World 2:** số lần rebirth nằm trong **profile dùng chung**, không
+> tách theo place. Muốn hai world hai công thức thì phải quyết định rõ: đọc công thức theo
+> `game.PlaceId`, hay lưu thêm một trường rebirth riêng cho World 2. Chọn nhầm là người chơi
+> teleport qua lại thấy yêu cầu level nhảy lung tung.
 - [ ] **Save place** → publish QA → Live
 - [ ] **Mua thật 1 món rẻ nhất trên Live** (Spin 1 vé, 19 R$) và xác nhận quà vào tay. Gamepass/product chỉ tồn tại ở universe Live nên **đường thanh toán chưa từng được test** — xem `docs/LIVEOPS.md` mục 4
 
@@ -225,7 +236,7 @@ credit cần cho 500 người  = 500 × 15 / H  =  7500 / H
 | Đủ 30.000 R$ rút DevEx lần đầu trong 6 tháng | 30–40% | **30–40%** | Không đổi — vẫn phụ thuộc cửa trên |
 | Quảng cáo tự tạo tăng trưởng tự nhiên bền vững | < 5% | **< 10%** | Nhích lên vì điểm 3 mục 3 (người quay lại có tính), nhưng vẫn rất thấp |
 
-⚠️ **Các con số này giả định GĐ 0 đã xong.** Hiện GĐ 0 còn **5 mục chưa tick**, trong đó hai mục là lỗ thủng giữ chân thật (rebirth wall rơi đúng tuần 2, người mới có 0 vé quay). Bỏ qua thì tụt dưới 20% — và đó là cách chắc chắn nhất để đốt 75 credit vô ích.
+⚠️ **Các con số này giả định GĐ 0 đã xong.** Tình trạng 2026-08-24: vé chào mừng **đã xong**, rebirth **cố ý giữ nguyên** (đã tính vào bảng trên — nếu sửa cả rebirth thì cận trên nhích lên ~70%). Còn **3 mục chưa tick**, trong đó nặng nhất là **nghiệm thu AntiCheat Zone 15** và **mua thử 1 món trên Live**: món đầu có thể làm người chơi bị giật ngược oan giữa lúc chạy, món sau là đường tiền chưa từng chạy thật lần nào. Bỏ qua hai cái đó thì tụt dưới 20% — và đó là cách chắc chắn nhất để đốt 75 credit vô ích.
 
 ## 10. Đòn bẩy thật sự không nằm trong 75 credit
 

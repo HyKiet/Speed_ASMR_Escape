@@ -3,6 +3,8 @@
 	RouletteService.luau — Vòng quay May mắn (Speed Roulette).
 
 	Vé quay (SpinTickets, persist trong profile):
+	  - Chào mừng: +1 vé ngay lần đầu, MỘT LẦN cho mỗi tài khoản (cờ `WelcomeSpinGranted`).
+	    Xem khối "VÉ CHÀO MỪNG" bên dưới trước khi đổi.
 	  - Free: mỗi 15 phút online liên tục +1 vé (chỉ tích khi đang < 3 vé; đầy thì tạm dừng đếm).
 	  - Daily Ngày 7: +1 vé (DailyService gọi GrantTickets, bỏ qua cap free).
 	  - Mua Robux: 1/5/10 lượt (ProcessReceipt, bỏ qua cap free, kẹp MAX_TICKETS).
@@ -80,6 +82,57 @@ local function sendState(player: Player)
 		tickets = math.clamp(tickets, 0, 255),
 		nextFreeTicketSeconds = nextFree,
 	}, player)
+end
+
+--[[
+	══ VÉ CHÀO MỪNG — MỘT VÉ, MỘT LẦN CHO MỖI TÀI KHOẢN (2026-08-24) ═══════════════════════
+
+	Trước đây người mới vào game có **0 vé** và phải online đủ 15 phút mới có vé đầu tiên. Cả
+	một hệ thống vòng quay — với ô Legendary 1% là aura x10 mạnh nhất mà F2P sở hữu được —
+	nằm sau một cánh cửa mà phần lớn người chơi không bao giờ mở, vì họ rời game trước phút
+	thứ 15. Nút Spin trên HUD nhấp nháy suốt 15 phút đó mà bấm vào thì không làm được gì.
+
+	Một vé ngay lúc vào đổi cái đó thành: thấy nút → bấm được → bánh xe quay → biết vòng quay
+	là gì và vé đáng giá bao nhiêu. Đó mới là lý do người ta chờ 15 phút để có vé thứ hai.
+
+	── VÌ SAO LÀ CỜ TRONG PROFILE, KHÔNG PHẢI "PROFILE MỚI TINH" ──────────────────────────
+	Suy từ `FirstJoinTime` thì người đã chơi trước bản này vĩnh viễn không nhận được — họ chưa
+	từng có vé chào mừng nào cả. Cờ riêng cho họ đúng một vé, một lần, rồi thôi.
+
+	── VÌ SAO PHẢI CHỜ PROFILE ───────────────────────────────────────────────────────────
+	`PlayerAdded` nổ TRƯỚC khi ProfileStore nạp xong. Ghi vé lúc đó là ghi vào khoảng không,
+	và tệ hơn: cờ có thể bị bản profile nạp sau ghi đè, thành ra tặng lại mỗi lần vào game.
+
+	⚠️ Trước bản này có một vòng lặp `RunService:IsStudio()` tặng 1 vé test mỗi 2 giây cho
+	player chưa có attribute `StudioSpinGranted`. Nó đã bị GỠ — giờ production tặng vé thật,
+	giữ lại là Studio nhận HAI vé và không còn khớp với thứ người chơi thật thấy (đúng cái
+	bẫy mà ghi chú 2026-08-13 của chính hook đó đã cảnh báo).
+]]
+local WELCOME_TICKETS = 1
+local PROFILE_WAIT_STEP = 0.1
+local PROFILE_WAIT_TRIES = 200 -- 20 giây; quá đó thì bỏ, lần vào sau vẫn còn cờ nên vẫn nhận được
+
+local function grantWelcomeTicket(player: Player)
+	task.spawn(function()
+		local tries = 0
+		while not DataService.IsLoaded(player) and tries < PROFILE_WAIT_TRIES and player.Parent == Players do
+			task.wait(PROFILE_WAIT_STEP)
+			tries += 1
+		end
+		if not DataService.IsLoaded(player) or player.Parent ~= Players then
+			return
+		end
+
+		local data = DataService.GetData(player)
+		if not data or data.WelcomeSpinGranted then
+			return
+		end
+
+		-- Đặt cờ TRƯỚC khi phát: `GrantTickets` có thể trả false (đã đầy cap vì lý do khác),
+		-- nhưng người này đã được mời rồi — đừng mời lại ở lần vào game sau.
+		data.WelcomeSpinGranted = true
+		RouletteService.GrantTickets(player, WELCOME_TICKETS, true)
+	end)
 end
 
 -- ignoreFreeCap: vé mua Robux / daily được vượt cap free (vẫn kẹp MAX_TICKETS).
@@ -244,16 +297,14 @@ function RouletteService.Start()
 
 	Players.PlayerAdded:Connect(function(player)
 		freeAccrualSeconds[player] = 0
+		grantWelcomeTicket(player)
 	end)
+	-- Người đã ở trong server lúc service Start (Studio, hoặc hot-reload) cũng phải nhận.
+	for _, player in Players:GetPlayers() do
+		freeAccrualSeconds[player] = 0
+		grantWelcomeTicket(player)
+	end
 
-	--[[
-		Studio-only: tặng vé test khi profile load xong. KHÔNG chạy ở production —
-		người chơi thật vào game có 0 vé và phải online 15 phút mới được vé đầu tiên.
-
-		2026-08-13: hạ 3 → 1. Con số 3 làm chính người phát triển tưởng game đang tặng 3 vé
-		cho người mới (badge "Spin FULL" ngay lần đầu vào Studio). Một vé là đủ để thử
-		luồng quay, mà lại khớp với thứ nhìn thấy ở production.
-	]]
 	--[[
 		[Studio-only test hook] BẮN THẲNG MỘT KẾT QUẢ QUAY (2026-08-14).
 
@@ -293,20 +344,6 @@ function RouletteService.Start()
 		Players.PlayerAdded:Connect(watchTestSpin)
 	end
 
-	if RunService:IsStudio() then
-		task.spawn(function()
-			while true do
-				task.wait(2)
-				for _, player in Players:GetPlayers() do
-					local data = DataService.GetData(player)
-					if data and not player:GetAttribute("StudioSpinGranted") then
-						player:SetAttribute("StudioSpinGranted", true)
-						RouletteService.GrantTickets(player, 1, true)
-					end
-				end
-			end
-		end)
-	end
 	Players.PlayerRemoving:Connect(function(player)
 		freeAccrualSeconds[player] = nil
 		lastSpinAt[player] = nil

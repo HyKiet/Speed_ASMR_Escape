@@ -88,6 +88,11 @@ local function normalizeData(data: { [string]: any })
 	if typeof(data.hasClaimedGroupReward) ~= "boolean" then
 		data.hasClaimedGroupReward = false
 	end
+	-- `profile:Reconcile()` đã điền khoá thiếu từ DataTemplate; guard này chỉ bắt trường hợp
+	-- giá trị tồn tại nhưng SAI KIỂU, giống các boolean khác trong hàm này.
+	if typeof(data.WelcomeSpinGranted) ~= "boolean" then
+		data.WelcomeSpinGranted = false
+	end
 	--[[
 		Starter Pack: mốc bắt đầu đếm 48h. Ghi ở đây (lúc nạp profile) chứ không phải lúc tạo
 		profile mới, nên tài khoản CŨ — có từ trước khi gói này ra đời — cũng được tính giờ từ

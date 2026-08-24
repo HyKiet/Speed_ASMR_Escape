@@ -10,6 +10,8 @@ local DataTemplate = {
 	PersonalBestRunWins = 0,
 	TotalDonatedRobux = 0,
 	hasClaimedGroupReward = false,
+	-- Vé quay chào mừng đã phát chưa (một lần cho mỗi tài khoản) — xem RouletteService.
+	WelcomeSpinGranted = false,
 	CoreLoopVersion = 0,
 	HighestCompletedStage = 0,
 	Rebirths = 0,
