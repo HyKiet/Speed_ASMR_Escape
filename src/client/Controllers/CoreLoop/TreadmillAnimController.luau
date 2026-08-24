@@ -67,7 +67,7 @@ local function stopTrack(player: Player, entry: Entry)
 		track:Stop(0.15)
 		track:Destroy()
 		if DEBUG then
-			print(`[TreadmillAnim] ⏹ {player.Name}`)
+			Log.Boot(`[TreadmillAnim] stop {player.Name}`)
 		end
 	end
 end
@@ -140,7 +140,7 @@ local function refresh(player: Player)
 	end
 	if not track then
 		if DEBUG then
-			warn(`[TreadmillAnim] LoadAnimation FAIL cho {player.Name} — poll sẽ thử lại`)
+			Log.Warn(`[TreadmillAnim] LoadAnimation FAILED for {player.Name} — poll will retry`)
 		end
 		return
 	end
@@ -151,7 +151,7 @@ local function refresh(player: Player)
 	track:Play(0.15)
 	entry.track = track
 	if DEBUG then
-		print(`[TreadmillAnim] ▶ {player.Name} ({track.Animation and (track.Animation :: Animation).AnimationId})`)
+		Log.Boot(`[TreadmillAnim] play {player.Name} ({track.Animation and (track.Animation :: Animation).AnimationId})`)
 	end
 end
 
@@ -226,7 +226,7 @@ function TreadmillAnimController.Start()
 	end)
 
 	if DEBUG then
-		Log.Boot("[TreadmillAnim] sẵn sàng — attribute-driven + poll 1s tự hồi phục")
+		Log.Boot("[TreadmillAnim] ready — attribute-driven + 1s self-healing poll")
 	end
 end
 

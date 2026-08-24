@@ -43,6 +43,19 @@ local MAX_WAIT_SECONDS = 20
 -- Chờ tối thiểu để màn hình không chớp một cái rồi biến mất (máy mạnh + asset đã cache).
 local MIN_SHOW_SECONDS = 1.6
 
+--[[
+	Có đang chạy ở place Live không.
+
+	CHÉP TAY id thay vì `require(Shared.Util.Env)` — cùng lý do với bảng màu bên dưới: file
+	này chạy ở `ReplicatedFirst`, TRƯỚC khi `ReplicatedStorage.Shared` chắc chắn đã tới
+	client. Chờ nó là tự đánh mất lý do tồn tại của ReplicatedFirst.
+
+	⚠️ Đổi `LIVE_PLACE_ID` trong `Shared/Util/Env.luau` thì nhớ đổi cả ở đây.
+	Dùng để CÂM dòng log trên bản Live: tab Client của Developer Console ai cũng mở được.
+]]
+local LIVE_PLACE_ID = 94107323826144
+local IS_LIVE = not RunService:IsStudio() and game.PlaceId == LIVE_PLACE_ID
+
 -- Chép tay từ HUD/Tokens (xem lý do ở đầu file).
 local INK = Color3.fromRGB(18, 18, 30)
 local GOLD = Color3.fromRGB(255, 205, 46)
@@ -307,9 +320,13 @@ gui:Destroy()
 
 do
 	local elapsed = os.clock() - startedAt
-	print(("[LoadingScreen] xong sau %.1fs (bước cuối: %s)"):format(elapsed, lastStep))
+	-- ReplicatedFirst chạy TRƯỚC khi `Shared` chắc chắn tới nơi nên KHÔNG require `Log` được
+	-- ở đây (xem cảnh báo đầu file). Tự kiểm môi trường bằng PlaceId thay vì qua Env.
+	if not IS_LIVE then
+		print(("[LoadingScreen] done in %.1fs (last step: %s)"):format(elapsed, lastStep))
+	end
 	-- Chạm trần chờ nghĩa là có bước không bao giờ xong — `lastStep` chỉ đúng chỗ đó.
 	if elapsed >= MAX_WAIT_SECONDS then
-		warn(("[LoadingScreen] CHẠM TRẦN %ds — kẹt ở bước %q"):format(MAX_WAIT_SECONDS, lastStep))
+		warn(("[LoadingScreen] HIT %ds CAP — stuck at step %q"):format(MAX_WAIT_SECONDS, lastStep))
 	end
 end

@@ -5,12 +5,16 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ServiceLocator =
-	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("ServiceLocator"))
+local SharedUtil = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util")
+
+local ServiceLocator = require(SharedUtil:WaitForChild("ServiceLocator"))
+-- `WaitForChild` chứ không index thẳng: bootstrapper chạy trước khi cây `Shared` chắc chắn
+-- đã replicate xong (cùng lý do với `ServiceLocator` ở trên).
+local Log = require(SharedUtil:WaitForChild("Log"))
 
 local ControllersFolder = script:WaitForChild("Controllers")
 
-print("--- [CLIENT LOADING] Bắt đầu nạp các bộ điều khiển (Controllers) trên Client... ---")
+Log.Boot("--- [CLIENT LOADING] Loading controllers... ---")
 
 type Controller = { Init: (() -> ())?, Start: (() -> ())? }
 local controllers: { [string]: Controller } = {}
@@ -59,13 +63,13 @@ for _, module in modules do
 	local success, controller = pcall(require, module)
 	if success then
 		if controllers[module.Name] then
-			warn(`[CLIENT WARN] Hai bộ điều khiển trùng tên: {module.Name}. Giữ bản đầu tiên.`)
+			Log.Warn(`[CLIENT WARN] Duplicate controller name: {module.Name}. Keeping the first one.`)
 		else
 			controllers[module.Name] = controller
 			ServiceLocator.Register(module.Name, controller)
 		end
 	else
-		warn(`[CLIENT ERROR] Lỗi nạp bộ điều khiển: {module.Name} | Chi tiết: {tostring(controller)}`)
+		Log.Warn(`[CLIENT ERROR] Failed to require controller: {module.Name} | {tostring(controller)}`)
 	end
 end
 
@@ -74,7 +78,7 @@ for name, controller in controllers do
 	if type(controller.Init) == "function" then
 		local success, err = pcall(controller.Init)
 		if not success then
-			warn(`[CLIENT ERROR] Lỗi Init bộ điều khiển: {name} | Chi tiết: {tostring(err)}`)
+			Log.Warn(`[CLIENT ERROR] Init failed: {name} | {tostring(err)}`)
 		end
 	end
 end
@@ -91,4 +95,4 @@ for name, controller in controllers do
 	end
 end
 
-print(`--- [CLIENT READY] Đã nạp {#modules} bộ điều khiển trên Client. ---`)
+Log.Boot(`--- [CLIENT READY] {#modules} controllers loaded. ---`)

@@ -16,6 +16,23 @@
 
 	Nên: các dòng khởi động vẫn còn nguyên trong code, chỉ bị TẮT TIẾNG theo mặc định.
 
+	══ ⚠️ TRÊN LIVE, CLIENT KHÔNG IN GÌ CẢ (2026-08-24) ═══════════════════════════════════
+
+	Bảng Developer Console (F9) mở được cho MỌI người chơi, và tab **Client** thì ai cũng đọc
+	được — chỉ tab Server mới giới hạn cho người có quyền sửa place. Nghĩa là mọi dòng client
+	in ra ở bản đã publish là công khai: số controller đã nạp, số sàn ASMR từng loại, thời
+	gian nạp, ngưỡng tốc độ của từng zone. Đó là bản đồ kiến trúc game phát miễn phí cho bất
+	kỳ ai bấm F9.
+
+	Nên: `Log.Boot`, `Log.Info` và dòng tổng `Log.Floor` đều **câm trên client ở môi trường
+	Live**. Server thì giữ nguyên — log server vốn đã chỉ mình bạn đọc được, mà nó lại là thứ
+	chảy vào Error Report trên Creator Hub.
+
+	⚠️ `Log.Warn` CỐ Ý VẪN IN Ở LIVE. Đó là nguồn cảnh báo lỗi phía client duy nhất chảy về
+	Error Report; bịt nó lại là tự làm mù mình ở production để đổi lấy việc giấu vài dòng lỗi
+	hiếm khi xảy ra. Đánh đổi sai. Muốn giấu cả warn thì đổi `WARN_SILENT_IN_LIVE = true` —
+	nhưng đọc lại câu trên trước.
+
 	══ BẬT LẠI ═══════════════════════════════════════════════════════════════════════════
 
 	Chạy ở Command Bar của Studio (chế độ Edit) RỒI bấm Play:
@@ -37,14 +54,25 @@
 	Cần cảnh báo thì vẫn dùng `warn` thẳng — `warn` không bao giờ bị cổng này chặn.
 ]]
 
+local RunService = game:GetService("RunService")
+
+local Env = require(script.Parent.Env)
+
 local Log = {}
 
 local VERBOSE_ATTRIBUTE = "SEVerboseBoot"
+-- Xem khối "TRÊN LIVE, CLIENT KHÔNG IN GÌ CẢ" trước khi bật cái này lên true.
+local WARN_SILENT_IN_LIVE = false
 
 local function verbose(): boolean
 	-- Đọc CẢ HAI chỗ: `workspace` là chỗ đặt được từ Studio Edit (xem khối "BẬT LẠI"),
 	-- `game` để một script server trong bản đã publish bật lên cũng ăn.
 	return workspace:GetAttribute(VERBOSE_ATTRIBUTE) == true or game:GetAttribute(VERBOSE_ATTRIBUTE) == true
+end
+
+-- Đang ở phía client của một server Live ⇒ mọi thứ in ra là công khai với người chơi.
+local function publiclyVisible(): boolean
+	return RunService:IsClient() and Env.IsLive()
 end
 
 -- Dòng khởi động. Im lặng theo mặc định — xem khối "BẬT LẠI" ở trên.
@@ -54,9 +82,20 @@ function Log.Boot(...: any)
 	end
 end
 
--- Sự kiện lúc chạy, luôn in. Đây là thứ đáng để chiếm chỗ trong Output.
+-- Sự kiện lúc chạy. In trên server và trong Studio; câm trên client ở Live.
 function Log.Info(...: any)
+	if publiclyVisible() and not verbose() then
+		return
+	end
 	print(...)
+end
+
+-- Cảnh báo. CỐ Ý vẫn in ở Live — xem khối cảnh báo ở đầu file.
+function Log.Warn(...: any)
+	if WARN_SILENT_IN_LIVE and publiclyVisible() and not verbose() then
+		return
+	end
+	warn(...)
 end
 
 --[[
@@ -118,9 +157,9 @@ local function flushFloors()
 	for _, name in names do
 		table.insert(parts, ("%s×%d"):format(name, floorCounts[name]))
 	end
-	local churn = if reattachTotal > 0 then (", %d lượt gắn lại"):format(reattachTotal) else ""
-	print(
-		("[ASMR] %d sàn sẵn sàng — %s (%s ô%s)"):format(
+	local churn = if reattachTotal > 0 then (", %d re-attached"):format(reattachTotal) else ""
+	Log.Info(
+		("[ASMR] %d floors ready — %s (%s cells%s)"):format(
 			floorTotal,
 			table.concat(parts, " "),
 			formatThousands(cellTotal),
