@@ -14,6 +14,10 @@
 	đẹp nhất hãy chỉnh tay trong Studio: Lighting.Technology = Future (ShadowMap cũng ổn).
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Lighting = game:GetService("Lighting")
 
 local LightingService = {}
@@ -85,7 +89,7 @@ function LightingService.Start()
 	sunRays.Intensity = 0.19
 	sunRays.Spread = 0.7
 
-	print("[LightingService] Simulator lighting đã áp dụng (sky decal giữ nguyên).")
+	Log.Boot("[LightingService] Simulator lighting đã áp dụng (sky decal giữ nguyên).")
 end
 
 return LightingService

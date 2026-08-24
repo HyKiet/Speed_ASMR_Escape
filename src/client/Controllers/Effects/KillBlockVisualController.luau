@@ -16,6 +16,10 @@
 	  • Không có part nào trong tầm → thoát ngay, 0 công việc.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -163,7 +167,7 @@ function KillBlockVisualController.Start()
 		end
 	end)
 
-	print(
+	Log.Boot(
 		("[KillBlockVisualController] Dung nham chảy nhẹ — %d slab, %dHz, cull %d studs tính theo bề mặt"):format(
 			#entries,
 			UPDATE_HZ,

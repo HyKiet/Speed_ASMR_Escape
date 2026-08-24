@@ -11,6 +11,10 @@
 	Cull: camera ngoài 130 studs → set trạng thái cuối tức thì, không ghi property.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local RunService = game:GetService("RunService")
 
 local Zone7JellyBridgeController = {}
@@ -95,7 +99,7 @@ function Zone7JellyBridgeController.Start()
 			register(p)
 		end
 		folder.ChildAdded:Connect(register)
-		print(("[Zone7JellyBridge] visual sẵn sàng — %d segment"):format(#segs))
+		Log.Boot(("[Zone7JellyBridge] visual sẵn sàng — %d segment"):format(#segs))
 
 		RunService.Heartbeat:Connect(function(dt)
 			local cam = workspace.CurrentCamera

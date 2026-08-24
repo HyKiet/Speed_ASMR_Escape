@@ -19,6 +19,8 @@ local CollectionService = game:GetService("CollectionService")
 local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 local SoundService = game:GetService("SoundService")
 local Workspace = game:GetService("Workspace")
 
@@ -561,7 +563,7 @@ function Zone13SpringFlingController.Start()
 	-- (thứ tự nạp controller không đảm bảo), khi đó `GetInstanceAddedSignal` không bắn lại.
 	refreshAllMeters()
 	local walls = #CollectionService:GetTagged("Zone13GlassWall")
-	print(
+	Log.Boot(
 		`[Zone13] Cổng Thủy Tinh Cyber v3 (client): shatter + mảnh vỡ 3D + đồng hồ WalkSpeed trên {walls} cổng`
 	)
 end

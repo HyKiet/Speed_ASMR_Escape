@@ -3,6 +3,10 @@
 -- + note piano pitch-shift 2^(semi/12); tốc độ cao -> swept + stagger 25ms = glissando.
 -- PointLight lazy-create per ô giữ nguyên (≤64 ô, Brightness=0 khi tắt).
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local MelodyRun = {}
 
 local NOTE_ID = 121997668450827 -- piano note c5, 4.00s (đã đo 2026-08-05)
@@ -88,7 +92,7 @@ function MelodyRun.attach(model, engine)
 		box = if base and base:IsA("BasePart") then Bounds.ofBase(base, 2) else Bounds.ofParts(folder:GetChildren(), 2)
 		topY = records[1] and (records[1].part.Position.Y + records[1].part.Size.Y / 2) or (box and box.topY) or 9.6
 		self.ready = box ~= nil and #records > 0
-		print("[ASMR MelodyRun] sẵn sàng —", #records, "ô ngũ cung glissando")
+		Log.Floor("MelodyRun", #records)
 	end)
 
 	-- Quét 3×3 cell chứ KHÔNG `bucketAt` (1 cell): ô không bao giờ căn khớp biên cell, nên

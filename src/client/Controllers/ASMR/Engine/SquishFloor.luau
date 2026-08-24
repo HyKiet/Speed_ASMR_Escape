@@ -10,6 +10,10 @@
 -- Hiệu năng: chỉ tính cho LocalPlayer (foot context của engine), cull toàn sàn khi
 -- camera ra ngoài 90 studs (snap mọi ô về rest đúng 1 lần rồi ngủ ~0 chi phí).
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local SquishFloor = {}
 
 local MAX_STEP_RATE = 15 -- trần bước/giây (trend chuẩn 10–15/s khi chạy nhanh)
@@ -119,7 +123,7 @@ function SquishFloor.make(cfg)
 				cullReach = CULL_DIST + math.max(box.halfX, box.halfZ)
 			end
 			self.ready = box ~= nil and #records > 0
-			print(("[ASMR %s] sẵn sàng — %d ô squish"):format(NAME, #records))
+			Log.Floor(NAME, #records)
 		end)
 
 		local function applyDeform(rec, v)

@@ -52,6 +52,10 @@
 	vậy file này vẫn giữ vai trò chốt chặn cuối cùng; hai cách đặt cùng lúc không xung đột.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 
 local AvatarScaleService = {}
@@ -118,7 +122,7 @@ function AvatarScaleService.Init() end
 
 function AvatarScaleService.Start()
 	if not ENFORCE then
-		print("[AvatarScaleService] ĐANG TẮT — avatar giữ nguyên cỡ người chơi tự chỉnh")
+		Log.Boot("[AvatarScaleService] ĐANG TẮT — avatar giữ nguyên cỡ người chơi tự chỉnh")
 		return
 	end
 
@@ -134,7 +138,7 @@ function AvatarScaleService.Start()
 	end
 	Players.PlayerAdded:Connect(hook)
 
-	print("[AvatarScaleService] chuẩn hoá cỡ avatar về R15 mặc định (HipHeight 2.0)")
+	Log.Boot("[AvatarScaleService] chuẩn hoá cỡ avatar về R15 mặc định (HipHeight 2.0)")
 end
 
 return AvatarScaleService

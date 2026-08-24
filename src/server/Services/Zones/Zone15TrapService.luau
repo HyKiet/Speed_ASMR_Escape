@@ -25,6 +25,7 @@ local Workspace = game:GetService("Workspace")
 
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
 local Zone15Traps = require(ReplicatedStorage.Shared.Config.Zones.Zone15Traps)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local Zone15TrapService = {}
 
@@ -83,7 +84,7 @@ local function setup(): boolean
 		return false
 	end
 
-	print("[Zone15TrapService] " .. Zone15Traps.Build(zone))
+	Log.Boot("[Zone15TrapService] " .. Zone15Traps.Build(zone))
 	zone:SetAttribute("TrapsReady", true)
 	return cacheBeams(zone)
 end

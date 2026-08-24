@@ -2,6 +2,10 @@
 -- Clay — port nguyên vẹn ClayClient v2: ô bo góc squishy lún + phình ngang dưới chân,
 -- hồi phục chậm (clay memory), âm nặn đất mịn.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Clay = {}
 
 -- ÂM THANH: HOÀN NGUYÊN HỆ CŨ (2026-08-07, yêu cầu user).
@@ -86,7 +90,7 @@ function Clay.attach(model, engine)
 			centerY = box and box.topY
 		end
 		self.ready = box ~= nil and #records > 0
-		print("[ASMR Clay] sẵn sàng —", #records, "ô bo góc squishy")
+		Log.Floor("Clay", #records)
 	end)
 
 	local function playSquish(parent: BasePart, volume: number, speedMin: number, speedMax: number)

@@ -11,6 +11,10 @@
 	5. Modulates a localized howling wind sound dynamically.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
@@ -184,7 +188,7 @@ function Zone12WindTunnelController.Start()
 		end
 	end)
 
-	print("[Zone12WindTunnelController] Client-side Wind Tunnel controller successfully loaded!")
+	Log.Boot("[Zone12WindTunnelController] Client-side Wind Tunnel controller successfully loaded!")
 end
 
 return Zone12WindTunnelController

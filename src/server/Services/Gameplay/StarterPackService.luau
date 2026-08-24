@@ -34,6 +34,7 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local StarterPackConfig = require(ReplicatedStorage.Shared.Config.Economy.StarterPack)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local StarterPackService = {}
 
@@ -163,7 +164,7 @@ function StarterPackService.GrantIfOwnedLegacyPass(player: Player, trusted: bool
 		end
 	end
 
-	print(`[StarterPackService] {player.Name} sở hữu gamepass Rookie Rocket đời đầu — phát bù gói.`)
+	Log.Info(`[StarterPackService] {player.Name} sở hữu gamepass Rookie Rocket đời đầu — phát bù gói.`)
 	grantPack(player, data)
 	return true
 end

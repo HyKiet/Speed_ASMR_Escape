@@ -24,6 +24,7 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local StarterPackConfig = require(ReplicatedStorage.Shared.Config.Economy.StarterPack)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local DataService: any = nil
 local ProgressionService: any = nil
@@ -417,7 +418,7 @@ function GamepassService.Start()
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, passId: number, purchased: boolean)
 			if purchased then
-				print(`[GamepassService] {player.Name} mua pass {passId} thành công`)
+				Log.Info(`[GamepassService] {player.Name} mua pass {passId} thành công`)
 				applyPass(player, passId)
 				return
 			end

@@ -32,6 +32,7 @@ local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PreloadManifest = require(ReplicatedStorage.Shared.Config.PreloadManifest)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local AssetWarmController = {}
 
@@ -66,7 +67,7 @@ function AssetWarmController.Start()
 			task.wait(BATCH_GAP)
 		end
 
-		print(
+		Log.Boot(
 			string.format(
 				"[AssetWarm] đã làm nóng %d asset nặng nhất của map trong %.1fs (%d lô lỗi)",
 				#list,

@@ -26,6 +26,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local RemoteConfigService = {}
 
@@ -273,7 +274,7 @@ function RemoteConfigService.Start()
 		lastFetchOk = refresh()
 		RemoteConfigService.PushEventState()
 		if lastFetchOk then
-			print(
+			Log.Boot(
 				`[RemoteConfigService] Configs sẵn sàng — event "{RemoteConfigService.GetEventName()}" `
 					.. `speed x{RemoteConfigService.GetEventSpeedMultiplier()} wins x{RemoteConfigService.GetEventWinsMultiplier()}`
 			)

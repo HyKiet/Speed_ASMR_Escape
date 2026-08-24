@@ -4,6 +4,10 @@
 -- Nâng cấp so bản cũ: vòng sóng dùng POOL 40 part tái sử dụng (không Instance.new/Destroy
 -- mỗi splash), giọt nước qua ParticlePool preset "droplets".
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local AquaRun = {}
 
 -- Mix ASMR: 5 splash vũng nước + bubble bloop + wood bowl blip (đa chất liệu phê tai)
@@ -51,7 +55,7 @@ function AquaRun.attach(model, engine)
 			ripples[i] = { part = r, t = RIPPLE_LIFE, grow = 0 }
 		end
 		self.ready = true
-		print("[ASMR AquaRun] sẵn sàng — splash + ripple pool", RIPPLE_N)
+		Log.Floor("AquaRun", RIPPLE_N)
 	end)
 
 	local function splashSound(parent, ratio)

@@ -42,6 +42,10 @@
 -- Hiệu năng: mỗi frame chỉ khối nằm trong `dentR + bán kính khối` mới được duyệt; khối đã về
 -- nghỉ thì bỏ qua hẳn. Cả sàn ra ngoài 110 studs camera → reset đúng một lần rồi ngủ.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Butter = {}
 
 --[[
@@ -216,14 +220,7 @@ function Butter.attach(model, engine)
 
 		self.ready = box ~= nil
 		if self.ready then
-			print(
-				("[ASMR Butter] sẵn sàng — %d khối × %d bone, R%.1f sâu %.2f"):format(
-					#blocks,
-					#blocks[1].bones,
-					dentR,
-					dentDepth
-				)
-			)
+			Log.Floor("Butter", #blocks)
 		end
 	end)
 

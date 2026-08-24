@@ -19,6 +19,7 @@ local Workspace = game:GetService("Workspace")
 
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
 local Zone3Crushers = require(ReplicatedStorage.Shared.Config.Zones.Zone3Crushers)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local Zone3CrusherService = {}
 
@@ -131,7 +132,7 @@ function Zone3CrusherService.Start()
 		while not resolve() do
 			task.wait(1)
 		end
-		print(`[Zone3CrusherService] {#crushers} máy ép — nhóm 1&2 ép chung, nhóm 3 ép sau`)
+		Log.Boot(`[Zone3CrusherService] {#crushers} máy ép — nhóm 1&2 ép chung, nhóm 3 ép sau`)
 
 		while true do
 			task.wait(TICK_RATE)

@@ -9,6 +9,10 @@
 --    → tương thích StreamingEnabled (sàn stream vào/ra tự attach/detach)
 --  • SoundPool 32 + ParticlePool 12 + FxBudget dùng chung — không Instance churn
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -177,6 +181,6 @@ local floorCount = 0
 for _ in Floors do
 	floorCount += 1
 end
-print(
+Log.Boot(
 	("[ASMR Engine] sẵn sàng — %d loại sàn, %d sound preload, tag '%s'"):format(floorCount, #allIds, FLOOR_TAG)
 )

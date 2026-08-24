@@ -32,6 +32,10 @@
 	(mỗi client chỉ kiểm tra bản thân với ≤ vài tường).
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -99,7 +103,7 @@ function Zone5SlideController.Start()
 				end
 			end
 		end)
-		print("[Zone5SlideController] cổng bắt buộc slide (client) sẵn sàng")
+		Log.Boot("[Zone5SlideController] cổng bắt buộc slide (client) sẵn sàng")
 	end)
 end
 

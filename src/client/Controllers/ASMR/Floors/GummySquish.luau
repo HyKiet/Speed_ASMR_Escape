@@ -26,6 +26,10 @@
 --   • `Collider` (BasePart, CanCollide) — mặt đi thật, top THẤP HƠN đỉnh ô để chân ngập gel.
 -- Attribute tinh chỉnh trên model: `DentRadius`, `DentDepth`, `Wave`, `Bounce`.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local GummySquish = {}
 
 --[[
@@ -186,15 +190,7 @@ function GummySquish.attach(model, engine)
 
 		self.ready = box ~= nil
 		if self.ready then
-			print(
-				("[ASMR GummySquish] sẵn sàng — lưới %dx%d (%d ô), R%.1f sâu %.2f"):format(
-					nx + 1,
-					nz + 1,
-					#list,
-					dentR,
-					dentDepth
-				)
-			)
+			Log.Floor("GummySquish", #list)
 		end
 	end)
 

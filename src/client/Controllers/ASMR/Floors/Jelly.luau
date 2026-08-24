@@ -2,6 +2,10 @@
 -- Jelly — port nguyên vẹn JellyClient: khối thạch wobble lò xo tắt dần exp(-2.6t)·sin(13t),
 -- nghiêng ngẫu nhiên, tiếng wobble board. Nhảy lên = rung mạnh, đi bộ = rung nhẹ liên tục.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Jelly = {}
 
 -- Mix ASMR: 4 wobble board + slime ướt + mouth pop (đa chất liệu phê tai)
@@ -44,7 +48,7 @@ function Jelly.attach(model, engine)
 			then Bounds.ofBase(collider, 2)
 			else Bounds.ofParts(folder:GetChildren(), 2)
 		self.ready = box ~= nil and #blocks > 0
-		print("[ASMR Jelly] sẵn sàng —", #blocks, "khối thạch")
+		Log.Floor("Jelly", #blocks)
 	end)
 
 	local function playWobble(parent, vol, spMin, spMax)

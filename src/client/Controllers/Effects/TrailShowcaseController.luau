@@ -44,6 +44,10 @@
 	giữa chừng thì part đang bay, lấy vị trí hiện tại làm tâm sẽ khiến quỹ đạo trôi dần đi.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -108,7 +112,7 @@ local function step(dt: number)
 	-- stream về client, nên in ngay ở đó luôn ra "0 bệ" và làm người đọc log tưởng hỏng.
 	if not announced and #showcases > 0 then
 		announced = true
-		print(("[TrailShowcase] %d bệ trưng bày quay trên CLIENT (trước đây 180 CFrame/s từ server)"):format(#showcases))
+		Log.Boot(("[TrailShowcase] %d bệ trưng bày quay trên CLIENT (trước đây 180 CFrame/s từ server)"):format(#showcases))
 	end
 
 	for _, s in showcases do

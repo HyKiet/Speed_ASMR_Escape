@@ -2,6 +2,10 @@
 -- PopIt — port nguyên vẹn PopItClient: bước lên bong bóng -> lõm xuống + pop lách tách,
 -- tự phồng lại 2.2–4.4s với tiếng trầm nhỏ. Sound qua SoundPool (hết Instance.new + Debris).
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local TweenService = game:GetService("TweenService")
 
 local PopIt = {}
@@ -60,7 +64,7 @@ function PopIt.attach(model, engine)
 			popR2 = r * r
 		end
 		self.ready = box ~= nil and #bubbles > 0
-		print("[ASMR PopIt] sẵn sàng —", #bubbles, "bubbles")
+		Log.Floor("PopIt", #bubbles)
 	end)
 
 	local function playPop(parent, speedMin, speedMax, volume)

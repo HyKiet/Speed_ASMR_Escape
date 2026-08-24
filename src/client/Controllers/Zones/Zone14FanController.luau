@@ -27,6 +27,7 @@ local SoundService = game:GetService("SoundService")
 local Workspace = game:GetService("Workspace")
 
 local Stages = require(ReplicatedStorage.Shared.Config.Stages)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local Zone14FanController = {}
 
@@ -350,7 +351,7 @@ function Zone14FanController.Start()
 					-- chỉ báo khi CẤU HÌNH đổi, không spam mỗi lần stream lại y hệt
 					if blades ~= lastPrint then
 						lastPrint = blades
-						print(
+						Log.Boot(
 							("[Zone14Fan] sẵn sàng — %d cụm quạt, %d cánh, ngưỡng %d WS"):format(
 								#clusters,
 								blades,

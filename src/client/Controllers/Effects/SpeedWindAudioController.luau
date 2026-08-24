@@ -5,6 +5,10 @@
 	using Roblox's new node-based Audio API.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
@@ -162,7 +166,7 @@ function SpeedWindAudioController.Start()
 		end
 	end)
 
-	print("[SpeedWindAudioController] Dynamic wind sound and sonic boom loaded successfully!")
+	Log.Boot("[SpeedWindAudioController] Dynamic wind sound and sonic boom loaded successfully!")
 end
 
 return SpeedWindAudioController

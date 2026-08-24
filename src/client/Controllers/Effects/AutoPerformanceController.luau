@@ -50,6 +50,10 @@
 	   hình dài là bình thường. Đo lúc đó là chắc chắn nhắc nhầm cho mọi người.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -209,7 +213,7 @@ function AutoPerformanceController.Start()
 		end
 	end)
 
-	print(
+	Log.Boot(
 		if SUGGEST_ONLY
 			then "[AutoPerformance] đang theo dõi khung hình — ĐỀ NGHỊ (không tự bật) nếu tụt dưới 50 fps"
 			else "[AutoPerformance] đang theo dõi khung hình — tự hạ hiệu ứng nếu tụt dưới 50 fps"

@@ -50,6 +50,7 @@ local RunService = game:GetService("RunService")
 
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local TutorialService = {}
 
@@ -218,7 +219,7 @@ function TutorialService.Start()
 				data.TutorialSkipped = false
 				data.TutorialRewarded = false
 				sendState(player)
-				print(`[TutorialService] Đã reset tutorial cho {player.Name} (Studio).`)
+				Log.Info(`[TutorialService] Đã reset tutorial cho {player.Name} (Studio).`)
 			end)
 		end
 		for _, player in Players:GetPlayers() do

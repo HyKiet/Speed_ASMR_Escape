@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ScriptContext = game:GetService("ScriptContext")
 
 local Env = require(ReplicatedStorage.Shared.Util.Env)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 -- 4 bước đầu của người chơi mới. Đổi thứ tự = làm gãy dữ liệu lịch sử, chỉ
 -- được THÊM bước vào cuối.
@@ -161,7 +162,7 @@ function TelemetryService.Start()
 		end
 	end)
 
-	print(`[Telemetry] Đang chạy ở môi trường {Env.Current}.`)
+	Log.Boot(`[Telemetry] Đang chạy ở môi trường {Env.Current}.`)
 end
 
 return TelemetryService

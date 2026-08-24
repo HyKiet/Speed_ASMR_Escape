@@ -19,6 +19,10 @@
 	Chi phí: O(số player) mỗi giây — 25 player không đáng kể.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -222,7 +226,7 @@ function TreadmillAnimController.Start()
 	end)
 
 	if DEBUG then
-		print("[TreadmillAnim] sẵn sàng — attribute-driven + poll 1s tự hồi phục")
+		Log.Boot("[TreadmillAnim] sẵn sàng — attribute-driven + poll 1s tự hồi phục")
 	end
 end
 

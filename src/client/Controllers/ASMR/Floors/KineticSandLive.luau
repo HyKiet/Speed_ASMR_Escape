@@ -14,6 +14,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local SoundIds = require(ReplicatedStorage.Shared.Config.SoundIds)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local KineticSandLive = {}
 
@@ -129,7 +130,7 @@ function KineticSandLive.attach(model, engine)
 			return -- watchdog engine sẽ attach lại khi tile đã tới
 		end
 		self.ready = box ~= nil and n > 0
-		print("[ASMR KineticSandLive] sẵn sàng —", n, "ô cát | crater+rim | engine chung")
+		Log.Floor("KineticSandLive", n)
 	end)
 
 	local function crunch(root, ratio)

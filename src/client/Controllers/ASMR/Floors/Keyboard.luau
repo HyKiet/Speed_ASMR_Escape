@@ -5,6 +5,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local SoundIds = require(ReplicatedStorage.Shared.Config.SoundIds)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local Keyboard = {}
 
@@ -310,7 +311,7 @@ function Keyboard.attach(model, engine)
 		end
 
 		self.ready = true
-		print(("[ASMR Keyboard] sẵn sàng — %d phím, lún %.2f"):format(#keys, pressDepth))
+		Log.Floor("Keyboard", #keys)
 	end)
 
 	local function playKey(rec, speedRatio, volScale)

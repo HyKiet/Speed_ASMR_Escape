@@ -40,6 +40,7 @@ local MovementSlide = require(script.Parent.MovementSlide)
 local MovementStabilizer = require(script.Parent.MovementStabilizer)
 local MovementTypes = require(script.Parent.MovementTypes)
 local MovementUtil = require(script.Parent.MovementUtil)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 type Session = MovementTypes.Session
 
@@ -285,7 +286,7 @@ function MovementController.Start()
 		end
 	end)
 
-	print(
+	Log.Boot(
 		"[Movement] Hệ di chuyển — Slide [C], giảm nhẹ cú văng hậu va chạm, chống bật cóc + chống ngã (1 vòng Heartbeat)"
 	)
 end

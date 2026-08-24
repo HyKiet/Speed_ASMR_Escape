@@ -23,6 +23,7 @@ local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
 -- player ngoài vùng của nó mỗi frame, chung bảng là xoá dấu vết của nhau (xem TrapSweep).
 local sweep = require(ReplicatedStorage.Shared.Util.TrapSweep).new("Zone2Laser")
 local Zone2Lasers = require(ReplicatedStorage.Shared.Config.Zones.Zone2Lasers)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local Zone2LaserService = {}
 
@@ -207,7 +208,7 @@ function Zone2LaserService.Start()
 			task.wait(1)
 		end
 		ready = true
-		print(`[Zone2LaserService] {#lasers} laser — render client, phán xử server swept/Heartbeat`)
+		Log.Boot(`[Zone2LaserService] {#lasers} laser — render client, phán xử server swept/Heartbeat`)
 		RunService.Heartbeat:Connect(tick)
 	end)
 

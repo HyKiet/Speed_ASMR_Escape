@@ -5,6 +5,8 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Soap = {}
 
 local CUT_SOUNDS = { 9120972205, 9120626543, 9125610697, 9117020137 } -- whittle, wax press, scoop + mouth pop mềm
@@ -70,7 +72,7 @@ function Soap.attach(model, engine)
 			grooves[i] = { part = g, ttl = 0, life = 0 }
 		end
 		self.ready = box ~= nil and #bars > 0
-		print("[ASMR Soap] sẵn sàng —", #bars, "bánh xà phòng, pool", CURL_POOL_N, "+", GROOVE_POOL_N)
+		Log.Floor("Soap", #bars)
 	end)
 
 	local function cutSound(parent, ratio)

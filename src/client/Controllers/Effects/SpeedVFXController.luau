@@ -1,4 +1,8 @@
 --!strict
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -134,7 +138,7 @@ function SpeedVFXController.Start()
 		end
 	end)
 
-	print("[SpeedVFX] Camera Max Zoom (35) & Steady FOV Initialized.")
+	Log.Boot("[SpeedVFX] Camera Max Zoom (35) & Steady FOV Initialized.")
 end
 
 return SpeedVFXController

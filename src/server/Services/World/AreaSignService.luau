@@ -12,6 +12,10 @@
 -- Hai mặt: mỗi biển có SurfaceGui trên cả Front và Back nên nhìn từ hướng nào cũng đọc
 -- được. Part nền trong suốt hoàn toàn, không va chạm, không đổ bóng.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Workspace = game:GetService("Workspace")
 
 -- Điểm quy chiếu MẶC ĐỊNH để xoay biển: SpawnLocation của Lobby.
@@ -273,7 +277,7 @@ function AreaSignService.Start()
 		buildSign(config, root)
 	end
 
-	print(`[AreaSignService] Đã dựng {#SIGNS} biển khu vực.`)
+	Log.Boot(`[AreaSignService] Đã dựng {#SIGNS} biển khu vực.`)
 end
 
 return AreaSignService

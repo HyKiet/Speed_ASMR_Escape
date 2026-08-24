@@ -6,6 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local SoundIds = require(ReplicatedStorage.Shared.Config.SoundIds)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local KineticSand = {}
 
@@ -61,7 +62,7 @@ function KineticSand.attach(model, engine)
 			return
 		end
 		surfY = if tray and tray:IsA("BasePart") then tray.Position.Y + tray.Size.Y / 2 + 0.6 else box.topY
-		print("[ASMR KineticSand] sẵn sàng —", n, "ô cát, footprint memory")
+		Log.Floor("KineticSand", n)
 	end)
 
 	local function crunch(parent, ratio)

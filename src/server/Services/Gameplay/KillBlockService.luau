@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local KillBlockService = {}
 
@@ -79,7 +80,7 @@ function KillBlockService.Start()
 		lastKillTime[player] = nil
 	end)
 
-	print("[KillBlockService] KillBlockGlobal Touch-Kill System Initialized.")
+	Log.Boot("[KillBlockService] KillBlockGlobal Touch-Kill System Initialized.")
 end
 
 return KillBlockService

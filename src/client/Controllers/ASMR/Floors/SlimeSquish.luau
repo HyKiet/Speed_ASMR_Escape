@@ -16,6 +16,10 @@
 --   • `Collider` (BasePart, CanCollide) — mặt đi bộ thật, top thấp hơn đỉnh khối (chân lún).
 -- Attribute tinh chỉnh (không cần sửa code): `Fillet`, `DentRadius`, `DentDepth`.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local AssetService = game:GetService("AssetService")
 
 local SlimeSquish = {}
@@ -250,14 +254,7 @@ function SlimeSquish.attach(model, engine)
 
 		self.ready = build() and box ~= nil
 		if self.ready then
-			print(
-				("[ASMR SlimeSquish] khối jelly sẵn sàng — lưới %dx%d, lõm R%.1f sâu %.2f"):format(
-					nx,
-					nz,
-					dentR,
-					dentDepth
-				)
-			)
+			Log.Floor("SlimeSquish", nx * nz)
 		end
 	end)
 

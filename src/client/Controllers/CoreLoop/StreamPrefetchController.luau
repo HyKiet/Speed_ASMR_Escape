@@ -46,6 +46,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
+local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local StreamPrefetchController = {}
 
@@ -67,7 +68,7 @@ local localPlayer = Players.LocalPlayer
 function StreamPrefetchController.Start()
 	-- Streaming tắt thì không có gì để nạp trước.
 	if not Workspace.StreamingEnabled then
-		print("[StreamPrefetch] StreamingEnabled = false — bỏ qua")
+		Log.Boot("[StreamPrefetch] StreamingEnabled = false — bỏ qua")
 		return
 	end
 
@@ -140,7 +141,7 @@ function StreamPrefetchController.Start()
 		end)
 	end)
 
-	print(
+	Log.Boot(
 		("[StreamPrefetch] sẵn sàng — nhìn trước %.1fs (ở 250 WS = %d studs) + tải trước theo lệnh server"):format(
 			LOOKAHEAD_SECONDS,
 			math.floor(250 * LOOKAHEAD_SECONDS)

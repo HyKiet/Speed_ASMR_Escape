@@ -12,6 +12,10 @@
 	Mỗi client chỉ kiểm tra bản thân với ≤4 cá → 25 player vẫn nhẹ.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -76,7 +80,7 @@ function Zone6SharkController.Start()
 				end
 			end
 		end)
-		print("[Zone6SharkController] client kill khớp hình ảnh sẵn sàng")
+		Log.Boot("[Zone6SharkController] client kill khớp hình ảnh sẵn sàng")
 	end)
 end
 

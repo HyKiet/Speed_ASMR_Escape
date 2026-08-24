@@ -3,6 +3,10 @@
 -- + tia lấp lánh (giờ qua ParticlePool thay emitter lazy-create per-bóng), crinkle theo bước,
 -- hết bóng/15s -> sóng tái phồng chạy từng hàng.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Log = require(ReplicatedStorage.Shared.Util.Log)
+
 local TweenService = game:GetService("TweenService")
 
 local BubbleWrap = {}
@@ -89,7 +93,7 @@ function BubbleWrap.attach(model, engine)
 		end
 
 		self.ready = box ~= nil and #bubbles > 0
-		print(("[ASMR BubbleWrap] sẵn sàng — %d bóng khí + pop VFX, tụt %.2f"):format(#bubbles, popDrop))
+		Log.Floor("BubbleWrap", #bubbles)
 	end)
 
 	local function sound(parent, id, vol, spMin, spMax)
