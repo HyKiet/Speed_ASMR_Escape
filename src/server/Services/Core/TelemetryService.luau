@@ -162,7 +162,16 @@ function TelemetryService.Start()
 		end
 	end)
 
-	Log.Boot(`[Telemetry] Đang chạy ở môi trường {Env.Current}.`)
+	--[[
+		`Log.Info` chứ KHÔNG phải `Log.Boot` (sửa 2026-08-24, ngay trước lần publish Live đầu).
+
+		Đợt dọn Output hôm nay đã hạ dòng này xuống `Log.Boot` — tức im lặng theo mặc định.
+		Sai: đây không phải một dòng "đã nạp xong", nó là **thứ duy nhất cho biết server đang
+		ghi vào bể dữ liệu nào**. `Env` chọn store theo `game.PlaceId`; đoán nhầm hướng Live
+		nghĩa là ghi đè lên dữ liệu thật của người chơi. Một dòng như vậy phải luôn in ra, và
+		phải đọc được ngay ở dòng đầu log của server Live.
+	]]
+	Log.Info(`[Telemetry] Đang chạy ở môi trường {Env.Current}.`)
 end
 
 return TelemetryService
