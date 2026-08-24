@@ -58,8 +58,9 @@ local GOLD_DEEP = Color3.fromRGB(255, 162, 28)
 	chiều rộng (1024×576 cho 16:9).
 
 	KHÔNG đưa ảnh này vào `PreloadAsync` ở bước 3: `PreloadAsync` CHẶN, mỗi asset thêm vào đó
-	là màn hình chờ dài thêm — mà cả file này tồn tại để RÚT NGẮN cảm giác chờ. Ảnh tự stream
-	về rồi mờ dần hiện ra (xem `IsLoaded` bên dưới), chờ nó là tự mâu thuẫn.
+	là màn hình chờ dài thêm — mà cả file này tồn tại để RÚT NGẮN cảm giác chờ. Ảnh cứ để tự
+	stream về; chưa về thì người chơi thấy nền gradient, về rồi thì thấy ảnh. Chờ nó là tự
+	mâu thuẫn với chính mục đích của file.
 ]]
 local BACKGROUND = "rbxassetid://97656375918556"
 
@@ -105,21 +106,28 @@ photo.Image = BACKGROUND
 -- `Crop` chứ không phải `Stretch`: điện thoại và PC có tỉ lệ khác nhau, kéo giãn là méo mặt
 -- nhân vật. Crop cắt bớt mép và giữ nguyên tỉ lệ.
 photo.ScaleType = Enum.ScaleType.Crop
--- Bắt đầu trong suốt rồi mờ dần hiện ra khi ảnh về tới nơi. Không có bước này thì ảnh "bụp"
--- một cái giữa màn hình chờ — trông y như lỗi render.
-photo.ImageTransparency = 1
-photo.Parent = bg
+--[[
+	⚠️ HIỆN NGAY, ĐỪNG CHỜ `IsLoaded` (sửa 2026-08-24 — bản đầu tiên KHÔNG hiện ảnh).
 
-do
-	local function reveal()
-		if photo.IsLoaded then
-			TweenService:Create(photo, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { ImageTransparency = 0 }):Play()
-		end
-	end
-	-- Một connection, không có vòng lặp mỗi frame — đúng nguyên tắc ở đầu file.
-	photo:GetPropertyChangedSignal("IsLoaded"):Connect(reveal)
-	reveal() -- ảnh đã nằm sẵn trong cache (lần vào thứ hai) thì IsLoaded đúng ngay
-end
+	Bản đầu đặt `ImageTransparency = 1` rồi định mờ dần hiện ra khi ảnh về tới nơi, bắt qua
+	`GetPropertyChangedSignal("IsLoaded")`. Kết quả: ảnh **không bao giờ hiện**. Đo lại bằng
+	đối chứng ba mức trong suốt (1 · 0,99 · 0), cùng asset, cùng cây GUI, chờ 3 giây mỗi lần:
+
+	    ImageTransparency = 1      IsLoaded=false  signal bắn 0 lần
+	    ImageTransparency = 0.99   IsLoaded=false  signal bắn 0 lần
+	    ImageTransparency = 0      IsLoaded=false  signal bắn 0 lần
+
+	`IsLoaded` đứng nguyên `false` ở CẢ BA, và signal chưa bao giờ bắn — kể cả với asset đã
+	nằm trong cache. Nên nó không dùng làm điều kiện hiện hình được. (Cùng một bài học đã gặp
+	trước đó trong phiên này: `ContentProvider:PreloadAsync` báo Success cho 22 ảnh trong khi
+	`IsLoaded` của cả 22 vẫn là false.)
+
+	Cách đúng lại đơn giản hơn: để `ImageTransparency = 0` ngay từ đầu. Texture chưa về thì
+	ImageLabel không vẽ gì cả — đúng bằng cái nền gradient bên dưới — rồi ảnh về là hiện.
+	Không có bước "bụp" nào đáng lo, vì thứ nó thay thế cũng là màu tối.
+]]
+photo.ImageTransparency = 0
+photo.Parent = bg
 
 local scrim = Instance.new("Frame")
 scrim.Size = UDim2.fromScale(1, 1)
@@ -146,8 +154,19 @@ centerScale.Parent = center
 
 local barBg = Instance.new("Frame")
 barBg.AnchorPoint = Vector2.new(0.5, 0.5)
--- Không còn chữ nào để nằm dưới ⇒ thanh về đúng giữa màn hình.
-barBg.Position = UDim2.fromScale(0.5, 0.5)
+--[[
+	Thanh nằm THẤP, không nằm giữa (sửa 2026-08-24 sau khi nhìn ảnh chụp thật).
+
+	Bỏ chữ xong tôi đưa thanh về giữa màn hình (0.5) vì "không còn gì để nằm dưới". Chụp lại
+	màn hình chờ đang chạy thì thấy hậu quả: thanh **cắt ngang giữa ngực nhân vật** trong ảnh
+	nền — đúng điểm nhìn của cả tấm art.
+
+	0.85 đưa thanh xuống dưới chân nhân vật, chừa trọn phần art cho mắt. Đây cũng là chỗ mắt
+	người quen tìm thanh tiến trình.
+
+	⚠️ Ảnh nền thay đổi thì kiểm lại con số này bằng ảnh chụp, đừng chỉnh mù.
+]]
+barBg.Position = UDim2.fromScale(0.5, 0.85)
 barBg.Size = UDim2.fromScale(0.4, 0.024)
 barBg.BackgroundColor3 = Color3.fromRGB(40, 40, 62)
 barBg.BorderSizePixel = 0
