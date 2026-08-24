@@ -90,7 +90,7 @@ function Clay.attach(model, engine)
 			centerY = box and box.topY
 		end
 		self.ready = box ~= nil and #records > 0
-		Log.Floor("Clay", #records)
+		Log.Floor("Clay", #records, model)
 	end)
 
 	local function playSquish(parent: BasePart, volume: number, speedMin: number, speedMax: number)

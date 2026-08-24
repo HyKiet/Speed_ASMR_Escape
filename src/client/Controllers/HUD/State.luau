@@ -284,10 +284,8 @@ State.groupChestModalVisible, State.groupChestModalMounted, State.groupChestModa
 	declareModal()
 State.groupChestCloseHovered = Value(false)
 State.groupChestJoinHovered = Value(false)
-State.groupChestLikeHovered = Value(false)
 State.groupChestClaimHovered = Value(false)
 State.groupChestIsGroupMember = Value(false)
-State.groupChestHasConfirmedLike = Value(false)
 State.groupChestHasClaimed = Value(false)
 
 -- Code modal

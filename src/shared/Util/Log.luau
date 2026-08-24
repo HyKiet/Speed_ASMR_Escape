@@ -18,10 +18,17 @@
 
 	══ BẬT LẠI ═══════════════════════════════════════════════════════════════════════════
 
-	Hai cách, không cần sửa file này:
-	  • Trong Studio — chạy `game:SetAttribute("SEVerboseBoot", true)` ở Command Bar RỒI Play.
-	    (Phải đặt TRƯỚC khi Play: các dòng này in đúng một lần lúc nạp, đặt sau là lỡ mất.)
-	  • Trong game đã publish — đặt cùng attribute đó từ một script server.
+	Chạy ở Command Bar của Studio (chế độ Edit) RỒI bấm Play:
+
+	    workspace:SetAttribute("SEVerboseBoot", true)
+
+	⚠️ **Phải đặt trên `workspace`, KHÔNG phải trên `game`.** Đã thử 2026-08-24:
+	`game:SetAttribute(...)` trong Edit thì Play KHÔNG thấy — attribute trên chính DataModel
+	không được sao sang phiên chạy. `workspace` là một Instance trong cây nên nó theo sang.
+	(Hàm `verbose()` vẫn đọc cả hai, để một script server trong game đã publish đặt kiểu nào
+	cũng được.)
+
+	Cũng phải đặt TRƯỚC khi Play: các dòng này in đúng một lần lúc nạp, đặt sau là lỡ mất.
 
 	Ba mức, cố ý ít:
 	  • `Log.Boot`  — dòng "sẵn sàng" lúc nạp. IM LẶNG trừ khi bật verbose.
@@ -35,7 +42,9 @@ local Log = {}
 local VERBOSE_ATTRIBUTE = "SEVerboseBoot"
 
 local function verbose(): boolean
-	return game:GetAttribute(VERBOSE_ATTRIBUTE) == true
+	-- Đọc CẢ HAI chỗ: `workspace` là chỗ đặt được từ Studio Edit (xem khối "BẬT LẠI"),
+	-- `game` để một script server trong bản đã publish bật lên cũng ăn.
+	return workspace:GetAttribute(VERBOSE_ATTRIBUTE) == true or game:GetAttribute(VERBOSE_ATTRIBUTE) == true
 end
 
 -- Dòng khởi động. Im lặng theo mặc định — xem khối "BẬT LẠI" ở trên.
@@ -59,19 +68,32 @@ end
 	Sàn cuối cùng attach xong thì 1,5 giây sau in đúng một dòng tổng.
 
 	Dòng tổng vẫn giữ đủ thông tin để chẩn đoán — số lượng theo TỪNG LOẠI và tổng số ô:
-	    [ASMR] 35 sàn sẵn sàng — Clay×16 BubbleWrap×10 Keyboard×8 KineticSandLive×1 (5.468 ô)
+	    [ASMR] 36 sàn sẵn sàng — Clay×16 BubbleWrap×10 Keyboard×8 KineticSandLive×2 (11.640 ô)
 	Thiếu một loại hay hụt số ô là nhìn ra ngay, y như đọc 40 dòng cũ nhưng trong một dòng.
 
 	⚠️ Sàn init hụt là chết câm vĩnh viễn (không log, không lỗi). Dòng tổng này chính là chỗ
 	phát hiện: số sàn ít hơn số model mang tag `ASMRFloor` nghĩa là có cái không attach nổi.
+
+	══ ĐẾM THEO MODEL, KHÔNG ĐẾM THEO LƯỢT GỌI (sửa 2026-08-24) ═══════════════════════════
+
+	Bản đầu cộng dồn mỗi lần `Log.Floor` được gọi. Chạy thử ra `[ASMR] 70 sàn — Clay×32
+	BubbleWrap×20 Keyboard×16` trong khi chỉ có 36 model mang tag: watchdog của engine ASMR
+	**gỡ ra gắn lại** những sàn chưa `ready`, và mỗi lần gắn lại là một lượt gọi nữa. Con số
+	phồng lên thành vô nghĩa — tệ hơn cả 40 dòng cũ, vì nó trông như một sự thật.
+
+	Nên giờ khoá theo chính `model`: gắn lại cùng một model KHÔNG cộng thêm sàn, chỉ cộng vào
+	bộ đếm `reattach`. Và số đó được in ra khi khác 0 — churn attach là một lỗi thật đáng
+	thấy, đừng giấu nó đi lần nữa.
 ]]
 local SETTLE_SECONDS = 1.5
 
 local floorCounts: { [string]: number } = {}
-local floorCells: { [string]: number } = {}
 local floorTotal = 0
 local cellTotal = 0
+local reattachTotal = 0
 local pendingToken = 0
+-- Model nào đã tính rồi. Khoá yếu: sàn bị streaming dỡ hẳn thì bảng này không giữ nó sống.
+local seenModels: { [Instance]: number } = setmetatable({}, { __mode = "k" }) :: any
 
 local function formatThousands(n: number): string
 	local s = tostring(n)
@@ -96,21 +118,32 @@ local function flushFloors()
 	for _, name in names do
 		table.insert(parts, ("%s×%d"):format(name, floorCounts[name]))
 	end
+	local churn = if reattachTotal > 0 then (", %d lượt gắn lại"):format(reattachTotal) else ""
 	print(
-		("[ASMR] %d sàn sẵn sàng — %s (%s ô)"):format(
+		("[ASMR] %d sàn sẵn sàng — %s (%s ô%s)"):format(
 			floorTotal,
 			table.concat(parts, " "),
-			formatThousands(cellTotal)
+			formatThousands(cellTotal),
+			churn
 		)
 	)
 end
 
--- `cells` là số ô/phím/bóng của riêng sàn đó. Sàn không đếm được thì truyền 0.
-function Log.Floor(name: string, cells: number)
-	floorCounts[name] = (floorCounts[name] or 0) + 1
-	floorCells[name] = (floorCells[name] or 0) + cells
-	floorTotal += 1
-	cellTotal += cells
+-- `cells` là số ô/phím/bóng của riêng sàn đó (0 nếu không đếm được).
+-- `model` là Model mang tag `ASMRFloor` — dùng làm KHOÁ, xem khối "ĐẾM THEO MODEL" ở trên.
+function Log.Floor(name: string, cells: number, model: Instance?)
+	if model and seenModels[model] then
+		-- Cùng một sàn gắn lại: không phải sàn mới. Chỉ ghi nhận churn rồi vẫn hẹn giờ in
+		-- lại, để dòng tổng phản ánh cả những lượt gắn lại tới muộn.
+		reattachTotal += 1
+	else
+		if model then
+			seenModels[model] = 1
+		end
+		floorCounts[name] = (floorCounts[name] or 0) + 1
+		floorTotal += 1
+		cellTotal += cells
+	end
 
 	pendingToken += 1
 	local token = pendingToken

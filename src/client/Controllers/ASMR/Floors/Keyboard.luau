@@ -311,7 +311,7 @@ function Keyboard.attach(model, engine)
 		end
 
 		self.ready = true
-		Log.Floor("Keyboard", #keys)
+		Log.Floor("Keyboard", #keys, model)
 	end)
 
 	local function playKey(rec, speedRatio, volScale)

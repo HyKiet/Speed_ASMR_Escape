@@ -126,14 +126,10 @@ return ByteNet.defineNamespace("speedEscape", function()
 		groupChestState = ByteNet.definePacket({
 			value = ByteNet.struct({
 				isGroupMember = ByteNet.bool,
-				hasConfirmedLike = ByteNet.bool,
 				hasClaimed = ByteNet.bool,
 			}),
 		}),
 		requestGroupChestState = ByteNet.definePacket({
-			value = ByteNet.struct({}),
-		}),
-		requestGroupChestLikeConfirm = ByteNet.definePacket({
 			value = ByteNet.struct({}),
 		}),
 		requestGroupChestClaim = ByteNet.definePacket({

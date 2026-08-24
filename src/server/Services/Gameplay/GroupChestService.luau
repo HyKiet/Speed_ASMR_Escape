@@ -1,5 +1,28 @@
 --!strict
--- Group Chest: quà tham gia group, cache trạng thái group và gắn ProximityPrompt cho rương lobby.
+--[[
+	Group Chest: quà tham gia group, cache trạng thái group và gắn ProximityPrompt cho rương lobby.
+
+	══ ĐIỀU KIỆN DUY NHẤT = VÀO GROUP (bỏ vế "Like Game" 2026-08-24) ═══════════════════════
+
+	Trước đây quà đòi HAI thứ: vào group **và** "xác nhận đã like game". Vế thứ hai đã bị gỡ
+	vì nó không có thật ở cả hai đầu:
+
+	  • **Không xác minh được.** Roblox không expose API server-side nào cho biết một player
+	    đã like experience hay chưa. Server chỉ bật một cờ khi client bảo nó bật.
+	  • **Không làm gì cả.** Nút "Like Game" bên client không mở giao diện like — nó chỉ gửi
+	    gói tin bật cờ. Người chơi bấm xong tưởng mình đã like, thực tế không.
+	  • **Tự bật.** Nút gộp "JOIN + LIKE + CLAIM" gọi `confirmLike()` ngay dòng đầu, vô điều
+	    kiện. Nên điều kiện đó chưa từng chặn được ai — nó là hình thức thuần tuý.
+
+	Ngoài ra thưởng cho hành vi like/favorite là vùng rủi ro chính sách của Roblox (thưởng cho
+	vào group thì không). Gỡ hẳn vừa đúng với thứ đang thực sự xảy ra, vừa tránh vùng đó.
+
+	Phần thưởng GIỮ NGUYÊN (5.000 Speed + 10 Wins + 10% Wins vĩnh viễn + tag [Fan]): trước
+	giờ mọi người bấm nút đều nhận đủ, nên đây không phải cắt quà mà là bỏ một cái cổng giả.
+
+	Điều kiện còn lại là điều kiện THẬT: `player:IsInGroup()` do server tự hỏi Roblox, client
+	không nói dối được.
+]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,7 +40,6 @@ local CLAIM_COOLDOWN_SECONDS = 1.25
 type PlayerData = {
 	Speed: number,
 	hasClaimedGroupReward: boolean,
-	hasConfirmedLikeGroupReward: boolean,
 }
 
 local DataService
@@ -60,7 +82,6 @@ local function sendState(player: Player)
 	local data: PlayerData? = DataService.GetData(player)
 	GamePackets.groupChestState.sendTo({
 		isGroupMember = GroupChestService.IsGroupMember(player),
-		hasConfirmedLike = if data then data.hasConfirmedLikeGroupReward else false,
 		hasClaimed = if data then data.hasClaimedGroupReward else false,
 	}, player)
 end
@@ -120,20 +141,6 @@ function GroupChestService.OpenChest(player: Player)
 	sendState(player)
 end
 
-function GroupChestService.ConfirmLike(player: Player)
-	local data: PlayerData? = DataService.GetData(player)
-	if not data then
-		sendToast(player, "Data still loading")
-		return
-	end
-
-	-- Roblox hiện không expose API server-side để xác minh từng player đã like experience.
-	-- Vì vậy đây là cờ xác nhận tự nguyện, còn điều kiện Group vẫn được validate thật trên server.
-	data.hasConfirmedLikeGroupReward = true
-	sendToast(player, "Like confirmed")
-	sendState(player)
-end
-
 function GroupChestService.TryClaim(player: Player): boolean
 	if not canAttemptClaim(player) then
 		return false
@@ -147,12 +154,6 @@ function GroupChestService.TryClaim(player: Player): boolean
 
 	if not GroupChestService.IsGroupMember(player) then
 		sendToast(player, "Join the Roblox group first!")
-		sendState(player)
-		return false
-	end
-
-	if not data.hasConfirmedLikeGroupReward then
-		sendToast(player, "Like the game first!")
 		sendState(player)
 		return false
 	end
@@ -237,13 +238,6 @@ function GroupChestService.Start()
 			return
 		end
 		GroupChestService.OpenChest(player)
-	end)
-
-	GamePackets.requestGroupChestLikeConfirm.listen(function(_request, player: Player)
-		if NetRateLimit.ShouldDrop(player, "groupChestLike") then
-			return
-		end
-		GroupChestService.ConfirmLike(player)
 	end)
 
 	-- TryClaim đã tự có cooldown riêng (canAttemptClaim / CLAIM_COOLDOWN_SECONDS),

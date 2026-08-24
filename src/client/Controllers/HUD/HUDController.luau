@@ -226,7 +226,6 @@ function HUDController.Start()
 
 	local groupChestStateListener = GamePackets.groupChestState.listen(function(data)
 		State.groupChestIsGroupMember:set(data.isGroupMember)
-		State.groupChestHasConfirmedLike:set(data.hasConfirmedLike)
 		State.groupChestHasClaimed:set(data.hasClaimed)
 		Manager.OpenGroupChest()
 	end)

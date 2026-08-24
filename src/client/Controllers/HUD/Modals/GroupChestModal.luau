@@ -112,17 +112,19 @@ local function makeRewardCard(
 	})
 end
 
-local function confirmLike()
-	GamePackets.requestGroupChestLikeConfirm.send({})
-end
+--[[
+	Một nút làm trọn chuỗi: mở hộp thoại vào group của Roblox → đợi người chơi bấm → hỏi lại
+	server xem đã là thành viên chưa → nhận quà.
 
-local function runJoinLikeClaim()
+	Vế "Like Game" đã bị gỡ 2026-08-24 (lý do đầy đủ ở đầu `GroupChestService`): nó không xác
+	minh được, nút cũ không mở giao diện like nào cả, và chính hàm này gọi `confirmLike()` vô
+	điều kiện nên cái cổng đó chưa từng chặn ai.
+]]
+local function runJoinAndClaim()
 	if State.groupChestHasClaimed:get() then
 		Toast.Show("Group chest already claimed")
 		return
 	end
-
-	confirmLike()
 
 	task.spawn(function()
 		if not State.groupChestIsGroupMember:get() then
@@ -145,16 +147,14 @@ local function buildContent(): { any }
 	local claimHovered = State.groupChestClaimHovered
 
 	local canClaim = Computed(function()
-		return State.groupChestIsGroupMember:get()
-			and State.groupChestHasConfirmedLike:get()
-			and not State.groupChestHasClaimed:get()
+		return State.groupChestIsGroupMember:get() and not State.groupChestHasClaimed:get()
 	end)
 
 	return {
 		Theme.MakeOutlineLabel({
 			Position = UDim2.fromOffset(34, 108),
 			Size = UDim2.fromOffset(692, 34),
-			Text = "One tap starts the group join prompt, confirms like, then claims your reward.",
+			Text = "One tap opens the group join prompt, then claims your reward.",
 			TextColor3 = Color3.fromRGB(255, 226, 226),
 			MaxTextSize = 24,
 			ZIndex = 42,
@@ -188,8 +188,9 @@ local function buildContent(): { any }
 			Color3.fromRGB(138, 22, 74)
 		),
 
-		makeStatusPill("Join Group", State.groupChestIsGroupMember, UDim2.fromOffset(64, 322)),
-		makeStatusPill("Like Game", State.groupChestHasConfirmedLike, UDim2.fromOffset(396, 322)),
+		-- Chỉ còn MỘT điều kiện nên pill phải nằm giữa: nút CLAIM bên dưới neo ở x = 380,
+		-- pill rộng 300 ⇒ x = 380 − 150 = 230. Để nguyên 64 là lệch hẳn sang trái.
+		makeStatusPill("Join Group", State.groupChestIsGroupMember, UDim2.fromOffset(230, 322)),
 
 		-- Nút CLAIM: `MakeSurface` + `Zoom` (viền và chữ phóng cùng nhịp, nở đều 4 góc).
 		Theme.MakeSurface({
@@ -213,7 +214,7 @@ local function buildContent(): { any }
 				return Color3.fromRGB(150, 18, 28)
 			end),
 			Zoom = { Hovered = claimHovered, Scale = 1.06 },
-			Activated = runJoinLikeClaim,
+			Activated = runJoinAndClaim,
 			MouseEnter = function()
 				claimHovered:set(true)
 			end,
@@ -229,7 +230,7 @@ local function buildContent(): { any }
 							if State.groupChestHasClaimed:get() then
 								return "CLAIMED"
 							end
-							return if canClaim:get() then "CLAIM GROUP CHEST" else "JOIN + LIKE + CLAIM"
+							return if canClaim:get() then "CLAIM GROUP CHEST" else "JOIN + CLAIM"
 						end),
 						Zoom = zoom,
 						MaxTextSize = 32,

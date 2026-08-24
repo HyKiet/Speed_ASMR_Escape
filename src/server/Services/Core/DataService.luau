@@ -88,9 +88,6 @@ local function normalizeData(data: { [string]: any })
 	if typeof(data.hasClaimedGroupReward) ~= "boolean" then
 		data.hasClaimedGroupReward = false
 	end
-	if typeof(data.hasConfirmedLikeGroupReward) ~= "boolean" then
-		data.hasConfirmedLikeGroupReward = false
-	end
 	--[[
 		Starter Pack: mốc bắt đầu đếm 48h. Ghi ở đây (lúc nạp profile) chứ không phải lúc tạo
 		profile mới, nên tài khoản CŨ — có từ trước khi gói này ra đời — cũng được tính giờ từ

@@ -92,7 +92,7 @@ function MelodyRun.attach(model, engine)
 		box = if base and base:IsA("BasePart") then Bounds.ofBase(base, 2) else Bounds.ofParts(folder:GetChildren(), 2)
 		topY = records[1] and (records[1].part.Position.Y + records[1].part.Size.Y / 2) or (box and box.topY) or 9.6
 		self.ready = box ~= nil and #records > 0
-		Log.Floor("MelodyRun", #records)
+		Log.Floor("MelodyRun", #records, model)
 	end)
 
 	-- Quét 3×3 cell chứ KHÔNG `bucketAt` (1 cell): ô không bao giờ căn khớp biên cell, nên

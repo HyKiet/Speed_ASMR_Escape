@@ -55,7 +55,7 @@ function AquaRun.attach(model, engine)
 			ripples[i] = { part = r, t = RIPPLE_LIFE, grow = 0 }
 		end
 		self.ready = true
-		Log.Floor("AquaRun", RIPPLE_N)
+		Log.Floor("AquaRun", RIPPLE_N, model)
 	end)
 
 	local function splashSound(parent, ratio)

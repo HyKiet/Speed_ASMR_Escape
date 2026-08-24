@@ -48,7 +48,7 @@ function Jelly.attach(model, engine)
 			then Bounds.ofBase(collider, 2)
 			else Bounds.ofParts(folder:GetChildren(), 2)
 		self.ready = box ~= nil and #blocks > 0
-		Log.Floor("Jelly", #blocks)
+		Log.Floor("Jelly", #blocks, model)
 	end)
 
 	local function playWobble(parent, vol, spMin, spMax)

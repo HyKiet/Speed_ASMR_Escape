@@ -62,7 +62,7 @@ function KineticSand.attach(model, engine)
 			return
 		end
 		surfY = if tray and tray:IsA("BasePart") then tray.Position.Y + tray.Size.Y / 2 + 0.6 else box.topY
-		Log.Floor("KineticSand", n)
+		Log.Floor("KineticSand", n, model)
 	end)
 
 	local function crunch(parent, ratio)

@@ -220,7 +220,7 @@ function Butter.attach(model, engine)
 
 		self.ready = box ~= nil
 		if self.ready then
-			Log.Floor("Butter", #blocks)
+			Log.Floor("Butter", #blocks, model)
 		end
 	end)
 

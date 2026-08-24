@@ -254,7 +254,7 @@ function SlimeSquish.attach(model, engine)
 
 		self.ready = build() and box ~= nil
 		if self.ready then
-			Log.Floor("SlimeSquish", nx * nz)
+			Log.Floor("SlimeSquish", nx * nz, model)
 		end
 	end)
 

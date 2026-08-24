@@ -190,7 +190,7 @@ function GummySquish.attach(model, engine)
 
 		self.ready = box ~= nil
 		if self.ready then
-			Log.Floor("GummySquish", #list)
+			Log.Floor("GummySquish", #list, model)
 		end
 	end)
 

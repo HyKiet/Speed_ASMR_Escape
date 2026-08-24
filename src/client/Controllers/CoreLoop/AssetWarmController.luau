@@ -36,8 +36,29 @@ local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local AssetWarmController = {}
 
--- Chờ cho màn hình chờ + vòng nạp controller xong hẳn rồi mới bắt đầu.
-local START_DELAY = 3
+--[[
+	`START_DELAY = 0` (đổi từ 3 ngày 2026-08-24).
+
+	User báo: "vào game lag lúc đầu, chơi một chút thì mượt hơn." Đọc log thì thấy đúng ba
+	giây trống đó là thủ phạm:
+	    [LoadingScreen] xong sau 5.7s      ← người chơi bắt đầu chạy từ đây
+	    [AssetWarm] … trong 3.1s            ← nhưng mới CHỜ 3s rồi mới bắt đầu tải
+	Nghĩa là việc làm nóng rơi trúng giây thứ 3–6 của phiên — đúng lúc người chơi đang lia
+	camera lần đầu và mọi mesh đều chưa lên GPU.
+
+	Bỏ hẳn thời gian chờ thì việc tải bắt đầu NGAY khi controller Start, tức là vẫn còn đang
+	ở sau màn hình chờ (`LoadingScreen` mất ~5,7 s, mà vòng nạp controller xong trước đó).
+	Phần lớn công việc rơi vào lúc người chơi còn đang nhìn thanh tiến trình.
+
+	⚠️ VẪN GIỮ chia lô + nghỉ giữa lô. Bỏ `START_DELAY` chỉ dời điểm BẮT ĐẦU sớm lên; nếu bỏ
+	luôn `BATCH_GAP` thì lại tạo ra đúng cục nghẽn mà cả file này sinh ra để tránh — lúc đó
+	nó nghẽn ngay giữa màn hình chờ, và thanh tiến trình đứng hình.
+
+	Muốn triệt để hơn nữa thì phải kéo hẳn việc này VÀO TRONG `LoadingScreen` (màn chờ dài
+	thêm ~3 s). Đó là đánh đổi với tỉ lệ bỏ game ở màn chờ — xem khối "BA QUYẾT ĐỊNH" ở trên,
+	quyết định đó chưa đổi.
+]]
+local START_DELAY = 0
 local BATCH_SIZE = 3
 local BATCH_GAP = 0.4
 

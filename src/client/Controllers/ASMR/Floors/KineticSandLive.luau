@@ -130,7 +130,7 @@ function KineticSandLive.attach(model, engine)
 			return -- watchdog engine sẽ attach lại khi tile đã tới
 		end
 		self.ready = box ~= nil and n > 0
-		Log.Floor("KineticSandLive", n)
+		Log.Floor("KineticSandLive", n, model)
 	end)
 
 	local function crunch(root, ratio)

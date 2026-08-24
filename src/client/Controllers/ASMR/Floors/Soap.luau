@@ -72,7 +72,7 @@ function Soap.attach(model, engine)
 			grooves[i] = { part = g, ttl = 0, life = 0 }
 		end
 		self.ready = box ~= nil and #bars > 0
-		Log.Floor("Soap", #bars)
+		Log.Floor("Soap", #bars, model)
 	end)
 
 	local function cutSound(parent, ratio)

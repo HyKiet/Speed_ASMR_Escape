@@ -64,7 +64,7 @@ function PopIt.attach(model, engine)
 			popR2 = r * r
 		end
 		self.ready = box ~= nil and #bubbles > 0
-		Log.Floor("PopIt", #bubbles)
+		Log.Floor("PopIt", #bubbles, model)
 	end)
 
 	local function playPop(parent, speedMin, speedMax, volume)

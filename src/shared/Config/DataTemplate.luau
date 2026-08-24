@@ -10,7 +10,6 @@ local DataTemplate = {
 	PersonalBestRunWins = 0,
 	TotalDonatedRobux = 0,
 	hasClaimedGroupReward = false,
-	hasConfirmedLikeGroupReward = false,
 	CoreLoopVersion = 0,
 	HighestCompletedStage = 0,
 	Rebirths = 0,

@@ -123,7 +123,7 @@ function SquishFloor.make(cfg)
 				cullReach = CULL_DIST + math.max(box.halfX, box.halfZ)
 			end
 			self.ready = box ~= nil and #records > 0
-			Log.Floor(NAME, #records)
+			Log.Floor(NAME, #records, model)
 		end)
 
 		local function applyDeform(rec, v)

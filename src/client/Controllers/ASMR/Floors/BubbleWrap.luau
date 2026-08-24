@@ -93,7 +93,7 @@ function BubbleWrap.attach(model, engine)
 		end
 
 		self.ready = box ~= nil and #bubbles > 0
-		Log.Floor("BubbleWrap", #bubbles)
+		Log.Floor("BubbleWrap", #bubbles, model)
 	end)
 
 	local function sound(parent, id, vol, spMin, spMax)
