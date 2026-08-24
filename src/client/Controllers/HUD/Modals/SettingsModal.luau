@@ -491,7 +491,7 @@ local function buildDisplayTab()
 				chipA = Color3.fromRGB(255, 208, 84),
 				chipB = Color3.fromRGB(226, 130, 22),
 				title = "Performance Mode",
-				hint = "Turns off shadows and other players' effects — lighting and colours stay untouched",
+				hint = "Hides shadows and other players' VFX. Colours stay the same.",
 				order = 1,
 				state = State.performanceMode,
 				onChanged = function(on)
@@ -519,10 +519,10 @@ local function buildDisplayTab()
 					]]
 					if on and not qualityHintShown then
 						qualityHintShown = true
-						Toast.Show(
-							"Mượt hơn nữa: menu Roblox ⚙ → Graphics Quality kéo xuống thấp nhất",
-							"success"
-						)
+						-- Câu này TỪNG bảo "kéo Quality xuống thấp nhất", ngược hẳn với kết luận
+						-- đo được ghi ngay phía trên (Automatic mượt hơn Manual+max). Sửa cho
+						-- khớp, và chuyển sang tiếng Anh như mọi chữ hiện ra cho người chơi.
+						Toast.Show("Even smoother: Roblox ⚙ → Graphics Mode → Automatic", "success")
 					end
 				end,
 			}),
@@ -531,7 +531,7 @@ local function buildDisplayTab()
 				chipA = Color3.fromRGB(150, 160, 255),
 				chipB = Color3.fromRGB(58, 46, 168),
 				title = "Night Mode",
-				hint = "Night sky with the zones still fully lit — trails and auras glow best here",
+				hint = "Night sky, zones stay bright. Trails and auras glow best.",
 				order = 2,
 				state = State.nightMode,
 				onChanged = function(on)

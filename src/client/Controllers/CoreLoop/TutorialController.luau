@@ -114,10 +114,23 @@ type StepConfig = {
 
 	⚠️ Giữ MỖI CÂU MỘT VIỆC. Dải nhắc cao 92 design px, hai dòng là hết chỗ; nhồi hai việc vào
 	một câu thì trên điện thoại chữ co lại còn không đọc nổi.
+
+	══ KHUÔN "VIỆC → THƯỞNG", MỘT DÒNG (rút gọn 2026-08-24) ═════════════════════════════════
+
+	User: câu chữ phải ngắn gọn dễ hiểu. Ba câu cũ dài 45–66 ký tự và mỗi câu một kiểu ngữ pháp
+	(mệnh lệnh / khoe số / rủ rê), nên người chơi phải ĐỌC HẾT mới biết mình cần làm gì.
+
+	Giờ cả ba dùng chung đúng một khuôn, mũi tên là chỗ mắt nhảy tới:
+	    <VIỆC PHẢI LÀM> → <THỨ NHẬN ĐƯỢC>
+	Đọc lướt qua mũi tên là đủ hiểu, không cần đọc trọn câu. Ba luật trên vẫn còn nguyên: vế
+	phải mũi tên CHÍNH LÀ phần thưởng (luật 1), vẫn là con số thật (luật 2), và vẫn lớn dần
+	(luật 3): 1 Win → gấp đôi mỗi bước → Speed tự chảy.
+
+	Thêm câu mới thì giữ khuôn này; đừng quay lại lối viết một câu trọn vẹn.
 ]]
 local STEPS: { StepConfig } = {
 	{
-		text = "Sprint Stage 1 and stomp the gold pad — your first Win is waiting!",
+		text = "Run Stage 1, stomp the gold pad → 1 Win!",
 		targetPath = { "Zones", "Zone1", "Mechanics", "WinCollectionPad" },
 		fallbackPath = { "Zones", "Zone1", "Mechanics", "Stage1Start" },
 	},
@@ -129,12 +142,12 @@ local STEPS: { StepConfig } = {
 			(xem `MultiplierPads`). Sửa một trong hai con số đó thì phải sửa câu này theo, nếu
 			không tutorial nói dối ngay ở bước có người chơi bỏ cuộc nhiều nhất.
 		]]
-		text = "You've got 1 Win — spend it on Pad 2: every step pays DOUBLE!",
+		text = "Spend 1 Win on Pad 2 → every step pays DOUBLE!",
 		targetPath = { "Lobby", "MultiplierPads", "Pad_2", "PadPart" },
 	},
 	{
 		-- KHÔNG viết "last step" nữa: sau bước này còn bước nhận quà Daily (4/4).
-		text = "Hop on the treadmill and watch Speed pour in!",
+		text = "Hop on the treadmill → Speed pours in!",
 		targetPath = { "Lobby", "Treadmills", "Treadmill_x1", "Hitbox" },
 	},
 }

@@ -168,10 +168,12 @@ function AutoPerformanceController.Start()
 					-- giây phút đã nhắc thì quả bóng nằm bên người chơi — hệt như khi họ tự bấm.
 					playerOverrode = true
 					local automatic = isAutomaticGraphics()
+					-- Toàn bộ chữ hiện ra cho người chơi đều là TIẾNG ANH (chốt 2026-08-24) và
+					-- theo khuôn VIỆC → KẾT QUẢ, một dòng, đọc lướt là hiểu.
 					Toast.Show(
 						if automatic
-							then "Máy đang tụt FPS — bật Performance Mode trong Cài đặt để mượt hơn"
-							else "Máy đang tụt FPS — menu Roblox ⚙ → Graphics Mode → Automatic sẽ mượt hơn hẳn",
+							then "Low FPS? Settings → Performance Mode"
+							else "Low FPS? Roblox ⚙ → Graphics Mode → Automatic",
 						"error"
 					)
 					print(

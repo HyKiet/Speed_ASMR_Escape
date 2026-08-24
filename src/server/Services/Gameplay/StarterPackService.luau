@@ -270,14 +270,38 @@ function StarterPackService.Start()
 	--[[
 		Đồng hồ hết hạn: quét mỗi 30s. Không cần nhanh hơn — client tự đếm lùi từng giây, đây
 		chỉ là lúc CHỐT trạng thái (ẩn thẻ) khi cửa sổ đóng lại giữa phiên chơi.
+
+		⚠️ CHỈ GỬI ĐÚNG MỘT LẦN CHO MỖI PHIÊN (sửa 2026-08-24).
+
+		Bản cũ không có `expiredNotified`: điều kiện "chưa mua + hết hạn" đúng VĨNH VIỄN với
+		người chơi đã qua 48h, nên nó bắn lại `starterPackState` mỗi 30 giây suốt phiên. Mỗi
+		gói tin đó làm client đặt `starterPackDeadline = os.clock() + 0`, mà `boostClockNow`
+		bên client chỉ nhích 4 lần/giây → trong khe hở tối đa 0,25s thì
+		`deadline - boostClockNow` ra SỐ DƯƠNG, `Available` lật thành true và thẻ Starter Pack
+		CHỚP LÊN rồi tắt. Đúng triệu chứng "gói đã hết hạn mà thỉnh thoảng vẫn hiện ~1 giây".
+
+		Client cũng đã được vá riêng (`StarterPackShared.SecondsLeft` đọc `os.clock()` tươi),
+		nhưng gói tin lặp vô ích 30 giây một lần thì tự nó đã là thứ nên bỏ.
 	]]
+	local expiredNotified: { [Player]: boolean } = {}
+	Players.PlayerRemoving:Connect(function(player)
+		expiredNotified[player] = nil
+	end)
+
 	task.spawn(function()
 		while true do
 			task.wait(30)
 			for _, player in Players:GetPlayers() do
 				local data = DataService.GetData(player)
 				if data and not data.StarterPackBought and secondsLeft(data) <= 0 then
-					sendState(player)
+					if not expiredNotified[player] then
+						expiredNotified[player] = true
+						sendState(player)
+					end
+				else
+					-- Còn hạn trở lại (chỉ xảy ra ở chế độ xem trước trong Studio): mở cờ để
+					-- lần đóng cửa sổ sau vẫn được chốt đúng một lần.
+					expiredNotified[player] = nil
 				end
 			end
 		end

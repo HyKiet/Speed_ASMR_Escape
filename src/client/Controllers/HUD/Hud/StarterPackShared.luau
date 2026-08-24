@@ -29,10 +29,23 @@ function StarterPackShared.FormatCountdown(seconds: number): string
 	return string.format("%d:%02d", minutes, secs)
 end
 
--- `starterPackDeadline` là mốc theo `os.clock()` cục bộ; `boostClockNow` đã có sẵn nhịp
--- 4 lần/giây trong HUDController nên không cần vòng lặp thứ hai chỉ để nhích một con số.
+--[[
+	`starterPackDeadline` là mốc theo `os.clock()` cục bộ.
+
+	⚠️ ĐỌC `boostClockNow` ĐỂ LẤY NHỊP, NHƯNG TRỪ BẰNG `os.clock()` TƯƠI (sửa 2026-08-24).
+
+	`boostClockNow` chỉ nhích 4 lần/giây, nên nó LUÔN cũ tới 0,25 giây. Bản cũ trừ thẳng bằng
+	nó, và đó là chỗ sinh lỗi "thẻ Starter Pack đã hết hạn vẫn chớp lên ~1 giây": mỗi lần server
+	gửi lại trạng thái hết hạn, client đặt `deadline = os.clock() + 0` — một mốc MỚI HƠN giá trị
+	`boostClockNow` đang giữ — nên hiệu số ra dương và `Available` lật thành true cho tới nhịp
+	kế tiếp.
+
+	Vẫn phải gọi `boostClockNow:get()` vì đó là thứ Fusion bám vào để tính lại Computed; bỏ nó
+	đi thì đồng hồ đứng im. Nó chỉ còn làm NHỊP, không còn làm MỐC.
+]]
 function StarterPackShared.SecondsLeft(): number
-	return math.max(0, State.starterPackDeadline:get() - State.boostClockNow:get())
+	State.boostClockNow:get() -- nhịp cho Computed, xem chú thích trên
+	return math.max(0, State.starterPackDeadline:get() - os.clock())
 end
 
 -- Ba trạng thái đều do server phán (xem StarterPackService), client chỉ vẽ.
