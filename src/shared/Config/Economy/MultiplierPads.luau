@@ -25,10 +25,22 @@ local MultiplierPads: { MultiplierPadConfig } = {
 	{ id = "pad_5", speedPerStep = 50, requiredWins = 500 },
 	{ id = "pad_6", speedPerStep = 100, requiredWins = 2500 },
 	{ id = "pad_7", speedPerStep = 250, requiredWins = 15000 },
+	--[[
+		⚠️ BẢNG NÀY DỪNG Ở 8 — VÌ MAP CHỈ DỰNG 8 PAD (cắt 2026-08-26, user).
+
+		`Workspace.Lobby.MultiplierPads` có đúng Pad_1..Pad_8. Bản trước bảng này khai thêm
+		pad_9/10/11 (200k / 1M / 5M Wins) không có thân xác ngoài đời, và `MultiplierPadService`
+		tin bảng chứ không tin map:
+		  • `eligibleIndex` trả 9 cho người ≥200k Wins ⇒ `enforcePad` cấp thẳng +1000/step từ
+		    một cái pad họ chưa từng đi tới. Pad 8 (+500) tốn 50k Wins để leo lên; pad 9 tự rơi
+		    vào tay miễn phí — nấc cuối của cả hệ thống bị vô hiệu hoá.
+		  • `ActivePadId = "pad_9"` không khớp PadPart nào ⇒ client không tô vàng pad nào cả,
+		    người chơi mất luôn chỉ dấu "mình đang ở pad nào".
+
+		⚠️ THÊM PAD MỚI = DỰNG PAD TRONG MAP TRƯỚC, thêm dòng vào đây sau. Ngược lại là tặng
+		sức mạnh cho một thứ không tồn tại.
+	]]
 	{ id = "pad_8", speedPerStep = 500, requiredWins = 50000 },
-	{ id = "pad_9", speedPerStep = 1000, requiredWins = 200000 },
-	{ id = "pad_10", speedPerStep = 2500, requiredWins = 1000000 },
-	{ id = "pad_11", speedPerStep = 6000, requiredWins = 5000000 },
 }
 
 return MultiplierPads

@@ -843,6 +843,43 @@ local function watchStudioLevelHook(player: Player)
 	end)
 end
 
+--[[
+	[Studio-only test hook] ĐẶT THẲNG SỐ WINS ĐỂ NGHIỆM THU (2026-08-26).
+
+	Đặt attribute `StudioSetWins` = <số> lên Player ⇒ ghi `TotalWins`, cập nhật leaderstats
+	và bắn snapshot.
+
+	VÌ SAO CẦN: quyền dùng Multiplier Pad tính theo Wins HIỆN TẠI (`MultiplierPadService`),
+	pad 8 đòi 50.000 Wins. Không có hook này thì mọi phép nghiệm thu chuyện chọn pad — đổi
+	pad, đứng lại để xuống pad thấp, bị hạ khi Wins tụt — đều không dựng nổi trong một phiên
+	test, y hệt khoảng trống mà `StudioSetLevel` lấp cho trần WalkSpeed.
+
+	CHỈ chạm `TotalWins` — không đụng Level/XP/cosmetic, và không đi qua `AwardWins` để khỏi
+	nhiễu telemetry lẫn tutorial.
+
+	⚠️ Studio-only, có `RunService:IsStudio()` chặn ở `Start()`. Đừng bao giờ để nó sống ở Live.
+]]
+local function watchStudioWinsHook(player: Player)
+	player:GetAttributeChangedSignal("StudioSetWins"):Connect(function()
+		local target = player:GetAttribute("StudioSetWins")
+		if typeof(target) ~= "number" or target < 0 then
+			return
+		end
+		player:SetAttribute("StudioSetWins", nil)
+
+		local data = DataService.GetData(player)
+		if not data then
+			return
+		end
+
+		data.TotalWins = math.floor(target)
+		DataService.UpdateLeaderstats(player)
+		sendSnapshot(player)
+
+		warn(`[ProgressionService] [Studio] {player.Name} → TotalWins {data.TotalWins}`)
+	end)
+end
+
 local function watchStudioCosmeticHook(player: Player)
 	-- (a) TỨC THỜI: đặt attribute lên PLAYER khi đang chơi ⇒ mở khoá ngay lập tức.
 	local function handleOneShot(attributeName: string, category: string)
@@ -896,9 +933,11 @@ function ProgressionService.Start()
 		for _, player in Players:GetPlayers() do
 			watchStudioCosmeticHook(player)
 			watchStudioLevelHook(player)
+			watchStudioWinsHook(player)
 		end
 		Players.PlayerAdded:Connect(watchStudioCosmeticHook)
 		Players.PlayerAdded:Connect(watchStudioLevelHook)
+		Players.PlayerAdded:Connect(watchStudioWinsHook)
 	end
 
 	GamePackets.requestSnapshot.listen(function(_data, player: Player)
