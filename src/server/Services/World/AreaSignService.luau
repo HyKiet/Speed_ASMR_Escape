@@ -130,7 +130,7 @@ local SIGNS: { SignConfig } = {
 		text = "Feedback",
 		-- Dòng phụ: mục đích là CHẶN dislike bốc đồng — nói thẳng "báo cho tụi mình" trước
 		-- khi người chơi kịp bấm nút không thích trên trang game.
-		subText = "Not happy with something? Please don't dislike —\ntell us here and we'll fix it fast. Thank you!",
+		subText = "Tell us here instead of disliking. Thanks!",
 		-- ĐO LẠI 2026-08-10 (user dời hòm thư): `Workspace.Feedback.Mailbox` @(-65.0, 13.8,
 		-- -70.4), nóc y ≈ 17.7. Biển lùi 6 stud RA SAU hòm thư theo trục hòm-thư→spawn
 		-- (spawn ≈ (3.1, -12)) nên đứng đọc prompt vẫn thấy chữ nằm trên hòm thư.
