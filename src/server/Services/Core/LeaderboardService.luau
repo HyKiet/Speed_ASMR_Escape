@@ -92,17 +92,27 @@ local ROBUX_GLYPH = "\u{E002}"
 
 	Ràng buộc bất biến: NAME_LEFT + VALUE_W + COLUMN_GAP + 12 phải < 750, nếu không cột
 	tên có bề rộng ÂM và chữ sẽ đè lên ô số.
+
+	── NỚI CHỮ TO LẠI (2026-08-26, user: "chữ nhỏ quá") ────────────────────────────────────
+	Bản 2026-08-10 thu nhỏ hơi tay: ≤20px trên một bảng người chơi đứng CÁCH XA vài chục stud
+	để đọc thì gần như không đọc nổi tên. Nay chữ lên ≤24px, và vì `ROW_ITEM_H` (chiều cao ô
+	chữ) là thứ TextScaled bám vào, nó phải nới theo — không thì cap mới vô nghĩa.
+	Đổi lại: hàng cao 64px ⇒ trong khung thấy ~12 hàng thay vì ~13. Vẫn cuộn tới top 50.
+	`VALUE_W` nới 178 → 196 để số 7 chữ số + hậu tố " WINS" không bị TextScaled bóp xuống
+	dưới cap mới (ô số hẹp thì cap có to mấy chữ vẫn nhỏ).
 ]]
-local ROW_HEIGHT = 58
+local ROW_HEIGHT = 64
+local ROW_ITEM_H = 46 -- chiều cao ô chữ trong hàng; TextScaled bám vào số này
+local ROW_ITEM_Y = (ROW_HEIGHT - ROW_ITEM_H) // 2
 local RANK_W = 54
-local AVATAR_SIZE = 44
-local NAME_LEFT = RANK_W + AVATAR_SIZE + 18 -- 116: rank + avatar + các khe hở
-local VALUE_W = 178
+local AVATAR_SIZE = 48
+local NAME_LEFT = RANK_W + AVATAR_SIZE + 18 -- 120: rank + avatar + các khe hở
+local VALUE_W = 196
 local COLUMN_GAP = 10
 
-local TEXT_MAX_RANK = 20
-local TEXT_MAX_NAME = 19
-local TEXT_MAX_VALUE = 19
+local TEXT_MAX_RANK = 24
+local TEXT_MAX_NAME = 23
+local TEXT_MAX_VALUE = 23
 
 local BOARD_CONFIGS: { BoardConfig } = {
 	{
@@ -378,7 +388,7 @@ local function getBoardRoot(config: BoardConfig): Frame?
 		TextStrokeTransparency = 0,
 		ZIndex = 3,
 	}, header)
-	addTextSizeCap(titleLabel, 44)
+	addTextSizeCap(titleLabel, 48)
 
 	local subtitleLabel = create("TextLabel", {
 		BackgroundTransparency = 1,
@@ -393,7 +403,7 @@ local function getBoardRoot(config: BoardConfig): Frame?
 		TextStrokeTransparency = 0.2,
 		ZIndex = 3,
 	}, header)
-	addTextSizeCap(subtitleLabel, 20)
+	addTextSizeCap(subtitleLabel, 22)
 
 	-- Danh sách CUỘN (top 50) thay cho phân trang tự lật.
 	local list = create("ScrollingFrame", {
@@ -442,8 +452,8 @@ local function createRankRow(parent: Instance, config: BoardConfig, entry: Ranke
 	local rankLabel = create("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBlack,
-		Position = UDim2.fromOffset(8, 9),
-		Size = UDim2.fromOffset(RANK_W, 40),
+		Position = UDim2.fromOffset(8, ROW_ITEM_Y),
+		Size = UDim2.fromOffset(RANK_W, ROW_ITEM_H),
 		Text = `#{rank}`,
 		TextColor3 = rankColor,
 		TextScaled = true,
@@ -468,8 +478,8 @@ local function createRankRow(parent: Instance, config: BoardConfig, entry: Ranke
 	local nameLabel = create("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
-		Position = UDim2.fromOffset(NAME_LEFT, 9),
-		Size = UDim2.new(1, -(NAME_LEFT + VALUE_W + COLUMN_GAP + 12), 0, 40),
+		Position = UDim2.fromOffset(NAME_LEFT, ROW_ITEM_Y),
+		Size = UDim2.new(1, -(NAME_LEFT + VALUE_W + COLUMN_GAP + 12), 0, ROW_ITEM_H),
 		Text = getCachedName(entry.userId),
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		TextScaled = true,
@@ -484,8 +494,8 @@ local function createRankRow(parent: Instance, config: BoardConfig, entry: Ranke
 	local valueLabel = create("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBlack,
-		Position = UDim2.new(1, -(VALUE_W + 12), 0, 9),
-		Size = UDim2.fromOffset(VALUE_W, 40),
+		Position = UDim2.new(1, -(VALUE_W + 12), 0, ROW_ITEM_Y),
+		Size = UDim2.fromOffset(VALUE_W, ROW_ITEM_H),
 		Text = (config.valuePrefix or "") .. formatNumber(entry.value) .. config.valueSuffix,
 		TextColor3 = Color3.fromRGB(255, 244, 169),
 		TextScaled = true,
@@ -552,7 +562,7 @@ local function renderAll(config: BoardConfig)
 			TextScaled = true,
 			ZIndex = 2,
 		}, list)
-		addTextSizeCap(empty, 26)
+		addTextSizeCap(empty, 30)
 		return
 	end
 

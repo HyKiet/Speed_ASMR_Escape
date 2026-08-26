@@ -29,8 +29,49 @@ local Log = require(ReplicatedStorage.Shared.Util.Log)
 local DataService: any = nil
 local ProgressionService: any = nil
 local StarterPackService: any = nil
+local LeaderboardService: any = nil
 
 local GamepassService = {}
+
+--[[
+	GHI DONATE CHO GAMEPASS (2026-08-26, cùng đợt sửa bảng Top Donate rỗng).
+
+	Gamepass KHÔNG đi qua `ProcessReceipt` — nên cái móc đặt ở `ReceiptService` chỉ bắt được
+	developer product. Thiếu chỗ này thì người mua VIP / x8 Speed / treadmill pass, tức phần
+	Robux ĐẮT NHẤT của game, vẫn vắng mặt trên bảng Donate.
+
+	Giá phải hỏi web (`GetProductInfo`) chứ không đọc từ config game: hoá đơn gamepass không
+	kèm `CurrencySpent`, và giá thật nằm trên Creator Dashboard — config có thể đã lệch.
+	Cache theo passId vì giá không đổi trong một phiên server, mà đây là lệnh web bị bóp.
+]]
+local passPriceCache: { [number]: number } = {}
+
+local function recordGamepassDonation(player: Player, passId: number)
+	if not LeaderboardService then
+		return
+	end
+	task.spawn(function()
+		local price = passPriceCache[passId]
+		if not price then
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(passId, Enum.InfoType.GamePass)
+			end)
+			if not ok or typeof(info) ~= "table" then
+				warn(`[GamepassService] không đọc được giá pass {passId} để ghi Top Donate`)
+				return
+			end
+			price = tonumber(info.PriceInRobux) or 0
+			passPriceCache[passId] = price
+		end
+		if price <= 0 or player.Parent ~= Players then
+			return
+		end
+		local ok, err = pcall(LeaderboardService.RecordDonation, player, price)
+		if not ok then
+			warn(`[GamepassService] RecordDonation lỗi cho {player.Name}: {err}`)
+		end
+	end)
+end
 
 -- passId → tên hiển thị (speed passes + VIP; multiplier tính trong ProgressionService)
 local SPEED_PASS_NAMES: { [number]: string } = {}
@@ -337,6 +378,8 @@ function GamepassService.Init()
 	-- nó, hai bên phụ thuộc chéo nên bên chạy trước không được phép nổ vì bên kia chưa sẵn
 	-- sàng. Chỉ cần nó có mặt lúc người chơi bấm mua, mà lúc đó cả hai đã Init xong từ lâu.
 	StarterPackService = ServiceLocator.Find("StarterPackService")
+	-- `Find`: bảng xếp hạng là thứ phụ, thiếu nó thì pass vẫn phải mua và áp được.
+	LeaderboardService = ServiceLocator.Find("LeaderboardService")
 	buildMaps()
 end
 
@@ -420,6 +463,14 @@ function GamepassService.Start()
 			if purchased then
 				Log.Info(`[GamepassService] {player.Name} mua pass {passId} thành công`)
 				applyPass(player, passId)
+				--[[
+					⚠️ CHỈ ở nhánh này. Nhánh `purchased == false` bên dưới cũng gọi `applyPass`
+					khi phát hiện tài khoản đã sở hữu sẵn trên web — đó là người đã mua TỪ TRƯỚC
+					(hoặc mua ngoài web), và nó chạy MỖI LẦN họ mở lại prompt. Ghi donate ở đó là
+					cộng dồn tiền cũ vô hạn: một người mua VIP 1 lần có thể leo lên đầu bảng chỉ
+					bằng cách bấm mở prompt vài chục lần.
+				]]
+				recordGamepassDonation(player, passId)
 				return
 			end
 
