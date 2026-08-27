@@ -96,3 +96,22 @@ vết ở đâu ra.
 - **Con trỏ chuột** đứng giữa khung suốt clip. Lần này xoá được bằng `delogo` vì nó đứng yên
   trên nền cát trơn; con trỏ mà di chuyển thì không cứu được.
   → OBS → Sources → Game/Display Capture → bỏ tick **"Capture Cursor"**.
+
+---
+
+## Đăng bài
+
+**Mô tả** — `out/A7_sand.txt`. Câu hỏi giữa bài là để mồi bình luận, đừng bỏ.
+
+**Ảnh bìa** — `assets/cover_A7_sand.jpg` (khung giây 5.4). Tiêu đề **KINETIC SAND** + phụ đề *it remembers your steps*, đặt ở 1/3 trên.
+Ô "Sửa ảnh bìa" có tab tải lên; nếu bản web không cho tải, kéo thanh chọn khung về **giây 5.4**.
+Không đặt chữ ở 1/3 dưới: lưới hồ sơ TikTok đè lượt xem + tiêu đề lên đó.
+
+**Vị trí** — **để trống**. Gợi ý đang hiện là các địa điểm Singapore (TikTok đoán theo IP).
+Gắn vị trí là báo cho thuật toán ưu tiên người xem quanh đó, mà clip nói tiếng Anh nhắm
+người chơi Roblox toàn cầu — gắn vào là tự thu hẹp.
+
+**Thời điểm** — **Lên lịch 08:00 giờ VN**. Trùng tối Mỹ (19–21h ET) và vẫn là giờ bạn tỉnh
+để trả lời bình luận trong giờ đầu. Đăng "Bây giờ" lúc nửa đêm thì giờ vàng rơi vào lúc bạn ngủ.
+
+**Ngay sau khi đăng:** ghim bình luận đầu tiên có link game.
