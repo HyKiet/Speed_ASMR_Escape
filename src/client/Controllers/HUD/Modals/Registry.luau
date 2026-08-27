@@ -46,6 +46,8 @@ Registry.IDS = {
 	"groupChest",
 	"starterPack",
 	"settings",
+	-- Treadmill Offline: mở TỰ ĐỘNG lúc vào game khi có Speed chờ nhận (OfflineEarningsService).
+	"offline",
 }
 
 return Registry

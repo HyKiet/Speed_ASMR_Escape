@@ -86,4 +86,20 @@ for name, service in services do
 	end
 end
 
-print("--- [SERVER READY] Tất cả các dịch vụ trên Server đã được nạp thành công! ---")
+--[[
+	In PHIÊN BẢN PLACE ra log ngay lúc server lên (2026-08-27).
+
+	Roblox KHÔNG cập nhật server đang chạy: bản vừa publish chỉ áp cho server sinh ra SAU đó.
+	Nên khi nghi ngờ "đã lên bản mới chưa", câu trả lời nằm ở con số này chứ không phải ở
+	trang publish. `game.PlaceVersion` tăng mỗi lần publish; thấy số cũ = đang ở server cũ.
+
+	`JobId` đi kèm để đối chiếu với danh sách server trên trang web (rỗng = đang trong Studio).
+	Người chơi cũng xem được cặp số này trong bảng Cài đặt — xem SettingsModal.makeVersionLabel.
+]]
+print(
+	("--- [SERVER READY] v%d · place %d · job %s ---"):format(
+		game.PlaceVersion,
+		game.PlaceId,
+		if game.JobId ~= "" then string.sub(game.JobId, 1, 8) else "studio"
+	)
+)

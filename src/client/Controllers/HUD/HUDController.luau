@@ -34,6 +34,7 @@ local GroupChestModal = require(script.Parent.Modals.GroupChestModal)
 local RouletteModal = require(script.Parent.Modals.RouletteModal)
 local SettingsModal = require(script.Parent.Modals.SettingsModal)
 local StarterPackModal = require(script.Parent.Modals.StarterPackModal)
+local OfflineModal = require(script.Parent.Modals.OfflineModal)
 
 local Children = Fusion.Children
 local New = Fusion.New
@@ -88,6 +89,7 @@ local function buildGui()
 					RouletteModal.Build(),
 					SettingsModal.Build(),
 					StarterPackModal.Build(),
+					OfflineModal.Build(),
 					BoostCelebration.Build(),
 					WinsFlight.Build(),
 					Toast.BuildCenterToast(),
@@ -237,6 +239,19 @@ function HUDController.Start()
 	local playtimeListener = localPlayer:GetAttributeChangedSignal("SessionPlaytime"):Connect(updatePlaytime)
 	State.sweeper:Add(playtimeListener)
 
+	--[[
+		Chấm đỏ "vừa trúng aura Legendary 1%".
+
+		Đi bằng attribute chứ không phải packet: server đặt `UnseenAuraUnlock` trên Player và
+		Roblox tự replicate: không tốn gói tin nào, và giá trị vẫn đúng ngay ở khung hình đầu
+		tiên sau khi vào game (`DataService` khôi phục nó lúc nạp profile).
+	]]
+	local function updateAuraDot()
+		State.auraUnlockDot:set(localPlayer:GetAttribute("UnseenAuraUnlock") == true)
+	end
+	updateAuraDot()
+	State.sweeper:Add(localPlayer:GetAttributeChangedSignal("UnseenAuraUnlock"):Connect(updateAuraDot))
+
 	-- Server Boosts: deadline = os.clock() + số giây server báo; BoostHud tự đếm ngược.
 	local boostStateListener = GamePackets.boostState.listen(function(data)
 		local now = os.clock()
@@ -278,6 +293,11 @@ function HUDController.Start()
 		RouletteModal.OnSpinResult(data)
 	end)
 
+	-- Treadmill Offline: speed > 0 ⇒ mở modal nhận thưởng; speed = 0 ⇒ server đã phát, đóng lại.
+	local offlineListener = GamePackets.offlineEarnings.listen(function(data)
+		OfflineModal.OnState(data)
+	end)
+
 	-- Đồng hồ chung cho các Computed đếm ngược (boost chips + roulette timer).
 	task.spawn(function()
 		while localPlayer.Parent == Players do
@@ -317,6 +337,7 @@ function HUDController.Start()
 		GamePackets.eventState.disconnect(eventStateListener)
 		GamePackets.rouletteState.disconnect(rouletteStateListener)
 		GamePackets.spinResult.disconnect(spinResultListener)
+		GamePackets.offlineEarnings.disconnect(offlineListener)
 	end)
 	task.spawn(function()
 		while localPlayer.Parent == Players do

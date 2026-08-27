@@ -35,6 +35,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
@@ -732,6 +733,45 @@ local function makeTabBar()
 	})
 end
 
+--[[
+	══ NHÃN PHIÊN BẢN (2026-08-27, user) ═══════════════════════════════════════════════════
+
+	Bối cảnh: bản LIVE đã publish nhưng người chơi vẫn thấy nội dung cũ. Nguyên nhân là
+	Roblox KHÔNG cập nhật server đang chạy — bản mới chỉ áp cho server sinh ra sau đó. Không
+	có cách nào nhìn vào game mà biết server này đang chạy build nào, nên mọi lần nghi ngờ
+	đều phải đoán.
+
+	`game.PlaceVersion` đọc thẳng được ở client, không cần packet hay attribute: nó chính là
+	số phiên bản của place mà SERVER NÀY đang chạy. Sau mỗi lần publish, số này tăng — thấy
+	số cũ nghĩa là đang ở server cũ, không phải publish hỏng.
+
+	`game.JobId` đi kèm để phân biệt hai server cùng phiên bản (khi cần đối chiếu với danh
+	sách server trên trang web). Cắt 8 ký tự đầu là đủ để nhận ra, mà không chiếm cả dòng.
+
+	Đặt trong Cài đặt chứ không phải trên HUD: đây là thông tin CHẨN ĐOÁN, người chơi bình
+	thường không cần thấy, nhưng phải lấy được từ điện thoại mà không cần Developer Console.
+]]
+local function makeVersionLabel()
+	--[[
+		⚠️ `game.JobId` KHÔNG rỗng ở client trong Studio — nó là GUID toàn số 0
+		("00000000-0000-…"), khác hẳn phía server nơi nó rỗng thật. Đo được 2026-08-27: nhãn
+		hiện "server 00000000" thay vì "studio". Hỏi thẳng RunService mới đúng ở cả hai phía.
+	]]
+	local shortJob = if RunService:IsStudio() then "studio" else string.sub(game.JobId, 1, 8)
+	return New("TextLabel")({
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamMedium,
+		Position = UDim2.fromOffset(72, 96),
+		Size = UDim2.fromOffset(892, 18),
+		Text = `v{game.PlaceVersion}  ·  server {shortJob}`,
+		TextColor3 = Color3.fromRGB(120, 160, 172),
+		TextSize = 16,
+		TextTransparency = 0.15,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		ZIndex = 45,
+	})
+end
+
 function SettingsModal.Build()
 	return ModalShell.Build({
 		Id = "settings",
@@ -755,6 +795,7 @@ function SettingsModal.Build()
 		Title = "Settings",
 		OnClose = Manager.CloseSettings,
 		Content = {
+			makeVersionLabel(),
 			makeTabBar(),
 			buildDisplayTab(),
 			buildAudioTab(),

@@ -37,11 +37,35 @@
 	`base:FindFirstChild("Part")` bốc trúng cái đầu tiên trong danh sách con — không phải cái
 	đang đeo Trail. Bản server cũ không dính bẫy này vì nó dùng `script.Parent`.
 
-	Nên đúng part đã được đánh dấu trong map bằng hai attribute:
-	    `TrailShowcaseOrbit = true`   — đây là part phải quay
-	    `OrbitCenter        = Vector3` — tâm quỹ đạo, chụp lúc part còn đứng ở vị trí tác giả đặt
-	`OrbitCenter` BẮT BUỘC phải đọc từ attribute chứ không đọc `part.Position`: khi resolve lại
-	giữa chừng thì part đang bay, lấy vị trí hiện tại làm tâm sẽ khiến quỹ đạo trôi dần đi.
+	Nên đúng part đã được đánh dấu trong map bằng attribute `TrailShowcaseOrbit = true`. Cái
+	này KHÔNG suy ra được từ hình học nên phải giữ.
+
+	══ ⚠️ TÂM QUỸ ĐẠO: CHỤP LÚC NHÌN THẤY LẦN ĐẦU, KHÔNG ĐỌC TỪ ATTRIBUTE (2026-08-27) ══════
+
+	Bản trước đọc tâm từ attribute `OrbitCenter` bake sẵn trong map. Nó hỏng, và hỏng im lặng:
+	ai đó dời cả Lobby ~95 studs trên trục Z, ba attribute ở nguyên giá trị cũ. Đo lúc phát hiện
+	— X và Y khớp hoàn hảo, chỉ Z lệch **đúng 95.14 stud ở cả ba bệ**:
+
+	    Mystic Violet   part z = 94.7    OrbitCenter z = −0.40
+	    Golden Ray      part z = 113.4   OrbitCenter z = 18.22
+	    Crimson Fury    part z = 123.7   OrbitCenter z = 28.58
+
+	Triệu chứng người dùng thấy: "trong Edit trail nằm đúng bệ, vào Play thì bay ra ngoài" —
+	vì Edit không chạy controller, còn Play thì frame đầu tiên đã ném part về tâm cũ.
+	(Cùng một lần dời đó cũng làm lệch cả sáu biển khu vực — xem `AreaSignService`.)
+
+	Cách chữa: **chụp `part.Position` ngay lần đầu nhìn thấy MỘT INSTANCE part**, rồi nhớ theo
+	instance đó. Không có dữ liệu nào phải bảo trì bằng tay nữa ⇒ dời Lobby bao nhiêu lần cũng
+	đúng.
+
+	Vì sao vẫn AN TOÀN dù `resolve()` chạy lại mỗi 2 giây (đây là lý do bản cũ dùng attribute):
+	  • Part CŨ  — đã có trong `capturedCenter`, dùng lại giá trị đã chụp. KHÔNG đọc lại
+	    `part.Position` (lúc này part đang bay, lấy vị trí hiện tại làm tâm là quỹ đạo trôi dần).
+	  • Part MỚI — chỉ xuất hiện khi StreamingEnabled dựng lại từ dữ liệu map, tức nó đang đứng
+	    ĐÚNG vị trí tác giả đặt. Chụp lúc này là chụp đúng.
+
+	⚠️ Hệ quả: đừng cache `capturedCenter` theo TÊN part hay theo chỉ số — phải theo chính
+	Instance, vì streaming tạo instance mới chứ không tái dùng cái cũ.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -71,6 +95,14 @@ local showcases: { Showcase } = {}
 local resolveAcc = 0
 local announced = false
 
+--[[
+	Tâm quỹ đạo đã chụp, khoá theo INSTANCE (xem khối ⚠️ thứ hai ở đầu file).
+
+	Bảng yếu: streaming huỷ part cũ và dựng part mới, không tái dùng instance. Bảng thường sẽ
+	giữ tham chiếu tới mọi part đã chết suốt phiên chơi — rò rỉ chậm nhưng vĩnh viễn.
+]]
+local capturedCenter: { [BasePart]: Vector3 } = setmetatable({}, { __mode = "k" }) :: any
+
 -- Quét lại danh sách bệ. Giữ `angle` của bệ cũ để chuyển động không giật khi resolve lại.
 local function resolve()
 	local trailBase = Workspace:FindFirstChild("TrailBase", true)
@@ -87,16 +119,21 @@ local function resolve()
 	table.clear(showcases)
 	for _, o in trailBase:GetDescendants() do
 		if o:IsA("BasePart") and o:GetAttribute("TrailShowcaseOrbit") == true then
-			local center = o:GetAttribute("OrbitCenter")
-			if typeof(center) == "Vector3" then
-				table.insert(showcases, {
-					part = o,
-					center = center,
-					angle = previousAngle[o] or 0,
-				})
-			else
-				warn(`[TrailShowcase] {o:GetFullName()} thiếu attribute OrbitCenter — bệ này sẽ đứng im`)
+			--[[
+				Part đã biết ⇒ dùng lại tâm đã chụp (lúc này nó đang bay, đọc lại là trôi quỹ đạo).
+				Part mới ⇒ nó vừa được streaming dựng từ dữ liệu map nên đang đứng đúng chỗ tác
+				giả đặt: chụp ngay bây giờ.
+			]]
+			local center = capturedCenter[o]
+			if not center then
+				center = o.Position
+				capturedCenter[o] = center
 			end
+			table.insert(showcases, {
+				part = o,
+				center = center,
+				angle = previousAngle[o] or 0,
+			})
 		end
 	end
 end

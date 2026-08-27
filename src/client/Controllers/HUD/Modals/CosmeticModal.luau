@@ -474,7 +474,7 @@ local function makeCatalog(category: string, catalog: { any })
 	})
 end
 
-local function makeTab(category: string, label: string, position: UDim2, colorA: Color3, colorB: Color3)
+local function makeTab(category: string, label: string, position: UDim2, colorA: Color3, colorB: Color3, dot: any?)
 	local hovered = Value(false)
 	--[[
 		Tab TRAILS / AURAS. Đổi từ `UIStroke` sang `MakeSurface` cùng đợt gom 2026-08-16: viền
@@ -499,6 +499,15 @@ local function makeTab(category: string, label: string, position: UDim2, colorA:
 		Zoom = { Hovered = hovered, Scale = 1.08 },
 		Activated = function()
 			State.cosmeticCategory:set(category)
+			--[[
+				Mở tab AURAS = đã nhìn thấy món vừa trúng ⇒ tắt chấm đỏ ngay ở client (không đợi
+				server trả lời, nếu không chấm còn nhấp nháy thêm một nhịp round-trip) rồi báo
+				server ghi vào profile.
+			]]
+			if dot and State.auraUnlockDot:get() then
+				State.auraUnlockDot:set(false)
+				GamePackets.requestClearAuraDot.send({})
+			end
 		end,
 		MouseEnter = function()
 			hovered:set(true)
@@ -507,7 +516,7 @@ local function makeTab(category: string, label: string, position: UDim2, colorA:
 			hovered:set(false)
 		end,
 		Content = function(zoom)
-			return {
+			local content: { any } = {
 				Theme.MakeOutlineLabel({
 					Position = UDim2.fromScale(0, 0),
 					Size = UDim2.fromScale(1, 1),
@@ -518,6 +527,25 @@ local function makeTab(category: string, label: string, position: UDim2, colorA:
 					ZIndex = 47,
 				}),
 			}
+			if dot then
+				-- Chấm đỏ góc phải-trên của tab, cùng ngôn ngữ với chấm trên nút menu trái.
+				table.insert(
+					content,
+					New("Frame")({
+						AnchorPoint = Vector2.new(1, 0),
+						BackgroundColor3 = Color3.fromRGB(255, 62, 62),
+						Position = UDim2.new(1, -10, 0, 8),
+						Size = UDim2.fromOffset(20, 20),
+						Visible = dot,
+						ZIndex = 49,
+						[Children] = {
+							Theme.MakeCorner(10),
+							Theme.MakeStroke(Color3.fromRGB(18, 18, 30), 3),
+						},
+					})
+				)
+			end
+			return content
 		end,
 	})
 end
@@ -547,7 +575,10 @@ function CosmeticModal.Build()
 				"AURAS",
 				UDim2.fromOffset(322, 106),
 				Color3.fromRGB(255, 104, 79),
-				Color3.fromRGB(184, 36, 47)
+				Color3.fromRGB(184, 36, 47),
+				Computed(function()
+					return State.auraUnlockDot:get()
+				end)
 			),
 			makeCatalog("trail", Constants.TRAILS),
 			makeCatalog("aura", Constants.AURAS),

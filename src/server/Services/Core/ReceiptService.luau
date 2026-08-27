@@ -86,6 +86,7 @@ function ReceiptService.Init()
 	local roulette = ServiceLocator.Get("RouletteService")
 	local product = ServiceLocator.Get("ProductService")
 	local starterPack = ServiceLocator.Get("StarterPackService")
+	local offline = ServiceLocator.Get("OfflineEarningsService")
 	-- `Find`: bảng xếp hạng là thứ phụ, thiếu nó thì hoá đơn vẫn phải giao được.
 	LeaderboardService = ServiceLocator.Find("LeaderboardService")
 	processors = {
@@ -94,6 +95,7 @@ function ReceiptService.Init()
 		serverBoost.ProcessReceipt,
 		roulette.ProcessReceipt,
 		starterPack.ProcessReceipt,
+		offline.ProcessReceipt,
 		product.ProcessReceipt,
 	}
 

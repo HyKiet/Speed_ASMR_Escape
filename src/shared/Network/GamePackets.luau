@@ -237,6 +237,38 @@ return ByteNet.defineNamespace("speedEscape", function()
 		requestSpin = ByteNet.definePacket({
 			value = ByteNet.struct({}),
 		}),
+		--[[
+			Treadmill Offline — số Speed đang CHỜ NHẬN (xem `OfflineEarningsService`).
+
+			`speed = 0` là tín hiệu ĐÓNG modal: server gửi nó ngay sau khi đã phát thưởng, nên
+			client không cần đoán khi nào nên tự đóng.
+
+			`seconds` chỉ để hiện dòng "bạn đã vắng 2h 40m" — server đã kẹp nó vào trần
+			`OfflineEarnings.MAX_SECONDS` trước khi gửi.
+		]]
+		offlineEarnings = ByteNet.definePacket({
+			value = ByteNet.struct({
+				speed = ByteNet.float64,
+				seconds = ByteNet.float64,
+			}),
+		}),
+		--[[
+			Bấm "Claim". KHÔNG mang theo con số nào: số tiền nằm ở `PendingOfflineSpeed` trong
+			profile, client chỉ được quyền nói "tôi bấm rồi". Gửi kèm số là mời gọi hack.
+		]]
+		requestOfflineClaim = ByteNet.definePacket({
+			value = ByteNet.struct({}),
+		}),
+		--[[
+			Người chơi đã mở tab Auras ⇒ tắt chấm đỏ "vừa trúng aura Legendary".
+
+			Trạng thái chấm đỏ đi XUỐNG client bằng attribute `UnseenAuraUnlock` trên Player (tự
+			replicate, không tốn packet). Chỉ chiều TẮT mới cần gói tin, vì client không ghi được
+			attribute do server đặt.
+		]]
+		requestClearAuraDot = ByteNet.definePacket({
+			value = ByteNet.struct({}),
+		}),
 		-- Chúc mừng CÁ NHÂN (banner + confetti): mua gamepass/treadmill, rebirth thành công...
 		purchaseCelebration = ByteNet.definePacket({
 			value = ByteNet.struct({

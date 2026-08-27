@@ -315,7 +315,16 @@ function LeftMenu.Build()
 						Color3.fromRGB(100, 50, 210),
 						function()
 							Manager.ToggleCosmetic("trail")
-						end
+						end,
+						--[[
+							Chấm đỏ THỨ BA của lưới, và nó không phá luật "chỉ gắn chấm vào thứ
+							MIỄN PHÍ đang bị bỏ lỡ" ở khối trên: aura Legendary 1% vừa rơi vào tay
+							người chơi và họ chưa nhìn thấy nó lần nào. Chấm tắt ngay khi mở tab
+							AURAS, nên nó không bao giờ thành chấm đỏ vĩnh viễn.
+						]]
+						Computed(function()
+							return State.auraUnlockDot:get()
+						end)
 					),
 					Theme.MakeMenuButton(
 						"Teleport",

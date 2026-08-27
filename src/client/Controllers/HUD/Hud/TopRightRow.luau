@@ -30,6 +30,7 @@ local State = require(script.Parent.Parent.State)
 local Theme = require(script.Parent.Parent.Theme)
 local Tokens = require(script.Parent.Parent.Tokens)
 local Manager = require(script.Parent.Parent.Modals.Manager)
+local UIAnchors = require(script.Parent.Parent.UIAnchors)
 
 local Children = Fusion.Children
 local Computed = Fusion.Computed
@@ -88,7 +89,9 @@ function TopRightRow.Build()
 				Position = UDim2.fromOffset(Theme.TOP_ROW.spin, 0),
 				Size = UDim2.fromOffset(120, 130),
 				[Children] = {
-					makeIconButton({
+					-- Điểm neo để tutorial bước 5/5 chiếu spotlight vào ĐÚNG nút này
+					-- (xem `TutorialController.runSpinFinale`).
+					UIAnchors.Keep("spinButton", makeIconButton({
 						BackgroundTransparency = 1,
 						Image = Theme.UI_ASSETS.Spin,
 						Position = UDim2.fromOffset(10, 0),
@@ -100,7 +103,7 @@ function TopRightRow.Build()
 						[OnEvent("MouseLeave")] = function()
 							hoveredSpin:set(false)
 						end,
-					}, Manager.ToggleRoulette),
+					}, Manager.ToggleRoulette)),
 					Theme.MakeOutlineLabel({
 						Position = UDim2.fromOffset(0, 60),
 						Size = UDim2.fromOffset(120, 25),

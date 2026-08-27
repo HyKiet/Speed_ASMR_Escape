@@ -22,7 +22,33 @@ local DataTemplate = {
 	EquippedTreadmill = "treadmill_1",
 	EquippedTrail = "none",
 	EquippedAura = "none",
-	CustomSpeedLimit = 12,
+	-- Khớp `Tuning.BASE_MAX_WALK_SPEED` (trần của Level 1). Giá trị này gần như không bao giờ
+	-- được đọc: `DataService.normalizeData` ghi đè về trần mỗi lần nạp profile.
+	CustomSpeedLimit = 14,
+	--[[
+		Mốc `os.time()` lúc rời game gần nhất — nguồn duy nhất của Treadmill Offline.
+		0 = chưa từng ghi (tài khoản có trước tính năng) ⇒ OfflineEarningsService bỏ qua lượt
+		đầu và chỉ bắt đầu tính từ lần thoát kế tiếp. Xem `Config/OfflineEarnings.luau`.
+	]]
+	LastOnlineTime = 0,
+	--[[
+		Speed offline ĐÃ TÍNH nhưng người chơi CHƯA bấm nhận.
+
+		Nằm trong profile chứ không phải bộ nhớ phiên: người chơi đóng modal rồi thoát game
+		không được mất phần thưởng của mình. Cộng dồn qua nhiều phiên nếu họ cứ lờ đi.
+
+		Đây cũng là con số mà nút "Double It" nhân đôi — server đọc TỪ ĐÂY chứ không tin số
+		client gửi lên.
+	]]
+	PendingOfflineSpeed = 0,
+	--[[
+		Vừa trúng aura Legendary 1% ở vòng quay mà CHƯA mở tab Auras xem.
+
+		Nằm trong profile chứ không phải bộ nhớ phiên: trúng xong thoát game rồi mai vào lại thì
+		chấm đỏ vẫn còn — người chơi không mất dấu món đồ hiếm nhất mình vừa có. Xoá khi họ mở
+		tab Auras (`requestClearAuraDot`).
+	]]
+	UnseenAuraUnlock = false,
 	-- Daily login (7-Day hardcore streak)
 	DailyStreakDay = 0, -- số ngày đã nhận trong chuỗi hiện tại (0..7)
 	DailyLastClaimDay = 0, -- số thứ tự ngày (os.time // 86400) của lần nhận gần nhất

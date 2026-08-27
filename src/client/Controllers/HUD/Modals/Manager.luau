@@ -243,6 +243,7 @@ Manager.OpenDaily, Manager.CloseDaily, Manager.ToggleDaily = defineModal("daily"
 Manager.OpenGroupChest, Manager.CloseGroupChest, Manager.ToggleGroupChest = defineModal("groupChest")
 Manager.OpenStarterPack, Manager.CloseStarterPack, Manager.ToggleStarterPack = defineModal("starterPack")
 Manager.OpenSettings, Manager.CloseSettings, Manager.ToggleSettings = defineModal("settings")
+Manager.OpenOffline, Manager.CloseOffline, Manager.ToggleOffline = defineModal("offline")
 
 -- Roulette xin state mới từ server ngay lúc mở: số vé và đồng hồ quay miễn phí thay đổi cả khi
 -- modal đang đóng, nên đọc cache cũ là hiện sai số vé trong khung hình đầu tiên.

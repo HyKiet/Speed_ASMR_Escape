@@ -22,6 +22,7 @@ local Theme = require(script.Parent.Parent.Theme)
 local Tokens = require(script.Parent.Parent.Tokens)
 local Toast = require(script.Parent.Parent.Toast)
 local Manager = require(script.Parent.Manager)
+local UIAnchors = require(script.Parent.Parent.UIAnchors)
 
 local Children = Fusion.Children
 local Computed = Fusion.Computed
@@ -409,8 +410,9 @@ local function buildRightColumn()
 				MaxTextSize = 28,
 				ZIndex = 45,
 			}),
-			-- Nút SPIN
-			Theme.MakeSurface({
+			-- Nút SPIN. Bọc `UIAnchors.Keep` để tutorial bước 5/5 chiếu spotlight vào đúng đây
+			-- sau khi người chơi mở modal (xem `TutorialController.runSpinFinale`).
+			UIAnchors.Keep("rouletteSpinButton", Theme.MakeSurface({
 				ClassName = "TextButton",
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.fromOffset(240, 200),
@@ -453,7 +455,7 @@ local function buildRightColumn()
 						}),
 					}
 				end,
-			}),
+			})),
 			-- Tiêu đề mua thêm
 			Theme.MakeOutlineLabel({
 				Position = UDim2.fromOffset(0, 310),

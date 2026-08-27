@@ -2,13 +2,15 @@
 --[[
 	TutorialController.luau — phần NHÌN THẤY của tutorial (logic ở TutorialService).
 
-	── MẠCH CHẠY (làm lại 2026-08-17) ─────────────────────────────────────────────────────
-	    Vào game  →  1/4  thảm mũi tên tới WinCollectionPad của Zone 1   (+1 Win)
+	── MẠCH CHẠY (bước 5/5 thêm 2026-08-27) ───────────────────────────────────────────────
+	    Vào game  →  1/5  thảm mũi tên tới WinCollectionPad của Zone 1   (+1 Win)
 	              →  (chốt Wins xong game tự teleport về Lobby)
-	              →  2/4  tới Multiplier Pad 2, tiêu đúng 1 Win vừa kiếm  (+2 Speed/bước)
-	              →  3/4  tới Treadmill x1                                (Speed tự chảy)
-	              →  4/4  SPOTLIGHT nút Daily → SPOTLIGHT nút CLAIM       (+1.000 Speed, +2 Wins)
-	              →  hai câu chốt (vòng lặp + mồi quay lại mai) → Group Chest.
+	              →  2/5  tới Multiplier Pad 2, tiêu đúng 1 Win vừa kiếm  (+2 Speed/bước)
+	              →  3/5  tới Treadmill x1                                (Speed tự chảy)
+	              →  4/5  SPOTLIGHT nút Daily → SPOTLIGHT nút CLAIM       (+1.000 Speed, +2 Wins)
+	              →  hai câu chốt (vòng lặp + mồi quay lại mai)
+	              →  5/5  SPOTLIGHT nút Spin → SPOTLIGHT nút SPIN         (tiêu vé chào mừng)
+	              →  Group Chest.
 
 	Mỗi bước TO HƠN bước trước, và bước 1 tự nuôi bước 2 — đó là toàn bộ thiết kế.
 
@@ -819,8 +821,18 @@ local function hideBanner()
 	State.tutorialBannerVisible:set(false)
 end
 
--- Tổng số bước NGƯỜI CHƠI nhìn thấy = 3 bước thế giới + 1 bước nhận quà Daily ở cuối.
-local TOTAL_STEPS = #STEPS + 1
+--[[
+	Tổng số bước NGƯỜI CHƠI nhìn thấy = 3 bước thế giới + Daily + Vòng quay.
+
+	Server vẫn chỉ biết 3 bước (`TutorialService.STEP_INDEX`); hai bước cuối sống hoàn toàn ở
+	client vì chúng chỉ là "mở đúng modal và chỉ vào đúng nút", không có sự kiện gameplay nào
+	để server chốt. Phễu Onboarding trên Creator Hub vì vậy vẫn là 4 bước như cũ — ĐỪNG sửa
+	`STEP_INDEX` cho "khớp", làm thế là gãy toàn bộ dữ liệu phễu lịch sử.
+
+	DAILY_STEP để hai bước cuối tự đánh số đúng khi ai đó thêm/bớt bước, thay vì chép tay 4 và 5.
+]]
+local DAILY_STEP = #STEPS + 1
+local TOTAL_STEPS = #STEPS + 2
 
 --[[
 	══ NHỊP HOÀN THÀNH: CHỚP XANH "✓ Nice!" GIỮA HAI BƯỚC ═══════════════════════════════════
@@ -934,12 +946,12 @@ local function waitUntil(predicate: () -> boolean, timeout: number): boolean
 	return false
 end
 
-local function runDailyFinale()
+local function runDailyFinale(): boolean
 	-- Chưa có gói `dailyState`, hoặc hôm nay đã nhận rồi: không có gì để dắt.
 	if not waitUntil(function()
 		return State.dailyCanClaim:get()
 	end, 8) then
-		return
+		return false
 	end
 
 	--[[
@@ -953,10 +965,10 @@ local function runDailyFinale()
 		-- Không tìm thấy nút thì tuyệt đối KHÔNG bật lớp tối: sẽ thành màn hình đen với một lỗ
 		-- chỉ vào hư không. Thà mở thẳng modal còn hơn.
 		Manager.OpenDaily()
-		return
+		return false
 	end
 
-	setBanner("Your reward is waiting — tap Daily!", `{TOTAL_STEPS}/{TOTAL_STEPS}`)
+	setBanner("Your reward is waiting — tap Daily!", `{DAILY_STEP}/{TOTAL_STEPS}`)
 	Spotlight.Show(dailyButton :: GuiObject)
 
 	local opened = waitUntil(function()
@@ -966,7 +978,7 @@ local function runDailyFinale()
 		-- Người chơi bỏ mặc: dọn sạch, không để lớp tối treo vĩnh viễn trên màn hình.
 		Spotlight.Hide()
 		hideBanner()
-		return
+		return false
 	end
 
 	--[[
@@ -977,7 +989,7 @@ local function runDailyFinale()
 	]]
 	local claimButton = UIAnchors.Await("dailyClaimButton", 5)
 	if claimButton and claimButton:IsA("GuiObject") then
-		setBanner("CLAIM now: +1,000 Speed and +2 Wins!", `{TOTAL_STEPS}/{TOTAL_STEPS}`)
+		setBanner("CLAIM now: +1,000 Speed and +2 Wins!", `{DAILY_STEP}/{TOTAL_STEPS}`)
 		-- Mũi tên vàng trong modal (dựng sẵn trong `DailyModal`) chỉ xuống nút CLAIM.
 		State.tutorialClaimHint:set(true)
 		Spotlight.Show(claimButton :: GuiObject)
@@ -992,26 +1004,120 @@ local function runDailyFinale()
 	State.tutorialClaimHint:set(false)
 	hideBanner()
 
-	if claimed then
-		-- Chờ hiệu ứng lật thẻ + thẻ thưởng bay xong rồi mới nói câu cuối, nếu không hai thứ
-		-- cùng nổ một lúc và không đọc được cái nào.
-		task.wait(1.8)
-		--[[
-			Câu CHỐT LẠI VÒNG LẶP. Người chơi vừa đi qua đủ bốn mảnh (chạy → Wins → nâng cấp →
-			Speed) nhưng chưa chắc đã ghép chúng lại trong đầu; một câu gói cả vòng là thứ họ mang
-			theo suốt phiên sau.
-		]]
-		Toast.Show("That's the loop: farm Speed → run further → bank more Wins.", "info")
-		task.wait(2.6)
-		--[[
-			HAI CÁI MÓC trong một câu: một mục tiêu cho NGAY BÂY GIỜ (Stage 2 trả 3 Wins — gấp ba
-			Stage 1) và một lý do quay lại NGÀY MAI (quà Ngày 2 to hơn).
+	return claimed
+end
 
-			⚠️ Tutorial kết thúc là lúc người chơi dễ rời game nhất: hết việc được giao, không ai
-			nói tiếp theo làm gì. Câu này lấp đúng khoảng trống đó.
-		]]
-		Toast.Show("Next stop: Stage 2 pays 3 Wins. Come back tomorrow — Day 2 gift is bigger.", "info")
+--[[
+	Hai câu chốt của CẢ tutorial. Chạy SAU bước quay, không phải ngay sau khi nhận quà Daily.
+
+	⚠️ 2026-08-27 (user: "từ bước 4/5 sang 5/5 chậm quá, thấy claim xong là phải dẫn liền").
+	Trước đó hai câu này nằm ngay sau `claimed` và cộng thêm 1,8 + 2,6 giây vào ĐƯỜNG GĂNG
+	giữa lúc bấm CLAIM và lúc spotlight nút Spin sáng lên — tổng cộng ~5,4 giây người chơi
+	ngồi nhìn màn hình không có gì xảy ra, đúng chỗ dễ rời game nhất.
+
+	Chuyển xuống đây vừa xoá độ trễ đó, vừa hợp mạch hơn: đây là lời chốt của TOÀN BỘ tutorial
+	chứ không riêng gì bước Daily.
+]]
+local function runClosingToasts()
+	--[[
+		Câu CHỐT LẠI VÒNG LẶP. Người chơi vừa đi qua đủ bốn mảnh (chạy → Wins → nâng cấp →
+		Speed) nhưng chưa chắc đã ghép chúng lại trong đầu; một câu gói cả vòng là thứ họ mang
+		theo suốt phiên sau.
+	]]
+	Toast.Show("That's the loop: farm Speed → run further → bank more Wins.", "info")
+	task.wait(2.6)
+	--[[
+		HAI CÁI MÓC trong một câu: một mục tiêu cho NGAY BÂY GIỜ (Stage 2 trả 3 Wins — gấp ba
+		Stage 1) và một lý do quay lại NGÀY MAI (quà Ngày 2 to hơn).
+
+		⚠️ Tutorial kết thúc là lúc người chơi dễ rời game nhất: hết việc được giao, không ai
+		nói tiếp theo làm gì. Câu này lấp đúng khoảng trống đó.
+	]]
+	Toast.Show("Next stop: Stage 2 pays 3 Wins. Come back tomorrow — Day 2 gift is bigger.", "info")
+end
+
+--[[
+	══ BƯỚC 5/5: TIÊU VÉ QUAY CHÀO MỪNG (user chốt 2026-08-27) ══════════════════════════════
+
+	── VÌ SAO CHÈN VÀO GIỮA DAILY VÀ GROUP CHEST ─────────────────────────────────────────────
+	`RouletteService` phát MỘT vé miễn phí cho mọi tài khoản mới (cờ `WelcomeSpinGranted`),
+	nhưng trước bản này không có gì dẫn người chơi tới chỗ tiêu nó. Cái vé nằm im trong túi,
+	và phần lớn người chơi rời game mà chưa từng thấy vòng quay lần nào — tức là một trong
+	những khoảnh khắc đã-dựng-sẵn và đáng nhớ nhất của game bị bỏ phí hoàn toàn.
+
+	Đặt SAU Daily vì cùng một lý do đã đưa Daily xuống cuối: phần thưởng chỉ có nghĩa khi
+	người chơi đã hiểu Speed/Wins dùng để làm gì. Đặt TRƯỚC Group Chest vì Group Chest là lời
+	MỜI RA NGOÀI game (vào nhóm Roblox) — mọi thứ diễn ra bên trong game phải xong trước đã.
+
+	── VÌ SAO KHÔNG ÉP QUAY ──────────────────────────────────────────────────────────────────
+	Mọi vòng chờ đều thoát êm khi người chơi đóng modal. Vé vẫn nằm nguyên trong túi và chấm
+	đỏ trên nút Spin vẫn sáng, nên ai không muốn quay bây giờ không mất gì cả. Ép ở bước cuối
+	là cách nhanh nhất để biến một món quà thành một thủ tục.
+]]
+local function runSpinFinale()
+	--[[
+		ĐÓNG MODAL DAILY TRƯỚC.
+
+		`runDailyFinale` cố ý không đóng (người chơi có quyền ngồi xem tiếp bảng 7 ngày). Nhưng
+		nếu để nguyên thì bước này bật lớp tối ĐÈ LÊN một modal đang mở — nhìn thấy trong ảnh
+		nghiệm thu 2026-08-27: bảng Daily nằm mờ mờ giữa màn hình trong khi lỗ sáng lại ở góc
+		trên bên phải. Hai tiêu điểm cùng lúc, người chơi không biết nhìn đâu.
+	]]
+	Manager.CloseDaily()
+	task.wait(0.2)
+
+	--[[
+		Xin state trước khi dẫn: số vé thay đổi cả khi người chơi đang offline (đồng hồ vé free
+		vẫn chạy), nên giá trị trong `State` lúc này có thể là số cũ từ lúc join.
+	]]
+	GamePackets.requestRouletteState.send({})
+	if not waitUntil(function()
+		return State.rouletteTickets:get() > 0
+	end, 5) then
+		-- Không có vé thì không có gì để dắt. Im lặng bỏ qua, không hiện banner hụt.
+		return
 	end
+
+	-- Chặng 1 — chiếu vào nút SPIN ở hàng trên bên phải.
+	local spinButton = UIAnchors.Await("spinButton", 5)
+	if not spinButton or not spinButton:IsA("GuiObject") then
+		-- Cùng lý do với `runDailyFinale`: không tìm thấy nút thì TUYỆT ĐỐI không bật lớp tối,
+		-- vì đó sẽ là màn hình đen với một cái lỗ chỉ vào hư không. Mở thẳng modal còn hơn.
+		Manager.OpenRoulette()
+		return
+	end
+
+	setBanner("You have a free spin → claim your prize!", `{TOTAL_STEPS}/{TOTAL_STEPS}`)
+	Spotlight.Show(spinButton :: GuiObject)
+
+	if not waitUntil(function()
+		return State.rouletteModalVisible:get()
+	end, 90) then
+		Spotlight.Hide()
+		hideBanner()
+		return
+	end
+
+	-- Chặng 2 — chiếu vào nút SPIN bên trong modal (chỉ tồn tại sau khi modal dựng xong).
+	local wheelButton = UIAnchors.Await("rouletteSpinButton", 5)
+	if wheelButton and wheelButton:IsA("GuiObject") then
+		setBanner("Tap SPIN → see what you win!", `{TOTAL_STEPS}/{TOTAL_STEPS}`)
+		Spotlight.Show(wheelButton :: GuiObject)
+	end
+
+	--[[
+		Xong khi bánh xe BẮT ĐẦU quay, hoặc khi người chơi tự đóng modal.
+
+		Mốc là `rouletteSpinning` chứ không phải "vé giảm đi": bánh xe quay mất 4,2 giây và
+		lớp tối phải tắt NGAY lúc bấm, nếu không nó che mất đúng cái khoảnh khắc mà cả bước
+		này tồn tại để tạo ra.
+	]]
+	waitUntil(function()
+		return State.rouletteSpinning:get() or not State.rouletteModalVisible:get()
+	end, 120)
+
+	Spotlight.Hide()
+	hideBanner()
 end
 
 local function runCompletionSequence(_wins: number, _spins: number, skipped: boolean)
@@ -1037,10 +1143,42 @@ local function runCompletionSequence(_wins: number, _spins: number, skipped: boo
 		-- nằm ở cuối `runDailyFinale`. Chúc mừng sớm là báo "xong rồi" trong khi còn một bước.
 		task.wait(1.0)
 
-		-- Bước 4/4: nhận quà Daily, có spotlight dẫn đường.
-		runDailyFinale()
+		-- Bước 4/5: nhận quà Daily, có spotlight dẫn đường.
+		local claimed = runDailyFinale()
 
-		task.wait(0.6)
+		--[[
+			SANG BƯỚC 5 NGAY KHI THẤY ĐÃ NHẬN (user chốt 2026-08-27).
+
+			1,1 giây chứ không phải 0: thẻ thưởng Daily bay mất khoảng chừng đó, và cắt ngang
+			nó là người chơi không kịp thấy mình vừa được gì — vừa hỏng khoảnh khắc, vừa hỏng
+			luôn lý do đã đưa Daily xuống cuối tutorial.
+
+			Ai KHÔNG nhận (đóng modal, hoặc hết giờ chờ) thì không có thẻ nào đang bay, đi thẳng.
+		]]
+		if claimed then
+			task.wait(1.1)
+		end
+
+		-- Bước 5/5: tiêu vé quay chào mừng. Xem khối lý do ở `runSpinFinale`.
+		runSpinFinale()
+
+		--[[
+			Chờ lâu hơn ở đây (0.6 → 2.4s, hoặc 9s nếu bánh xe đang quay).
+
+			Bánh xe quay 4,2 giây, nhưng ĐUÔI của nó mới là chỗ dài: trúng Speed thì sau đó còn
+			toast phần thưởng + chuỗi "LEVEL UP!" nổ liên tiếp. Đo 2026-08-27: một cú +25K Speed
+			trên tài khoản mới bắn ra COMBO x8 và tấm "LEVEL UP!" đè CHỒNG LÊN modal Group Chest
+			vừa mở — hai lớp chữ to nằm đúng giữa màn hình, không đọc được cái nào.
+
+			9 giây = 4,2 quay + ~1,5 toast + ~3 cho chuỗi level-up dài nhất.
+		]]
+		task.wait(if State.rouletteSpinning:get() then 9.0 else 2.4)
+
+		-- Hai câu chốt của cả tutorial (trước đây nằm kẹt giữa bước 4 và 5 — xem khối lý do
+		-- ở `runClosingToasts`).
+		runClosingToasts()
+		task.wait(2.6)
+
 		-- Lời mời cuối cùng, và cũng là buff vĩnh viễn +10% Wins nếu họ vào group.
 		Manager.OpenGroupChest()
 	end)

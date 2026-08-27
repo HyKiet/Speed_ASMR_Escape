@@ -198,6 +198,15 @@ local function grantReward(player: Player, slotIndex: number): string
 		local auraId = slot.auraId or "aura_frozen_bloom"
 		if data and not data.UnlockedAuras[auraId] then
 			data.UnlockedAuras[auraId] = true
+			--[[
+				Bật chấm đỏ trên nút Cosmetics + tab Auras.
+
+				Ghi CẢ profile lẫn attribute: profile để chấm đỏ sống qua lần thoát game (món
+				hiếm nhất game, người chơi không được mất dấu nó), attribute để client biết
+				NGAY mà không tốn thêm packet — attribute tự replicate.
+			]]
+			data.UnseenAuraUnlock = true
+			player:SetAttribute("UnseenAuraUnlock", true)
 			ProgressionService.SendSnapshot(player)
 			return "FROZEN BLOOM UNLOCKED!"
 		end
@@ -286,6 +295,20 @@ end
 function RouletteService.Start()
 	GamePackets.requestSpin.listen(function(_data, player: Player)
 		onSpinRequest(player)
+	end)
+
+	--[[
+		Người chơi đã mở tab Auras ⇒ tắt chấm đỏ.
+
+		Không cần chống spam: gói này chỉ ghi `false` lên một cờ boolean, gọi bao nhiêu lần cũng
+		ra cùng kết quả và không đụng tới kinh tế.
+	]]
+	GamePackets.requestClearAuraDot.listen(function(_data, player: Player)
+		local data = DataService.GetData(player)
+		if data then
+			data.UnseenAuraUnlock = false
+		end
+		player:SetAttribute("UnseenAuraUnlock", false)
 	end)
 
 	GamePackets.requestRouletteState.listen(function(_data, player: Player)

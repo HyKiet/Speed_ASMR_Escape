@@ -297,6 +297,34 @@ local function getGainMultiplier(player: Player, data: PlayerData): number
 	return getMultiplierBreakdown(player, data).totalMultiplier
 end
 
+--[[
+	Hệ số dùng cho TREADMILL OFFLINE (xem `OfflineEarningsService`).
+
+	Khác `getMultiplierBreakdown` ở đúng hai chỗ, và cả hai đều là cố ý:
+
+	  1. TREADMILL LUÔN TÍNH THEO CÁI ĐANG TRANG BỊ. Online thì `getTreadmillMultiplier` trả 1
+	     nếu người chơi không đứng trên máy — nhưng tính năng này TÊN LÀ "treadmill offline",
+	     nên máy họ đã mua phải có tác dụng. Đây cũng là thứ khiến Purple/Blue/Gold đáng tiền
+	     hơn hẳn: nó làm việc cả lúc chủ nhân đi ngủ.
+
+	  2. RỔ LIVEOPS BỊ LOẠI HẲN (Playtime × Friends × ServerBoost × Event). Đó là buff của PHIÊN
+	     CHƠI. Playtime Boost lên tới x4 ở phút 60 và Server Boost x2 — nhân chúng vào 2 giờ
+	     offline là biến trần an toàn thành con số vô nghĩa. Ai muốn hệ số cao thì phải ONLINE.
+
+	Rebirth và cosmetic thì GIỮ: cả hai là tài sản vĩnh viễn người chơi đã cày/mua được, và giữ
+	cosmetic ở đây còn cho Wins thêm một chỗ để tiêu — thứ bảng Economy đang thiếu hoàn toàn.
+]]
+function ProgressionService.GetOfflineMultiplier(player: Player, data: PlayerData): number
+	local treadmillConfig = Constants.GetTreadmillById(data.EquippedTreadmill)
+	local treadmillMult = if treadmillConfig then math.max(1, treadmillConfig.multiplier) else 1
+
+	local premiumMult = additiveBucket(treadmillMult, computeGamepassMultiplier(player), computeVipMultiplier(player))
+	local cosmeticMult =
+		additiveBucket(Constants.GetTrailMultiplier(data.EquippedTrail), Constants.GetAuraMultiplier(data.EquippedAura))
+
+	return premiumMult * cosmeticMult * Constants.GetRebirthMultiplier(data.Rebirths)
+end
+
 -- ============================================================================
 -- Snapshot
 -- ============================================================================
@@ -844,6 +872,44 @@ local function watchStudioLevelHook(player: Player)
 end
 
 --[[
+	[Studio-only test hook] ĐẶT THẲNG CUSTOM SPEED (2026-08-27).
+
+	Đặt attribute `StudioSetCustomSpeed` = <số> lên Player ⇒ ghi `CustomSpeedLimit` y như khi
+	người chơi tự gõ số trong ô Custom Speed.
+
+	Vì sao cần: hành vi "tự chỉnh thì GIỮ, thoát ra vào lại thì VỀ KỊCH TRẦN" không nghiệm thu
+	được qua `requestCustomSpeed` — ByteNet không đi qua được VM riêng của `execute_luau`
+	(xem cạm bẫy QA trong ghi chú kiến trúc bẫy zone). Hook attribute thì đi qua được.
+
+	Đặt số ≥ trần cũng được: `applyWalkSpeed` kẹp lại, và lúc đó người chơi quay về chế độ TỰ
+	BÁM (vì `CustomSpeedLimit == trần`) — đúng như khi họ tự gõ số kịch trần trong game.
+]]
+local function watchStudioCustomSpeedHook(player: Player)
+	player:GetAttributeChangedSignal("StudioSetCustomSpeed"):Connect(function()
+		local target = player:GetAttribute("StudioSetCustomSpeed")
+		if typeof(target) ~= "number" or target < 1 then
+			return
+		end
+		player:SetAttribute("StudioSetCustomSpeed", nil)
+
+		local data = DataService.GetData(player)
+		if not data then
+			return
+		end
+
+		local maxSpeed = getMaxWalkSpeed(data)
+		data.CustomSpeedLimit = math.clamp(math.floor(target), Constants.DEFAULT_WALK_SPEED, maxSpeed)
+		applyWalkSpeed(player, data)
+		sendSnapshot(player)
+
+		warn(
+			`[ProgressionService] [Studio] {player.Name} → CustomSpeedLimit `
+				.. `{data.CustomSpeedLimit} / trần {maxSpeed}`
+		)
+	end)
+end
+
+--[[
 	[Studio-only test hook] ĐẶT THẲNG SỐ WINS ĐỂ NGHIỆM THU (2026-08-26).
 
 	Đặt attribute `StudioSetWins` = <số> lên Player ⇒ ghi `TotalWins`, cập nhật leaderstats
@@ -934,10 +1000,12 @@ function ProgressionService.Start()
 			watchStudioCosmeticHook(player)
 			watchStudioLevelHook(player)
 			watchStudioWinsHook(player)
+			watchStudioCustomSpeedHook(player)
 		end
 		Players.PlayerAdded:Connect(watchStudioCosmeticHook)
 		Players.PlayerAdded:Connect(watchStudioLevelHook)
 		Players.PlayerAdded:Connect(watchStudioWinsHook)
+		Players.PlayerAdded:Connect(watchStudioCustomSpeedHook)
 	end
 
 	GamePackets.requestSnapshot.listen(function(_data, player: Player)
@@ -1105,14 +1173,19 @@ function ProgressionService.Start()
 			    11.29s  NHÂN VẬT MỚI, state → Running (HP=100, WS=6)
 			    11.56s  WalkSpeed 6 → 250          ← 270 ms
 
-			6 là `Tuning.DEFAULT_WALK_SPEED` — giá trị StarterPlayer cấp cho nhân vật mới. Tốc
-			độ THẬT chỉ được đặt lại ở `tickPlayer`, mà tick là vòng lặp có nhịp riêng, nên
-			người chơi cầm lái một nhân vật bò 6 studs/s trong tối đa ~0.3 giây sau khi hồi
+			6 là `Tuning.DEFAULT_WALK_SPEED` LÚC ĐO — giá trị StarterPlayer cấp cho nhân vật
+			mới. Tốc độ THẬT chỉ được đặt lại ở `tickPlayer`, mà tick là vòng lặp có nhịp riêng,
+			nên người chơi cầm lái một nhân vật bò 6 studs/s trong tối đa ~0.3 giây sau khi hồi
 			sinh. Ở 250 WS đó là chênh lệch 40 LẦN: đúng cảm giác "chết xong nhân vật bị đơ".
 
 			Vì sao trước đây không ai thấy: ở Level thấp `DEFAULT_WALK_SPEED = 6` gần bằng tốc
 			độ thật nên khoảng trễ này vô hình. Nó chỉ lộ ra ở tốc độ cao — và đó chính là
 			trạng thái mà mọi người chơi gắn bó đều đang ở.
+
+			⚠️ 2026-08-27: `DEFAULT_WALK_SPEED` đã lên **14** (và `StarterPlayer.CharacterWalkSpeed`
+			trong map đổi theo). Con số 6 trong dòng thời gian trên là DỮ LIỆU ĐO LÚC ĐÓ, giữ
+			nguyên làm chứng cứ — đừng sửa thành 14. Bản vá dưới đây vẫn cần thiết y như cũ:
+			14 so với 250 vẫn là chênh 18 lần.
 
 			Sửa bằng cách áp tốc độ NGAY trong `CharacterAdded` thay vì đợi tick. `CharacterAdded`
 			nổ trước khi người chơi kịp bấm phím đầu tiên, nên khoảng bò 6 studs/s biến mất hẳn

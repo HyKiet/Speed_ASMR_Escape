@@ -1,16 +1,54 @@
 --!strict
--- Biển tên khu vực trong Lobby (Treadmills / Multiplier Pads / Leaderboards /
--- Trails & Auras / Group Chest / Feedback).
---
--- Chữ lớn nổi trên không, viền đen dày, gradient theo màu chủ đạo của khu — cùng ngôn
--- ngữ với biển Stage ngoài Obby. Biển dựng RUNTIME (không nằm trong .rbxlx) để chỉnh vị
--- trí/chữ chỉ cần sửa bảng `SIGNS` bên dưới.
---
--- VỊ TRÍ: biển đứng SÁT PHÍA SAU khu (mép xa spawn nhất), nhô lên khỏi nóc công trình —
--- nhìn từ lối vào thấy chữ làm phông nền cho cả khu, không che mặt tiền.
---
--- Hai mặt: mỗi biển có SurfaceGui trên cả Front và Back nên nhìn từ hướng nào cũng đọc
--- được. Part nền trong suốt hoàn toàn, không va chạm, không đổ bóng.
+--[[
+	AreaSignService — biển tên khu vực trong Lobby (Treadmills / Multiplier Pads /
+	Leaderboards / Trails & Auras / Group Chest / Feedback).
+
+	Chữ lớn nổi trên không, viền đen dày, gradient theo màu chủ đạo của khu — cùng ngôn ngữ
+	với biển Stage ngoài Obby. Biển dựng RUNTIME (không nằm trong .rbxl), hai mặt Front/Back
+	nên nhìn từ hướng nào cũng đọc được. Part nền trong suốt, không va chạm, không đổ bóng.
+
+	══ BIỂN BÁM THEO CỤM CÔNG TRÌNH, KHÔNG CÒN TOẠ ĐỘ CỨNG (2026-08-27) ═════════════════════
+
+	Bản trước khai `position = Vector3(...)` cho từng biển. Cách đó hỏng theo đúng một kiểu,
+	và nó đã hỏng thật: **ai đó dời cả Lobby ~95 studs trên trục Z**, sáu tấm biển ở nguyên
+	chỗ cũ. Đo lúc phát hiện:
+
+	    Treadmills      biển z = -107   ·  dàn máy giờ ở z = 1.5    → lệch ~108 studs
+	    MultiplierPads  biển z = -25    ·  cụm pad giờ ở z = 70.1   → lệch ~95 studs
+	    Trails & Auras  biển z = -9     ·  hai bệ giờ ở z = 85.7    → lệch ~95 studs
+
+	(Cùng một lần dời đó cũng làm hỏng `OrbitCenter` của ba bệ Trail — xem
+	`TrailShowcaseController`. Hai lỗi, một nguyên nhân: dữ liệu vị trí bị CHÉP ra khỏi map.)
+
+	Giờ mỗi biển khai **cụm công trình của nó** thay vì toạ độ. Vị trí suy ra lúc chạy từ hộp
+	bao thật của cụm:
+
+	    tâm, nócY  =  hộp bao gộp của mọi BasePart trong `targets`
+	    hướng      =  `facing` nếu có, không thì quay về SpawnLocation
+	    vị trí     =  (tâm.X, nócY + clearance, tâm.Z)  −  hướng × setback
+
+	Dời cụm trong Studio ⇒ biển tự đi theo, không phải sửa file này. Đó là toàn bộ mục đích.
+
+	── HAI SỐ ĐO CỦA MỖI BIỂN ────────────────────────────────────────────────────────────────
+	  `clearance` — nhô lên bao nhiêu stud TRÊN NÓC cụm (để chữ không bị chính công trình che).
+	  `setback`   — lùi bao nhiêu stud RA SAU, tính ngược chiều `facing`. Số ÂM = nhô ra TRƯỚC
+	                (cụm Leaderboard cần vậy: phía sau nó là tán cây, chữ bị nuốt).
+
+	── ⚠️ VÌ SAO `facing` PHẢI KHAI TAY Ở BA CHỖ ────────────────────────────────────────────
+	Mặc định biển quay về SpawnLocation. Ba ngoại lệ, mỗi cái một lý do đã phải trả giá:
+
+	  • MultiplierPads → +X. Để mặc định thì biển quay chéo ~15° và một đầu của tấm rộng 52
+	    stud văng ra SAU `Wall.Wall_Lobby` (đo lại 2026-08-27: tường ở x ≈ −96.2 suốt dải z
+	    45→100). Người chơi đọc được đúng "…iplier Pads". Hướng +X đặt biển SONG SONG tường,
+	    cách mặt tường 1.6 stud.
+	  • GroupChest → −Z. Mặt rương (nắp + ổ khoá vàng) quay về −Z, không phải theo
+	    `CFrame.LookVector` như bản 2026-07-29 đã tin nhầm và dựng biển ở cạnh bên rương.
+	  • Leaderboards → trung bình 3 LookVector của các DisplayPanel (chúng xếp chéo nhau).
+	    Phép quay không đổi khi tịnh tiến, nên vector này vẫn đúng sau khi cụm bị dời.
+
+	Hai tường bên đã đo lại 2026-08-27: trái x ≈ −96.2, phải x ≈ +104.8, sau lưng treadmill
+	z ≈ −25. Mọi biển dưới đây đều nằm trong khoảng đó.
+]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,20 +56,23 @@ local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local Workspace = game:GetService("Workspace")
 
--- Điểm quy chiếu MẶC ĐỊNH để xoay biển: SpawnLocation của Lobby.
-local VIEWER_ANCHOR = Vector3.new(-4, 0, 0)
+--[[
+	Điểm quy chiếu để xoay biển. Đọc SpawnLocation THẬT lúc chạy chứ không hằng số hoá:
+	hằng số là đúng cái đã làm hỏng cả sáu biển lần trước.
 
--- `facing`: hướng mặt Front của biển. Bỏ trống ⇒ quay về `VIEWER_ANCHOR`.
--- Khu nào có hướng nhìn RIÊNG (rương quay mặt về -X, cụm leaderboard xếp chéo) thì phải
--- chỉ định tay, nếu không biển sẽ lệch khỏi tâm khu khi người chơi đứng đúng mặt tiền.
--- `subText`: dòng phụ nhỏ NGAY DƯỚI chữ lớn (hiện chỉ biển Feedback dùng). Có subText thì
--- chữ chính co lại còn 58% chiều cao biển để nhường chỗ — nên biển nào dùng phải khai báo
--- `height` cao hơn bình thường, nếu không chữ chính teo đi trông như lỗi.
+	Fallback chỉ dùng khi không tìm thấy spawn — xem `lobby-spawn-path`: spawn nằm ở
+	`Workspace.Spawn`, NGOÀI Lobby.
+]]
+local FALLBACK_VIEWER = Vector3.new(3, 0, 94)
+
 type SignConfig = {
 	name: string,
 	text: string,
 	subText: string?,
-	position: Vector3,
+	-- Đường dẫn (từ Workspace) tới cụm công trình. Nhiều đường ⇒ hộp bao GỘP lại.
+	targets: { { string } },
+	clearance: number,
+	setback: number,
 	width: number,
 	height: number,
 	colorA: Color3,
@@ -43,8 +84,9 @@ local SIGNS: { SignConfig } = {
 	{
 		name = "TreadmillsSign",
 		text = "Treadmills",
-		-- Sau dàn treadmill (z ≈ -104.6), cao hơn nóc máy (y ≈ 24).
-		position = Vector3.new(4.5, 34, -107),
+		targets = { { "Lobby", "Treadmills" } },
+		clearance = 10,
+		setback = 14,
 		width = 48,
 		height = 11,
 		colorA = Color3.fromRGB(120, 240, 255),
@@ -53,29 +95,10 @@ local SIGNS: { SignConfig } = {
 	{
 		name = "MultiplierPadsSign",
 		text = "Multiplier Pads",
-		--[[
-			ĐO LẠI 2026-08-14 (user: biển lệch khỏi tâm khu). Bản cũ ở z = -9 — đó là toạ độ
-			của HÀNG PAD ĐẦU TIÊN (Pad_1/Pad_5 @ z ≈ -7), không phải tâm khu. Cả cụm trải dài
-			z từ -58.2 tới 8.3, nên biển đứng lệch hẳn 16 stud về một đầu.
-
-			Số đo thật của `Workspace.Lobby.MultiplierPads` (37 part):
-			  bbox  min (-92.0, 10.0, -58.2)  →  max (-61.2, 19.9, 8.3)
-			  tâm   (-76.6, 14.9, -25.0)      nóc y = 19.9
-			⇒ z = -25 (đúng tâm), x = -95 (lùi ~18 stud ra sau tâm theo trục khu→spawn nên
-			  không che mặt tiền), y = 29 (trên nóc pad tầng trên ~9 stud).
-
-			⚠️ `facing` PHẢI KHAI BÁO TAY, và đây là lý do (mất một vòng mới ra):
-			Để trống thì biển tự quay về `VIEWER_ANCHOR` (-4, 0, 0). Từ (-95, -25) hướng đó
-			chéo ~15°, nên tấm biển rộng 52 stud bị XOAY và một đầu văng tới x = -101.9 — trong
-			khi `Workspace.Wall.Wall_Lobby` là một mặt phẳng đứng ở x ≈ -96.6 (đo bằng raycast,
-			đều suốt z từ -55 tới +5). Đầu đó chui hẳn ra SAU tường, và người chơi đọc được đúng
-			"…iplier Pads": bốn chữ đầu bị chính bức tường nuốt mất.
-
-			Hướng +X cho biển nằm SONG SONG với tường ở x = -95 (cách mặt tường 1.6 stud), nên
-			cả 52 stud chiều ngang đều nằm trước tường. Nó cũng là hướng đúng về mặt thị giác:
-			người chơi từ spawn đi tới nhìn theo -X, tức nhìn thẳng vào mặt biển.
-		]]
-		position = Vector3.new(-95, 29, -25),
+		targets = { { "Lobby", "MultiplierPads" } },
+		clearance = 9,
+		-- 18 stud sau tâm cụm ⇒ x ≈ −94.6, cách tường (x ≈ −96.2) 1.6 stud. Xem khối ⚠️ ở đầu file.
+		setback = 18,
 		facing = Vector3.new(1, 0, 0),
 		width = 52,
 		height = 11,
@@ -86,12 +109,11 @@ local SIGNS: { SignConfig } = {
 	{
 		name = "LeaderboardsSign",
 		text = "Leaderboards",
-		-- ĐO LẠI 2026-08-10 (user dời cụm bảng): tâm 3 DisplayPanel = trung bình của
-		-- (-91.1, 35.2) / (-83.2, 62.6) / (-61.4, 81.0) ⇒ (-78.6, 59.6); nóc bảng y ≈ 30.7
-		-- (tâm 21.36 + nửa chiều cao 18.77). Biển nhô ~10 stud RA TRƯỚC theo hướng mặt bảng
-		-- để không bị chính bảng/tán cây phía sau nuốt chữ.
-		position = Vector3.new(-70.3, 38, 54),
-		-- Trung bình 3 LookVector: (1,0,0) + (0.842,0,-0.540) + (0.328,0,-0.945), chuẩn hoá.
+		targets = { { "Lobby", "LeaderBoard" } },
+		clearance = 4,
+		-- ÂM = nhô RA TRƯỚC mặt bảng: phía sau cụm là tán cây, để biển lùi ra sau là mất chữ.
+		setback = -8,
+		-- Trung bình 3 LookVector của Top_Speeds / Top_Donate / Top_Wins (chúng xếp chéo).
 		facing = Vector3.new(0.825, 0, -0.565),
 		width = 44,
 		height = 10,
@@ -100,10 +122,13 @@ local SIGNS: { SignConfig } = {
 	},
 	{
 		name = "CosmeticsSign",
-		-- TrailBase (z -4..33) và AuraBase (z -51..-20) nằm chung một dải x 73..99 →
-		-- một biển chung ở giữa, lùi ra sau cả hai.
 		text = "Trails & Auras",
-		position = Vector3.new(102, 29, -9),
+		-- Hai bệ nằm chung một dải x nhưng cách nhau ~50 stud trên z ⇒ gộp hộp bao để biển
+		-- đứng đúng giữa cả hai, thay vì bám một bệ và bỏ rơi bệ kia.
+		targets = { { "Lobby", "TrailBase" }, { "Lobby", "AuraBase" } },
+		clearance = 9,
+		-- 16 stud ⇒ x ≈ 101.7, cách tường phải (x ≈ 104.8) 3.1 stud.
+		setback = 16,
 		width = 52,
 		height = 11,
 		colorA = Color3.fromRGB(220, 160, 255),
@@ -112,13 +137,9 @@ local SIGNS: { SignConfig } = {
 	{
 		name = "GroupChestSign",
 		text = "Group Chest",
-		-- ⚠️ 2026-07-29: bản cũ tin vào `RegularChest.CFrame.LookVector` (-X) nên biển đứng
-		-- ở CẠNH BÊN rương, người chơi không bao giờ thấy. MẶT RƯƠNG (nắp + ổ khoá vàng)
-		-- thật ra quay về **-Z** — kiểm bằng screen_capture 4 hướng: chỉ hướng nhìn từ
-		-- z≈46 về +Z mới thấy mặt trước, hai cây dừa ôm hai bên, biển xanh bên phải.
-		-- Biển lùi 6 stud ra SAU rương (+Z), cao 33 (nóc rương ≈ 24.3) nên nổi trên nền
-		-- đồi xanh + trời, đứng trước rương nhìn lên là chữ nằm chính giữa.
-		position = Vector3.new(68, 33, 87.5),
+		targets = { { "Lobby", "GroupChest" } },
+		clearance = 9,
+		setback = 8,
 		facing = Vector3.new(0, 0, -1),
 		width = 44,
 		height = 11,
@@ -131,12 +152,11 @@ local SIGNS: { SignConfig } = {
 		-- Dòng phụ: mục đích là CHẶN dislike bốc đồng — nói thẳng "báo cho tụi mình" trước
 		-- khi người chơi kịp bấm nút không thích trên trang game.
 		subText = "Tell us here instead of disliking. Thanks!",
-		-- ĐO LẠI 2026-08-10 (user dời hòm thư): `Workspace.Feedback.Mailbox` @(-65.0, 13.8,
-		-- -70.4), nóc y ≈ 17.7. Biển lùi 6 stud RA SAU hòm thư theo trục hòm-thư→spawn
-		-- (spawn ≈ (3.1, -12)) nên đứng đọc prompt vẫn thấy chữ nằm trên hòm thư.
-		position = Vector3.new(-69.5, 26, -74.3),
-		-- Cao hơn biển cũ vì có thêm dòng phụ 2 dòng.
+		targets = { { "Lobby", "Feedback" } },
+		clearance = 8,
+		setback = 6,
 		width = 44,
+		-- Cao hơn biển thường vì có thêm dòng phụ 2 dòng.
 		height = 13,
 		colorA = Color3.fromRGB(150, 255, 210),
 		colorB = Color3.fromRGB(20, 175, 130),
@@ -232,7 +252,86 @@ local function buildFace(part: BasePart, config: SignConfig, face: Enum.NormalId
 	}, label)
 end
 
-local function buildSign(config: SignConfig, parent: Instance): BasePart
+
+--[[
+	Hộp bao GỘP của mọi BasePart trong các đường dẫn của một biển.
+
+	Dùng hộp bao trục-thế-giới (không tính xoay của từng part) là CỐ Ý: ta chỉ cần tâm X/Z và
+	độ cao nóc để đặt biển, còn hộp bao xoay-chuẩn của một cụm 147 part vừa đắt vừa không cho
+	kết quả tốt hơn cho mục đích này.
+
+	Trả về nil nếu không tìm thấy đường dẫn nào — gọi phía trên sẽ bỏ qua biển đó và warn to.
+]]
+local function measure(config: SignConfig): (Vector3?, number)
+	local min = Vector3.new(math.huge, math.huge, math.huge)
+	local max = Vector3.new(-math.huge, -math.huge, -math.huge)
+	local count = 0
+
+	local function eat(part: BasePart)
+		count += 1
+		local half = part.Size / 2
+		min = min:Min(part.Position - half)
+		max = max:Max(part.Position + half)
+	end
+
+	for _, path in config.targets do
+		local node: Instance? = Workspace
+		for _, segment in path do
+			node = node and node:FindFirstChild(segment)
+		end
+		if not node then
+			warn(`[AreaSignService] {config.name}: không thấy Workspace.{table.concat(path, ".")}`)
+			continue
+		end
+		if node:IsA("BasePart") then
+			eat(node)
+		end
+		for _, d in node:GetDescendants() do
+			if d:IsA("BasePart") then
+				eat(d)
+			end
+		end
+	end
+
+	if count == 0 then
+		return nil, 0
+	end
+	return (min + max) / 2, max.Y
+end
+
+local function viewerAnchor(): Vector3
+	local spawn = Workspace:FindFirstChild("Spawn")
+	if spawn then
+		if spawn:IsA("BasePart") then
+			return spawn.Position
+		elseif spawn:IsA("Model") then
+			return spawn:GetPivot().Position
+		end
+	end
+	warn("[AreaSignService] Không thấy Workspace.Spawn — biển xoay theo toạ độ dự phòng.")
+	return FALLBACK_VIEWER
+end
+
+-- Trả về nil nếu cụm công trình không tồn tại (đã warn trong `measure`).
+local function buildSign(config: SignConfig, parent: Instance, viewer: Vector3): BasePart?
+	local center, roofY = measure(config)
+	if not center then
+		return nil
+	end
+
+	--[[
+		Hướng mặt Front. Mặc định quay về spawn; `facing` ghi đè (ba chỗ, lý do ở đầu file).
+
+		`.Unit` trên vector phẳng XZ chứ không phải vector 3D: lấy cả thành phần Y vào sẽ làm
+		tấm biển NGHIÊNG theo độ cao chênh lệch giữa nó và spawn.
+	]]
+	local raw = config.facing or (viewer - center)
+	local flat = Vector3.new(raw.X, 0, raw.Z)
+	local facing = if flat.Magnitude > 1e-4 then flat.Unit else Vector3.new(0, 0, 1)
+
+	-- Lùi RA SAU = ngược chiều nhìn. setback âm ⇒ nhô ra trước (cụm Leaderboard).
+	local position = Vector3.new(center.X, roofY + config.clearance, center.Z) - facing * config.setback
+
 	local part = create("Part", {
 		Anchored = true,
 		CanCollide = false,
@@ -246,12 +345,8 @@ local function buildSign(config: SignConfig, parent: Instance): BasePart
 		Transparency = 1,
 	}, parent) :: BasePart
 
-	-- Front (mặt -Z của part) = LookVector; Back lo nốt hướng ngược lại.
-	local facing = config.facing
-	local target = if facing
-		then config.position + Vector3.new(facing.X, 0, facing.Z).Unit * 10
-		else Vector3.new(VIEWER_ANCHOR.X, config.position.Y, VIEWER_ANCHOR.Z)
-	part.CFrame = CFrame.lookAt(config.position, Vector3.new(target.X, config.position.Y, target.Z))
+	-- Front = mặt -Z của part = LookVector; Back lo nốt hướng ngược lại.
+	part.CFrame = CFrame.lookAt(position, position + facing)
 
 	buildFace(part, config, Enum.NormalId.Front)
 	buildFace(part, config, Enum.NormalId.Back)
@@ -272,12 +367,32 @@ function AreaSignService.Start()
 		existing:Destroy()
 	end
 
+	local viewer = viewerAnchor()
 	local root = create("Folder", { Name = "AreaSigns" }, lobby)
+	local built = 0
 	for _, config in SIGNS do
-		buildSign(config, root)
+		local sign = buildSign(config, root, viewer)
+		if sign then
+			built += 1
+			--[[
+				In TOẠ ĐỘ ĐÃ SUY RA, không phải chỉ đếm số biển.
+
+				Đây là dòng log duy nhất phát hiện được chuyện "cụm bị dời, biển đi theo nhưng
+				tới chỗ vô lý" (ví dụ ai đó bỏ quên một part ở xa trong Folder làm hộp bao phình
+				ra). Đếm suông thì lần lệch 95 stud vừa rồi vẫn sẽ in ra "đã dựng 6 biển".
+			]]
+			Log.Boot(
+				("[AreaSignService] %-20s @ (%.1f, %.1f, %.1f)"):format(
+					config.name,
+					sign.Position.X,
+					sign.Position.Y,
+					sign.Position.Z
+				)
+			)
+		end
 	end
 
-	Log.Boot(`[AreaSignService] Đã dựng {#SIGNS} biển khu vực.`)
+	Log.Boot(`[AreaSignService] Đã dựng {built}/{#SIGNS} biển khu vực (bám theo cụm công trình).`)
 end
 
 return AreaSignService

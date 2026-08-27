@@ -306,6 +306,25 @@ State.rouletteNextFreeReceivedAt = Value(0) -- os.clock() lúc nhận state (đ�
 State.rouletteSpinning = Value(false)
 State.rouletteResultText = Value("")
 
+--[[
+	Chấm đỏ "vừa trúng aura Legendary 1%" trên nút Cosmetics + tab AURAS.
+
+	Nguồn sự thật là attribute `UnseenAuraUnlock` trên Player (server đặt, tự replicate);
+	`HUDController` đồng bộ giá trị này. Xem `RouletteService`.
+]]
+State.auraUnlockDot = Value(false)
+
+-- Treadmill Offline (modal Claim / Double It)
+State.offlineModalVisible, State.offlineModalMounted, State.offlineModalAnimationGoal, State.offlineModalAnimation =
+	declareModal()
+State.offlineCloseHovered = Value(false)
+State.offlineClaimHovered = Value(false)
+State.offlineDoubleHovered = Value(false)
+-- Speed đang chờ nhận. 0 = không có gì (modal tự đóng).
+State.offlineSpeed = Value(0)
+-- Số giây đã vắng, dùng cho dòng phụ. Server đã kẹp vào trần MAX_SECONDS.
+State.offlineSeconds = Value(0)
+
 -- Server/Personal Boosts (deadline theo os.clock; client tự đếm ngược)
 State.boostServerSpeedUntil = Value(0)
 State.boostServerWinsUntil = Value(0)

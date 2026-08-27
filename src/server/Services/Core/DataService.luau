@@ -111,7 +111,26 @@ local function normalizeData(data: { [string]: any })
 	readNumber(data, "Rebirths", 0)
 	local level = readNumber(data, "Level", 1)
 	readNumber(data, "XP", 0)
-	readNumber(data, "CustomSpeedLimit", Constants.GetMaxWalkSpeed(level))
+	--[[
+		── CUSTOM SPEED RESET VỀ KỊCH TRẦN MỖI LẦN VÀO GAME (2026-08-27, yêu cầu user) ──────
+		"Player thoát ra vào lại thì hệ thống tự động chỉnh speed cao nhất, để level lên thì
+		speed tăng theo. Còn player tự chỉnh trong game thì giữ nguyên cho họ."
+
+		Hai vế đó là HAI CHẾ ĐỘ, và chế độ được suy ra từ chính giá trị chứ không cần cờ riêng:
+		  • `CustomSpeedLimit == trần`  ⇒ chế độ TỰ BÁM. `ProgressionService.addSpeed` thấy
+		    `wasAtMax` nên mỗi lần lên level lại kéo lên trần mới.
+		  • `CustomSpeedLimit <  trần`  ⇒ người chơi đã TỰ CHỌN. `wasAtMax` false ⇒ level lên
+		    bao nhiêu cũng không đụng tới con số của họ.
+
+		Vì vậy chỉ cần một việc ở đây: **luôn ghi đè về trần lúc nạp profile**, thay vì đọc lại
+		giá trị đã lưu. Giá trị người chơi tự chỉnh do đó chỉ sống trong PHIÊN — đúng câu
+		"trừ thoát game vào lại".
+
+		⚠️ `CustomSpeedLimit` vẫn nằm trong DataTemplate và vẫn được ProfileStore lưu. KHÔNG gỡ:
+		gỡ một field khỏi template là một lần migration cho toàn bộ profile hiện có, đổi lấy
+		vài byte. Nó chỉ đơn giản là không còn được đọc lên nữa.
+	]]
+	data.CustomSpeedLimit = Constants.GetMaxWalkSpeed(level)
 
 	if typeof(data.EquippedTreadmill) ~= "string" then
 		data.EquippedTreadmill = "treadmill_1"
@@ -132,8 +151,9 @@ local function normalizeData(data: { [string]: any })
 		data.UnlockedAuras = { none = true }
 	end
 
+	-- (Migration này trước đây còn reset `CustomSpeedLimit`; từ 2026-08-27 việc đó đã thành
+	-- hành vi MẶC ĐỊNH của mọi lần nạp profile ở trên, nên ở đây chỉ còn ghi cờ phiên bản.)
 	if coreLoopVersion < Constants.CORE_LOOP_VERSION then
-		data.CustomSpeedLimit = Constants.GetMaxWalkSpeed(level)
 		data.CoreLoopVersion = Constants.CORE_LOOP_VERSION
 	end
 
@@ -209,6 +229,8 @@ local function loadPlayer(player: Player)
 	updateLeaderstats(player, profile.Data)
 	player:SetAttribute("ProfileLoaded", true)
 	player:SetAttribute("HighestCompletedStage", math.floor(readNumber(profile.Data, "HighestCompletedStage", 0)))
+	-- Chấm đỏ "vừa trúng aura Legendary" sống qua lần thoát game — xem `RouletteService`.
+	player:SetAttribute("UnseenAuraUnlock", profile.Data.UnseenAuraUnlock == true)
 end
 
 --[[
