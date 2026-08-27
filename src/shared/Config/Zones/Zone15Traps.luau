@@ -39,9 +39,23 @@ end
 Zone15Traps.Smooth = smooth
 
 --=====================================================================================
--- BẪY 1 — LASER SWEEP: 2 tia mảnh SÁT MẶT SÀN trượt tới-lui dọc đường chạy.
--- Chạy thẳng vào tia = chết; phải NHẢY qua. Hai tia lệch pha 180° nên chúng chụm vào
--- rồi tách ra như lưỡi kéo — người chơi đọc được khe an toàn từ xa.
+-- BẪY 1 — LASER SWEEP: MỘT tia mảnh SÁT MẶT SÀN trượt tới-lui dọc đường chạy.
+-- Chạy thẳng vào tia = chết; phải NHẢY qua.
+--
+-- ── HẠ TỪ 2 TIA XUỐNG 1 (2026-08-27, user: "chỉ 1 beam thôi để giảm độ khó") ─────────
+-- Bản cũ có hai tia đặt ở Offset ∓60, lệch pha 180°, nên chúng chụm vào rồi tách ra như
+-- LƯỠI KÉO và phủ trọn dải [-120, +120] quanh marker. Ở 234 WS người chơi phải đọc được
+-- CẢ HAI pha trong chưa tới một giây.
+--
+-- Nay còn một tia đặt ngay tâm marker (Offset 0), biên độ giữ nguyên 60 ⇒ nó quét dải
+-- [-60, +60]. Hai hệ quả, cả hai đều theo hướng dễ hơn:
+--   • Vùng nguy hiểm co còn một nửa; hai đầu hành lang thành lối đi an toàn tuyệt đối.
+--   • Chỉ còn MỘT nhịp để đọc thay vì hai nhịp ngược pha.
+--
+-- ⚠️ `#Beams` là hợp đồng cứng với CẢ Zone15TrapService (`#beams ~= #SW.Beams` ⇒ bỏ hết)
+-- LẪN Zone15TrapController (`resolveMoving(..., #SW.Beams, ...)`). Đổi số tia ở đây thì
+-- cụm `LaserSweep` đã bake trong map PHẢI được xoá để `Build` dựng lại — nếu không cả hai
+-- phía đều resolve trượt và bẫy chết câm (không tia, không sát thương).
 --=====================================================================================
 Zone15Traps.Sweep = {
 	MarkerName = "Trap1",
@@ -52,8 +66,7 @@ Zone15Traps.Sweep = {
 
 	-- Offset = vị trí tâm quét, tính từ marker theo hướng chạy.
 	Beams = {
-		{ Offset = -60, Phase = 0 },
-		{ Offset = 60, Phase = math.pi },
+		{ Offset = 0, Phase = 0 },
 	},
 	Amplitude = 60,
 	Period = 2.8,

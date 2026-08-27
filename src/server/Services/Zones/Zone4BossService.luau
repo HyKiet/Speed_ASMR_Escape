@@ -11,15 +11,14 @@
 	`collectRunners` / `pickLeader`.
 
 	TỐI ƯU so với bản cũ:
-	  • Vòng đuổi fixed-timestep 30Hz thay vì mỗi Heartbeat 60Hz → giảm 1/2 lượng replicate
-	    CFrame của boss (1 model bám theo mọi client) và 1/2 CPU.
-	  • Cổng "ngủ": arena không có ứng viên → boss về nhà MỘT LẦN rồi ngồi im, KHÔNG PivotTo
-	    lại cùng một CFrame mỗi frame (trước đây replicate thừa liên tục dù không ai chơi).
-	  • Bỏ qua repair-visual + animation khi đang ngủ.
+	  • Vòng đuổi fixed-timestep 30Hz thay vì mỗi Heartbeat 60Hz → nửa CPU.
+	  • Cổng "ngủ": arena không có ứng viên → boss về nhà MỘT LẦN rồi ngồi im.
+	  • Bỏ qua animation khi đang ngủ.
+	  • (v3) Server KHÔNG `PivotTo` model nữa — nó công bố attribute `BossCF`, client vẽ.
 
 	Vì sao KHÔNG deterministic-clock như các bẫy khác: boss là AI đuổi theo VỊ TRÍ NGƯỜI CHƠI
-	(không suy được từ đồng hồ), nên buộc server tính và replicate — nhưng chỉ 1 model, 30Hz,
-	và chỉ khi có người trong sân. Chi phí per-server = O(số người đang trong arena).
+	(không suy được từ đồng hồ), nên buộc server tính. Nhưng "server TÍNH" khác "server VẼ" —
+	xem khối ══ ngay dưới đây, đó mới là thứ quyết định boss nhìn có mượt hay không.
 ]]
 
 local Players = game:GetService("Players")
@@ -29,8 +28,58 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
+local LagComp = require(ReplicatedStorage.Shared.Util.LagComp)
 
 local Zone4BossService = {}
+
+--[[
+	══ VÌ SAO KHÔNG PHẢI "NÂNG TICK LÊN 60Hz" (2026-08-27, user hỏi thẳng câu này) ═════════
+
+	Câu hỏi: "có cách nào cho MonkeyBoss chạy 60fps không". Câu trả lời ngắn: **nâng nhịp
+	server KHÔNG làm boss mượt hơn**, và ở ping của game (350–400ms) nó còn làm mọi thứ tệ đi.
+
+	Lý do là thứ đã lặp lại ở mọi bẫy trong session này: part NEO do script dời KHÔNG được
+	client nội suy. Client NHẢY thẳng tới giá trị mới mỗi khi gói replicate tới, và gói đó đi
+	theo NHỊP GỬI CỦA MẠNG chứ không theo nhịp server hay nhịp hình. Nghĩa là:
+	  • Server 30Hz hay 60Hz thì client vẫn nhận cùng chừng ấy gói ⇒ nhìn y hệt nhau.
+	  • Cái thay đổi duy nhất là băng thông và CPU: gấp đôi, đổi lấy 0 pixel.
+
+	CÁCH ĐÚNG (v3): tách AUTHORITY khỏi HÌNH.
+	  • Server giữ nguyên 30Hz, vẫn là bên quyết định boss ở đâu và ai chết — nhưng KHÔNG
+	    `PivotTo` model nữa. Nó công bố một CFrame duy nhất qua attribute `BossCF`.
+	  • `Zone4BossController` phía client đọc `BossCF` rồi NỘI SUY MƯỢT tới đó mỗi
+	    RenderStepped, và chỉ ghi `HumanoidRootPart.CFrame` — Motor6D + Animator tự đặt 8 part
+	    còn lại. Kết quả là 60fps thật (hoặc bằng đúng FPS máy người chơi), bất kể gói tới thưa.
+
+	KÈM THEO — BÙ TRỄ (`LagComp`): boss chạy 56 studs/s, nên ở 195ms trễ một chiều, con khỉ mà
+	người chơi NHÌN THẤY ở sau con khỉ server đang phán xử tới **11 studs** — trong khi bán
+	kính chạm chết chỉ 3.75. Tức là "chết khi boss còn cách xa cả thân người". Server giờ giữ
+	một VÒNG ĐỆM LỊCH SỬ vị trí boss và phán xử chạm tại `now - delay(player)`, đúng khung
+	hình người chơi đã thấy.
+
+	HỆ QUẢ PHỤ TÍCH CỰC: `repairBossVisualIfNeeded` đã bỏ. Nó tồn tại vì các part rig trôi dần
+	khỏi pivot sau nhiều lần `PivotTo` liên tiếp. Giờ client đặt lại root MỖI FRAME và Animator
+	dựng lại toàn bộ Motor6D từ root đó, nên trôi là chuyện KHÔNG THỂ xảy ra về mặt cấu trúc.
+]]
+-- Bao nhiêu giây lịch sử vị trí boss cần giữ để bù trễ. Phải ≥ `LagComp.MAX_DELAY` (0.40)
+-- + `VISUAL_SMOOTH_LAG`, cộng một chút lề cho nhịp tick.
+local HISTORY_SECONDS = 0.6
+
+--[[
+	TRỄ CỦA BỘ LỌC MƯỢT PHÍA CLIENT — hằng số này là HỢP ĐỒNG với `Zone4BossController`.
+	Nó phải luôn bằng `1 / SMOOTH_K` bên đó. Đổi một vế mà quên vế kia là boss giết lệch.
+
+	Vì sao đúng bằng 1/k, không phải một con số chọn tay: bộ lọc mũ
+	`x ← x + (goal − x)·(1 − e^(−k·dt))` khi bám một mục tiêu đi ĐỀU với vận tốc v thì sai số
+	xác lập đúng bằng `v/k`. Mà `v/k` chính là quãng đường mục tiêu đi trong `1/k` giây ⇒ hình
+	người chơi thấy BẰNG tư thế server của `1/k` giây TRƯỚC. Boss chạy đều (CHASE_SPEED không
+	đổi) nên xấp xỉ này đúng gần như tuyệt đối ở đây.
+
+	Cộng với trễ mạng: người chơi ping 195ms nhìn thấy con boss của `now − 0.195 − 0.055`.
+	Không cộng vế này thì ở 56 studs/s vẫn còn lệch 3 studs — gần bằng cả bán kính chạm chết
+	3.75, tức là vẫn "chết khi boss chưa chạm tới".
+]]
+local VISUAL_SMOOTH_LAG = 1 / 18
 
 local MECHANICS_NAME = "Mechanics"
 local ARENA_FLOOR_NAME = "BossArenaFloor"
@@ -47,8 +96,6 @@ local CHASE_SPEED = 56
 local RETURN_SPEED = 72
 local TOUCH_KILL_DISTANCE = 3.75
 local KILL_COOLDOWN_SECONDS = 1.15
-local VISUAL_REPAIR_INTERVAL = 1.25
-local VISUAL_DRIFT_DISTANCE = 10
 local ARENA_DETECTION_PADDING = 4
 local TICK_RATE = 1 / 30 -- vòng đuổi 30Hz (đủ mượt cho NPC, nửa băng thông so với 60Hz)
 
@@ -69,7 +116,6 @@ local bossTemplate: Model?
 local runTrack: AnimationTrack?
 local runTrackBoss: Model?
 local runAnimation = Instance.new("Animation")
-local lastVisualRepairTime = 0
 local lastKillTimes: { [Player]: number } = {}
 local activeEncounterPlayers: { [Player]: boolean } = {}
 local cachedArenaMinX = ARENA_MIN_X
@@ -77,6 +123,17 @@ local cachedArenaMaxX = ARENA_MAX_X
 local cachedArenaMinZ = ARENA_MIN_Z
 local cachedArenaMaxZ = ARENA_MAX_Z
 local restingAtHome = false
+
+--[[
+	Tư thế boss do SERVER quyết định. Từ v3 đây là NGUỒN SỰ THẬT duy nhất — không đọc
+	`model:GetPivot()` nữa, vì server không còn dời model (client mới là bên vẽ), nên GetPivot
+	sẽ mãi trả về vị trí lúc dựng.
+]]
+local bossCFrame = homePivot
+
+-- Vòng đệm lịch sử cho bù trễ: (giờ server, vị trí). Ở 30Hz × 0.6s là ~18 phần tử.
+type Snapshot = { t: number, p: Vector3 }
+local history: { Snapshot } = {}
 
 runAnimation.Name = "MonkeyBossRun"
 runAnimation.AnimationId = RUN_ANIMATION_ID
@@ -288,7 +345,15 @@ local function ensureBoss(): Model?
 		bossTemplate.Parent = nil
 	end
 
+	-- Đặt boss về nhà MỘT LẦN trên server rồi để yên vĩnh viễn: từ v3 client mới là bên vẽ
+	-- (xem khối lý do ở đầu file). Công bố ngay `BossCF` để client có cái để bám từ frame đầu.
 	model:PivotTo(homePivot)
+	bossCFrame = homePivot
+	table.clear(history)
+	model:SetAttribute("BossHome", homePivot)
+	model:SetAttribute("BossCF", homePivot)
+	model:SetAttribute("BossChaseSpeed", CHASE_SPEED)
+	model:SetAttribute("BossReady", true)
 	warmRunAnimation(model)
 	return model
 end
@@ -390,25 +455,48 @@ local function pickLeader(runners: { Runner }, bossPosition: Vector3): Runner?
 	return best
 end
 
-local function repairBossVisualIfNeeded(model: Model)
-	local now = os.clock()
-	if now - lastVisualRepairTime < VISUAL_REPAIR_INTERVAL then
-		return
-	end
-	lastVisualRepairTime = now
+--[[
+	Công bố tư thế boss cho client + ghi vào lịch sử bù trễ.
 
-	local pivot = model:GetPivot()
-	local boundingBox = model:GetBoundingBox()
-	if (boundingBox.Position - pivot.Position).Magnitude <= VISUAL_DRIFT_DISTANCE then
-		return
-	end
+	`BossCF` là attribute DUY NHẤT thay đổi lúc chạy. Nó thay cho việc `PivotTo` model mỗi
+	tick — xem khối lý do ở đầu file.
+]]
+local function publishPose(model: Model, cframe: CFrame, now: number)
+	bossCFrame = cframe
+	model:SetAttribute("BossCF", cframe)
 
-	local wasRunning = runTrack and runTrack.IsPlaying
-	configureBoss(model)
-	model:PivotTo(pivot)
-	if wasRunning then
-		playRunAnimation(model)
+	table.insert(history, { t = now, p = cframe.Position })
+	-- Cắt phần quá hạn từ đầu. Bảng chỉ ~18 phần tử nên `table.remove(1)` là rẻ.
+	while #history > 1 and now - history[1].t > HISTORY_SECONDS do
+		table.remove(history, 1)
 	end
+end
+
+--[[
+	Vị trí boss tại `at` (giờ server), nội suy tuyến tính giữa hai mẫu lịch sử gần nhất.
+	Ngoài tầm lịch sử thì kẹp về mẫu đầu/cuối — an toàn hơn ngoại suy, vì ngoại suy ở đây sẽ
+	tạo ra một con boss chưa từng tồn tại ở đâu cả.
+]]
+local function positionAt(at: number): Vector3
+	local n = #history
+	if n == 0 then
+		return bossCFrame.Position
+	end
+	if at >= history[n].t then
+		return history[n].p
+	end
+	if at <= history[1].t then
+		return history[1].p
+	end
+	for i = n - 1, 1, -1 do
+		local a, b = history[i], history[i + 1]
+		if at >= a.t then
+			local span = b.t - a.t
+			local alpha = if span > 1e-6 then (at - a.t) / span else 0
+			return a.p:Lerp(b.p, alpha)
+		end
+	end
+	return history[1].p
 end
 
 local function advanceToward(current: CFrame, targetPosition: Vector3, speed: number, deltaTime: number): CFrame
@@ -569,28 +657,30 @@ function Zone4BossService.Start()
 			return
 		end
 
-		local bossPivot = activeBoss:GetPivot()
+		local now = Workspace:GetServerTimeNow()
+		local bossPivot = bossCFrame
 		local runners = collectRunners()
 		local leader = pickLeader(runners, bossPivot.Position)
 
 		if leader then
 			restingAtHome = false
-			repairBossVisualIfNeeded(activeBoss)
 			activeBoss:SetAttribute("EncounterState", "Chasing")
 			playRunAnimation(activeBoss)
-			activeBoss:PivotTo(advanceToward(bossPivot, leader.position, CHASE_SPEED, step))
+			publishPose(activeBoss, advanceToward(bossPivot, leader.position, CHASE_SPEED, step), now)
 
 			--[[
 				Phép thử chạm chạy trên MỌI người trong sân, không riêng người đang bị dí. Boss
 				là một khối thịt đặc: ai lao vào nó cũng phải chết, kể cả người nó đang quay lưng
 				lại. Bản cũ chỉ thử đúng mục tiêu nên người thứ hai đi xuyên qua boss vô sự.
 
-				Đo lại vị trí boss SAU khi PivotTo — dùng `bossPivot` cũ là bỏ lỡ tới 2 studs mỗi
-				tick ở tốc độ 56, đủ để lướt qua người chơi mà không tính là chạm.
+				BÙ TRỄ (v3): mỗi người so với vị trí boss tại `now - delay` của CHÍNH HỌ — đúng
+				khung hình họ đã thấy khi `runner.position` được chụp. Boss đi 56 studs/s nên ở
+				195ms đó là 11 studs, gấp 3 lần bán kính chạm chết 3.75: không bù thì người ping
+				cao chết khi con khỉ trên màn hình còn cách cả thân người.
 			]]
-			local bossPositionAfterMove = activeBoss:GetPivot().Position
 			for _, runner in runners do
-				if getFlatDistance(runner.position, bossPositionAfterMove) <= TOUCH_KILL_DISTANCE then
+				local bossThen = positionAt(now - LagComp.Delay(runner.player) - VISUAL_SMOOTH_LAG)
+				if getFlatDistance(runner.position, bossThen) <= TOUCH_KILL_DISTANCE then
 					killCharacter(runner.player, runner.character)
 				end
 			end
@@ -603,14 +693,14 @@ function Zone4BossService.Start()
 			return
 		end
 
-		local current = activeBoss:GetPivot()
+		local current = bossCFrame
 		if (homePivot.Position - current.Position).Magnitude > 0.05 then
 			activeBoss:SetAttribute("EncounterState", "Returning")
 			playRunAnimation(activeBoss)
-			activeBoss:PivotTo(advanceToward(current, homePivot.Position, RETURN_SPEED, step))
+			publishPose(activeBoss, advanceToward(current, homePivot.Position, RETURN_SPEED, step), now)
 		else
 			activeBoss:SetAttribute("EncounterState", "Idle")
-			activeBoss:PivotTo(homePivot)
+			publishPose(activeBoss, homePivot, now)
 			stopRunAnimation()
 			restingAtHome = true
 		end

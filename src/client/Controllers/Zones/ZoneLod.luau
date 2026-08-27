@@ -159,9 +159,64 @@ local rootPos = Vector3.zero
 local nowFrame = -1
 local nowValue = 0
 
-RunService.RenderStepped:Connect(function()
+--[[
+	══ ĐỒNG HỒ TRƠN — vì sao KHÔNG đọc thẳng GetServerTimeNow() mỗi frame ═══════════════════
+
+	(2026-08-27, user: "bẫy ở mọi zone giật giật khi stage đông người — không phải lag game,
+	giống lag mạng". Ping đo được 390ms trên PC, ~350ms trên iPhone 13.)
+
+	Vị trí MỌI bẫy tất định là một hàm THUẦN của đồng hồ này. Nên bất kỳ nhiễu nào trong đồng
+	hồ đều biến thành nhiễu trong HÌNH ẢNH — không phải trôi lệch từ từ, mà giật.
+
+	Và `workspace:GetServerTimeNow()` phía client KHÔNG phải một đồng hồ trơn: nó là ƯỚC LƯỢNG
+	giờ server, được hiệu chỉnh liên tục theo các gói đồng bộ. Ở ping thấp các nhát hiệu chỉnh
+	nhỏ tới mức vô hình. Ở 350–400ms — và nhất là khi ping DAO ĐỘNG vì stage đông người, đúng
+	điều kiện user mô tả — mỗi nhát hiệu chỉnh vài chục ms đẩy TOÀN BỘ bẫy trong tầm nhìn nhảy
+	một cái. Một sóng Zone 9 đi 120 studs/s ăn một nhát hiệu chỉnh 40ms là nhảy 4.8 studs.
+	Đó chính là "giật như lag mạng" mà không hề tụt FPS.
+
+	Chữa: đồng hồ chạy bằng thời gian THẬT của máy (cộng dồn `dt` — đơn điệu tuyệt đối, không
+	bao giờ nhảy), rồi KÉO NHẸ về phía giờ server thay vì bám dính theo nó:
+
+	  • Sai lệch nhỏ  → sửa tối đa `MAX_SLEW` (4%) tốc độ thời gian. Bẫy chạy nhanh/chậm hơn
+	    4% trong vài giây — mắt không thấy được, mà sai lệch tan hết.
+	  • Sai lệch lớn (`SNAP_ERROR`) → nhảy thẳng. Đây là teleport/rejoin/mất kết nối rồi nối
+	    lại, không phải nhiễu; kéo từ từ ở đây sẽ để bẫy sai pha hàng chục giây.
+
+	Vì sao KHÔNG hỏng tính tất định: 4% × vài giây rồi hội tụ, nên trung bình dài hạn của đồng
+	hồ này BẰNG giờ server. Còn phán xử sát thương thì nằm ở SERVER và server đọc giờ thật của
+	chính nó, nên cái trơn này thuần tuý là chuyện hiển thị. Phần lệch server↔client do trễ
+	mạng được xử lý riêng ở `Shared/Util/LagComp` (bù trễ khi phán xử).
+]]
+local MAX_SLEW = 0.04
+local SNAP_ERROR = 0.75
+
+local localElapsed = 0
+local clockOffset = 0
+local clockReady = false
+
+RunService.RenderStepped:Connect(function(dt)
 	frameId += 1
 	farBudget = ZoneLod.MAX_FAR_STEPS_PER_FRAME
+
+	-- Nền thời gian ĐƠN ĐIỆU của máy. Cộng dồn `dt` chứ không dùng `os.clock()`: chỉ cần
+	-- một thứ không bao giờ đi lùi và không bao giờ nhảy.
+	localElapsed += dt
+
+	local server = Workspace:GetServerTimeNow()
+	if not clockReady then
+		clockReady = true
+		clockOffset = server - localElapsed
+		return
+	end
+
+	local err = server - (localElapsed + clockOffset)
+	if err > SNAP_ERROR or err < -SNAP_ERROR then
+		clockOffset = server - localElapsed
+	else
+		local limit = MAX_SLEW * dt
+		clockOffset += math.clamp(err, -limit, limit)
+	end
 end)
 
 --[[
@@ -190,12 +245,19 @@ function ZoneLod.RootPosition(): Vector3
 	return rootPos
 end
 
--- `workspace:GetServerTimeNow()` một lần mỗi frame thay vì một lần mỗi controller.
--- Đồng hồ tất định của mọi bẫy — xem khối lý do đầu file.
+--[[
+	Đồng hồ tất định của mọi bẫy, một lần mỗi frame thay vì một lần mỗi controller.
+
+	Đây là bản ĐÃ LÀM TRƠN của `workspace:GetServerTimeNow()` — xem khối "ĐỒNG HỒ TRƠN" ở
+	trên để biết vì sao đọc thẳng lại làm bẫy giật ở ping cao. Trung bình dài hạn bằng giờ
+	server, nên mọi công thức bẫy giữ nguyên không phải sửa gì.
+]]
 function ZoneLod.Now(): number
 	if nowFrame ~= frameId then
 		nowFrame = frameId
-		nowValue = Workspace:GetServerTimeNow()
+		-- Trước frame đầu tiên (controller gọi trong `Start` trước khi RenderStepped chạy)
+		-- thì chưa có nền — rơi về giờ server thô, đúng hành vi cũ.
+		nowValue = if clockReady then localElapsed + clockOffset else Workspace:GetServerTimeNow()
 	end
 	return nowValue
 end

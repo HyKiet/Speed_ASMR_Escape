@@ -28,6 +28,7 @@ local Workspace = game:GetService("Workspace")
 
 local Stages = require(ReplicatedStorage.Shared.Config.Stages)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
+local ZoneLod = require(script.Parent.ZoneLod)
 
 local Zone14FanController = {}
 
@@ -320,7 +321,9 @@ local function spinBlades()
 		return
 	end
 	local camPos = camera.CFrame.Position
-	local angle = (Workspace:GetServerTimeNow() * BLADE_RPS * math.pi * 2) % (math.pi * 2)
+	-- ZoneLod.Now() chúư không phải GetServerTimeNow(): đồng hồ trơn, xem khối "ĐỒNG HỒ TRƠN"
+	-- trong ZoneLod — cánh quạt là thứ quay nhanh nhất game nên nhạy nhất với nhiễu đồng bộ giờ.
+	local angle = (ZoneLod.Now() * BLADE_RPS * math.pi * 2) % (math.pi * 2)
 
 	for _, c in clusters do
 		local d = camPos - c.center

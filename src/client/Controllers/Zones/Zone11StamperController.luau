@@ -237,7 +237,9 @@ local function step()
 	-- controller KHÔNG ghi .Color nữa. Cảnh báo pha telegraph đã có laser chỉ giới ở trên.
 
 	-- Pha 2: khoảnh khắc chạm đáy → burst 1 lần / chu kỳ
-	local cycleIndex = math.floor(Workspace:GetServerTimeNow() / cycle)
+	-- CÙNG đồng hồ với `t` ở trên (ZoneLod.Now()). Dùng hai nguồn giờ khác nhau thì ngay ranh
+	-- giới chu kỳ chúng lệch nhau một nhịp — burst nổ sai chu kỳ hoặc nổ hai lần.
+	local cycleIndex = math.floor(ZoneLod.Now() / cycle)
 	if t >= holdAt and t < retractAt and lastCyclePhase ~= cycleIndex then
 		lastCyclePhase = cycleIndex
 		if sparkEmitter then

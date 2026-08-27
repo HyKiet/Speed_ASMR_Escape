@@ -15,15 +15,29 @@
 	    tiếng này người chơi có chưa tới một giây để thoát khỏi lòng tháp.
 	  • NỆN — khối chạm đáy. Đóng nhịp, cho biết chu kỳ mới bắt đầu.
 
-	── VÌ SAO Ở CLIENT, VÀ VÌ SAO ĐỌC VỊ TRÍ THAY VÌ NGHE EVENT ─────────────────────────
-	Khối do một Script trong map dời (Zones.Zone10.Mechanics.Zone10RisingKillBlockScript) —
-	một part Anchored được server đặt lại Position mỗi Heartbeat, nên vị trí của nó ĐÃ replicate
-	sẵn về mọi client. Suy pha từ chính vị trí đó thì không cần thêm một packet nào, và không
-	phải sửa script trong map (script đó không nằm trong git — xem tools/zone10_risingkill_inline.luau).
+	── v2 (2026-08-27): CONTROLLER NÀY GIỜ VẼ LUÔN CẢ KHỐI ─────────────────────────────
+	User: "bẫy ở mọi zone giật giật khi stage đông người — không phải lag game, giống lag
+	mạng". Ping đo được 390ms (PC) / ~350ms (iPhone 13).
 
-	⚠️ Bẫy này KHÔNG chạy theo đồng hồ tất định như Zone 3/8: script trong map cho khối NGỦ khi
-	không có ai trong bán kính 260 và reset về đáy. Vì thế không thể tính pha bằng công thức —
-	phải đo chuyển động thật của part.
+	Khối lava là bẫy CUỐI CÙNG trong game còn để server dời part thật, và là cái tệ nhất về
+	hình ảnh: nó rơi 350 studs/s. Part neo do script dời thì client KHÔNG nội suy — nó nhảy
+	thẳng tới giá trị mới mỗi khi gói replicate tới, nên cú rơi 0.64 giây chỉ hiện ra thành
+	vài chục nấc, và stage càng đông người thì gói càng thưa. Đó chính là "giật như lag mạng"
+	mà FPS không hề tụt.
+
+	`Zone10RisingKillBlockScript` v5 trong map giờ KHÔNG dời khối nữa: nó công bố các hằng số
+	nhịp một lần, rồi mỗi lần bẫy thức thì ghi ĐÚNG MỘT attribute `BlockWakeAt` (giờ server
+	lúc thức). Controller này dựng lại chiều cao khối bằng cùng một hàm thuần `yFor` — server
+	và client không thể lệch nhau, và tốn 0 byte cho cả chu kỳ.
+
+	⚠️ Bẫy này KHÔNG chạy tự do như Zone 3/8: nó vẫn NGỦ khi không có ai trong bán kính 260 và
+	reset về đáy (đó là thứ giữ cửa sổ leo của người vừa vào, tức gate 150 WS). Vì vậy pha
+	tính từ `BlockWakeAt` chứ không phải từ giờ server thô. `BlockWakeAt` = nil ⇒ khối ở đáy.
+
+	── VÌ SAO PHẦN TIẾNG VẪN ĐỌC VỊ TRÍ ─────────────────────────────────────────────────
+	Logic tiếng bên dưới suy pha từ `block.Position.Y` giữa hai frame. Giữ nguyên: giờ chính
+	controller này ghi cái Position đó, nên phép đo đúng hơn bản cũ chứ không kém — và nó tự
+	động đúng cả khi khối đang ngủ.
 
 	Volume viết cứng là đúng ý đồ: `AudioMixController` tự nhận nuôi mọi Sound trong Workspace
 	vào kênh `sfx` rồi nhân hệ số slider lên trên.
@@ -62,6 +76,57 @@ local killBlock: BasePart? = nil
 local rumble: Sound? = nil
 local impact: Sound? = nil
 
+--[[
+	── DÒNG DUNG NHAM CHẢY (v3, 2026-08-27) ────────────────────────────────────────────────
+	Trước đây là một Script SERVER (`KillBlock.TextureScroller`) cộng `OffsetStudsU/V` mỗi
+	Heartbeat. Mỗi lần cộng là một thay đổi thuộc tính phải REPLICATE cho mọi client — 60 lần
+	mỗi giây, VĨNH VIỄN, kể cả khi cả server đang ở lobby và không ai nhìn thấy khối.
+
+	Cùng họ bệnh với quạt Zone 12 và khối lava: hiệu ứng thuần TRANG TRÍ mà lại đi qua đường
+	mạng, nên nó vừa tốn băng thông vừa chảy giật theo nhịp gói. Ở ping 350–400ms nhìn ra là
+	dung nham "nhấp nháy" chứ không chảy.
+
+	Ở client thì nó chỉ là một phép cộng cục bộ, và tự động ngủ theo cùng cổng LOD với phần
+	tiếng bên dưới — không ai nhìn thấy thì không tốn gì.
+]]
+local TEXTURE_SPEED_U = 1.5
+local TEXTURE_SPEED_V = 3.0
+local textures: { Texture } = {}
+
+--[[
+	── NHỊP KHỐI (v2) ───────────────────────────────────────────────────────────────────────
+	CHÉP NGUYÊN hàm `yFor` của Zone10RisingKillBlockScript v5. Đây là hợp đồng: sửa một vế mà
+	không sửa vế kia là hình và phán xử lệch nhau, người chơi chết oan hoặc đi xuyên khối.
+	Các hằng số đọc từ attribute do server ghi, KHÔNG chép số — để đổi nhịp chỉ phải sửa một chỗ.
+]]
+local mechanicsFolder: Instance? = nil
+local yBottom, yTop, vRise, vFall, waitTop, waitBottom = -121, 102, 220, 350, 1.0, 1.75
+local blockCycle = 0
+local blockBaseX, blockBaseZ = 0, 0
+local blockReady = false
+
+local function recomputeCycle()
+	blockCycle = waitBottom + (yTop - yBottom) / vRise + waitTop + (yTop - yBottom) / vFall
+end
+recomputeCycle()
+
+local function yFor(elapsed: number): number
+	local t = elapsed % blockCycle
+	if t < waitBottom then
+		return yBottom
+	end
+	t -= waitBottom
+	local riseT = (yTop - yBottom) / vRise
+	if t < riseT then
+		return yBottom + vRise * t
+	end
+	t -= riseT
+	if t < waitTop then
+		return yTop
+	end
+	return yTop - vFall * (t - waitTop)
+end
+
 local awake = false
 -- Y của frame trước. nil = chưa có gì để so (vừa vào tầm hoặc part vừa được stream về): frame
 -- đầu tiên KHÔNG phát cue nào, nếu không người chơi vừa tới nơi đã ăn ngay một cú nện lạc nhịp.
@@ -97,6 +162,32 @@ local function resolve()
 
 	killBlock = block
 	lastY = nil
+
+	table.clear(textures)
+	for _, child in block:GetChildren() do
+		if child:IsA("Texture") then
+			table.insert(textures, child)
+		end
+	end
+
+	-- Hằng số nhịp do server công bố (xem Zone10RisingBlockService).
+	mechanicsFolder = mechanics
+	blockReady = mechanics ~= nil and mechanics:GetAttribute("BlockReady") == true
+	if mechanics and blockReady then
+		local function num(name: string, fallback: number): number
+			local v = mechanics:GetAttribute(name)
+			return if type(v) == "number" then v else fallback
+		end
+		yBottom = num("BlockYBottom", yBottom)
+		yTop = num("BlockYTop", yTop)
+		vRise = num("BlockVRise", vRise)
+		vFall = num("BlockVFall", vFall)
+		waitTop = num("BlockWaitTop", waitTop)
+		waitBottom = num("BlockWaitBottom", waitBottom)
+		blockBaseX = num("BlockBaseX", block.Position.X)
+		blockBaseZ = num("BlockBaseZ", block.Position.Z)
+		recomputeCycle()
+	end
 	--[[
 		Mỗi tiếng một Sound RIÊNG sống sẵn trên khối, không dựng lại mỗi nhịp và không bao giờ
 		gán lại `SoundId`: gán id ngay trước `Play()` làm tiếng ra trễ vài trăm ms (đã đo, xem
@@ -144,18 +235,46 @@ local function step(dt: number)
 		return
 	end
 	local pos = ZoneLod.RootPosition()
-	local dx = pos.X - block.Position.X
-	local dz = pos.Z - block.Position.Z
+	-- Khối chỉ đi theo Y nên X/Z là hằng số — dùng `blockBaseX/Z` chứ không đọc `block.Position`
+	-- (từ v2 chính controller này ghi Position, đọc lại là vòng luẩn quẩn không cần thiết).
+	local dx = pos.X - blockBaseX
+	local dz = pos.Z - blockBaseZ
 	if dx * dx + dz * dz > ZoneLod.RadiusSq(RENDER_RADIUS) then
 		if awake then
 			awake = false
 			lastY = nil
 			lastPhase = "idle"
 			silence()
+			-- Ngủ: hạ khối về đáy ĐÚNG MỘT LẦN. Bỏ qua bước này thì nhìn từ zone khác sẽ thấy
+			-- khối treo lơ lửng giữa tháp, tưởng bẫy hỏng (đúng lỗi đã phàn nàn ở các zone khác).
+			if blockReady then
+				block.Position = Vector3.new(blockBaseX, yBottom, blockBaseZ)
+			end
 		end
 		return
 	end
 	awake = true
+
+	--[[
+		VẼ KHỐI (v2). `BlockWakeAt` = giờ server lúc bẫy thức, do map script ghi đúng một lần
+		mỗi lần ngủ↔thức. nil ⇒ zone trống ⇒ khối nằm đáy.
+
+		`ZoneLod.Now()` chứ không phải `GetServerTimeNow()`: đồng hồ đã làm trơn, xem khối
+		"ĐỒNG HỒ TRƠN" trong ZoneLod. Ở ping 350–400ms đây mới là thứ giữ cho khối không giật.
+	]]
+	if blockReady then
+		local wakeAt = mechanicsFolder and mechanicsFolder:GetAttribute("BlockWakeAt")
+		local targetY = if type(wakeAt) == "number" then yFor(ZoneLod.Now() - wakeAt) else yBottom
+		block.Position = Vector3.new(blockBaseX, targetY, blockBaseZ)
+	end
+
+	-- Dung nham chảy (xem khối lý do ở đầu file). Nằm SAU cổng LOD nên khối ở ngoài tầm là
+	-- không tốn gì.
+	for i = 1, #textures do
+		local tex = textures[i]
+		tex.OffsetStudsU += TEXTURE_SPEED_U * dt
+		tex.OffsetStudsV += TEXTURE_SPEED_V * dt
+	end
 
 	local y = block.Position.Y
 	local prev = lastY
@@ -210,7 +329,10 @@ function Zone10RisingBlockController.Start()
 
 	task.spawn(function()
 		while true do
-			if not alive() then
+			-- `not blockReady` cũng phải resolve lại: lần đầu có thể chạy TRƯỚC khi map script
+			-- kịp ghi attribute, và nếu chỉ xét `alive()` thì controller sẽ mắc kẹt vĩnh viễn ở
+			-- trạng thái "thấy part nhưng không biết nhịp" — khối đứng im cả phiên.
+			if not alive() or not blockReady then
 				resolve()
 			end
 			task.wait(RESOLVE_INTERVAL)
