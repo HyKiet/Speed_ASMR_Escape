@@ -78,6 +78,20 @@ local function readNumber(data: { [string]: any }, key: string, fallback: number
 	return fallback
 end
 
+--[[
+	Ngưỡng `requiredWins` của Multiplier Pad TRƯỚC 2026-09-06, khi pad còn là ngưỡng số dư ví.
+	Chỉ dùng cho migration CORE_LOOP_VERSION 4 → 5: cấp miễn phí và vĩnh viễn mọi pad mà người
+	chơi ĐANG dùng được, để không ai mất pad lúc chuyển sang mô hình mua đứt.
+
+	⚠️ Đây là ảnh chụp lịch sử — KHÔNG đồng bộ với `Economy/MultiplierPads` nữa. Đừng "sửa cho
+	khớp": khớp lại là migration cấp sai mức và người chơi cũ mất pad.
+]]
+local LEGACY_PAD_THRESHOLDS: { number } = { 0, 1, 15, 100, 500, 2500, 15000, 50000 }
+
+-- Chốt an toàn cho vòng leo level của migration 4 → 5. Cao hơn hẳn trần thiết kế
+-- (World 2 kết thúc ở Level 220) nên không tài khoản thật nào chạm tới.
+local MIGRATION_LEVEL_CEILING = 1000
+
 local function normalizeData(data: { [string]: any })
 	readNumber(data, "Speed", 0)
 	readNumber(data, "TotalWins", 0)
@@ -150,9 +164,91 @@ local function normalizeData(data: { [string]: any })
 	if typeof(data.UnlockedAuras) ~= "table" then
 		data.UnlockedAuras = { none = true }
 	end
+	if typeof(data.UnlockedEmotes) ~= "table" then
+		data.UnlockedEmotes = {}
+	end
+	local questIndex = readNumber(data, "QuestIndex", 0)
+	data.QuestIndex = math.max(0, math.floor(questIndex))
+	local questProgress = readNumber(data, "QuestProgress", 0)
+	data.QuestProgress = math.max(0, questProgress)
+	data.DailyQuestSeed = math.max(0, math.floor(readNumber(data, "DailyQuestSeed", 0)))
+	if typeof(data.DailyQuestProgress) ~= "table" then
+		data.DailyQuestProgress = { 0, 0, 0 }
+	end
+	if typeof(data.DailyQuestClaimedAt) ~= "table" then
+		data.DailyQuestClaimedAt = { 0, 0, 0 }
+	end
+	for index = 1, 3 do
+		data.DailyQuestProgress[index] = math.max(0, tonumber(data.DailyQuestProgress[index]) or 0)
+		data.DailyQuestClaimedAt[index] = math.max(0, math.floor(tonumber(data.DailyQuestClaimedAt[index]) or 0))
+	end
+	data.DailyQuestRewardWins = math.max(0, readNumber(data, "DailyQuestRewardWins", 0))
+	data.DailyQuestRewardSpeed = math.max(0, readNumber(data, "DailyQuestRewardSpeed", 0))
 
-	-- (Migration này trước đây còn reset `CustomSpeedLimit`; từ 2026-08-27 việc đó đã thành
-	-- hành vi MẶC ĐỊNH của mọi lần nạp profile ở trên, nên ở đây chỉ còn ghi cờ phiên bản.)
+	--[[
+		Pad đã sở hữu. Chỉ TĂNG, không bao giờ giảm — xem `Economy/MultiplierPads`.
+	]]
+	data.HighestPadIndex = math.clamp(math.floor(readNumber(data, "HighestPadIndex", 1)), 1, #Constants.MULTIPLIER_PADS)
+	data.LifetimeStreak = math.max(0, math.floor(readNumber(data, "LifetimeStreak", 0)))
+
+	--[[
+		══ MIGRATION CORE_LOOP_VERSION 4 → 5 (2026-09-06, GDD 3.0) ═══════════════════════════
+
+		Hai việc, cả hai đều CHỈ ĐƯỢC NỚI — không tài khoản nào được tụt sau khi chạy.
+
+		1. PAD: cấp miễn phí và vĩnh viễn mọi pad mà `TotalWins` hiện tại đủ theo bảng NGƯỠNG CŨ.
+		   Trước bản này pad là ngưỡng số dư ví, nên người có 50.000 Wins ĐANG dùng được Pad 8.
+		   Không cấp bù là cướp pad của họ ngay lúc chuyển sang mô hình mua đứt.
+
+		2. ĐƯỜNG CONG XP: tính lại Level/XP từ tổng Speed đã tích luỹ trong chu kỳ trùng sinh
+		   hiện tại. `data.Speed` chính là tổng XP đã kiếm kể từ lần trùng sinh gần nhất —
+		   `ProgressionService.addSpeed` cộng cùng lượng vào cả hai, và trùng sinh reset cả hai
+		   về 0. Đường cong mới rẻ hơn đường cũ ở MỌI level trong tầm chơi được, nên phép tính
+		   lại này chỉ có thể đẩy Level LÊN.
+
+		⚠️ Phải kẹp lại `CustomSpeedLimit` SAU khi tính lại Level, nếu không người chơi vừa lên
+		level nhưng vẫn bị kẹp theo trần cũ.
+	]]
+	if coreLoopVersion < 5 then
+		local totalWins = readNumber(data, "TotalWins", 0)
+		local grantedPad = 1
+		for index, threshold in LEGACY_PAD_THRESHOLDS do
+			if totalWins >= threshold then
+				grantedPad = index
+			else
+				break
+			end
+		end
+		if grantedPad > data.HighestPadIndex then
+			data.HighestPadIndex = grantedPad
+		end
+
+		--[[
+			Leo cộng dồn MỘT LẦN thay vì gọi `GetCumulativeXP` trong vòng lặp — hàm đó tự leo
+			từ level 1 nên viết kiểu ngây thơ là O(n²) ngay trên đường nạp profile.
+
+			⚠️ `MIGRATION_LEVEL_CEILING` là chốt an toàn, không phải trần thiết kế. `Speed`
+			đọc từ profile có thể là `inf`/NaN (hỏng dữ liệu, hoặc bản cũ ghi lỗi); thiếu chốt
+			này thì `while` không bao giờ thoát và người chơi đó treo vĩnh viễn ở màn nạp.
+		]]
+		local accumulated = math.max(0, readNumber(data, "Speed", 0))
+		local newLevel = 1
+		local cumulative = 0
+		while newLevel < MIGRATION_LEVEL_CEILING do
+			local nextCumulative = cumulative + Constants.GetRequiredXP(newLevel)
+			if nextCumulative > accumulated then
+				break
+			end
+			cumulative = nextCumulative
+			newLevel += 1
+		end
+		if newLevel > data.Level then
+			data.Level = newLevel
+		end
+		data.XP = math.max(0, accumulated - Constants.GetCumulativeXP(data.Level))
+		data.CustomSpeedLimit = Constants.GetMaxWalkSpeed(data.Level)
+	end
+
 	if coreLoopVersion < Constants.CORE_LOOP_VERSION then
 		data.CoreLoopVersion = Constants.CORE_LOOP_VERSION
 	end

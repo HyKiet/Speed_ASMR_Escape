@@ -3,7 +3,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
@@ -23,6 +22,7 @@ local BottomHud = require(script.Parent.Hud.BottomHud)
 local BoostHud = require(script.Parent.Hud.BoostHud)
 local StarterPackCard = require(script.Parent.Hud.StarterPackCard)
 local FriendsHud = require(script.Parent.Hud.FriendsHud)
+local QuestTracker = require(script.Parent.Hud.QuestTracker)
 local RebirthModal = require(script.Parent.Modals.RebirthModal)
 local CosmeticModal = require(script.Parent.Modals.CosmeticModal)
 local TeleportModal = require(script.Parent.Modals.TeleportModal)
@@ -35,6 +35,8 @@ local RouletteModal = require(script.Parent.Modals.RouletteModal)
 local SettingsModal = require(script.Parent.Modals.SettingsModal)
 local StarterPackModal = require(script.Parent.Modals.StarterPackModal)
 local OfflineModal = require(script.Parent.Modals.OfflineModal)
+local QuestModal = require(script.Parent.Modals.QuestModal)
+local EmoteModal = require(script.Parent.Modals.EmoteModal)
 
 local Children = Fusion.Children
 local New = Fusion.New
@@ -79,6 +81,7 @@ local function buildGui()
 					BoostHud.Build(),
 					StarterPackCard.Build(),
 					FriendsHud.Build(),
+					QuestTracker.Build(),
 					RebirthModal.Build(),
 					ShopModal.Build(),
 					CosmeticModal.Build(),
@@ -90,6 +93,8 @@ local function buildGui()
 					SettingsModal.Build(),
 					StarterPackModal.Build(),
 					OfflineModal.Build(),
+					QuestModal.Build(),
+					EmoteModal.Build(),
 					BoostCelebration.Build(),
 					WinsFlight.Build(),
 					Toast.BuildCenterToast(),
@@ -119,6 +124,47 @@ function HUDController.Init()
 end
 
 function HUDController.Start()
+	local questStateListener = GamePackets.questState.listen(function(data)
+		State.questActive:set(data.active)
+		State.questIndex:set(data.index)
+		State.questTitle:set(data.title)
+		State.questProgress:set(data.progress)
+		State.questTarget:set(math.max(1, data.target))
+		State.questRewardText:set(data.rewardText)
+		State.questRewardSpeed:set(data.rewardSpeed)
+		State.questRewardSpins:set(data.rewardSpins)
+	end)
+	State.sweeper:Add(function()
+		GamePackets.questState.disconnect(questStateListener)
+	end)
+
+	local dailyQuestStateListener = GamePackets.dailyQuestState.listen(function(data)
+		State.dailyQuestActive:set(data.active)
+		State.dailyQuestRewardText:set(data.rewardText)
+		State.dailyQuestRewardSpeed:set(data.rewardSpeed)
+		State.dailyQuestRewardWins:set(data.rewardWins)
+		State.dailyQuest1Title:set(data.quest1Title)
+		State.dailyQuest1Progress:set(data.quest1Progress)
+		State.dailyQuest1Target:set(math.max(1, data.quest1Target))
+		State.dailyQuest1Claimed:set(data.quest1Claimed)
+		State.dailyQuest2Title:set(data.quest2Title)
+		State.dailyQuest2Progress:set(data.quest2Progress)
+		State.dailyQuest2Target:set(math.max(1, data.quest2Target))
+		State.dailyQuest2Claimed:set(data.quest2Claimed)
+		State.dailyQuest3Title:set(data.quest3Title)
+		State.dailyQuest3Progress:set(data.quest3Progress)
+		State.dailyQuest3Target:set(math.max(1, data.quest3Target))
+		State.dailyQuest3Claimed:set(data.quest3Claimed)
+		State.questClaimable:set(
+			(data.quest1Progress >= data.quest1Target and not data.quest1Claimed)
+				or (data.quest2Progress >= data.quest2Target and not data.quest2Claimed)
+				or (data.quest3Progress >= data.quest3Target and not data.quest3Claimed)
+		)
+	end)
+	State.sweeper:Add(function()
+		GamePackets.dailyQuestState.disconnect(dailyQuestStateListener)
+	end)
+
 	local snapshotListener = GamePackets.profileSnapshot.listen(function(data: State.Snapshot)
 		local previousSpeed = State.lastSpeed
 		local previousSnapshot = State.snapshot:get(false)
@@ -172,6 +218,15 @@ function HUDController.Start()
 		Toast.Show(
 			if data.amount > 0 then `+{Theme.FormatInteger(data.amount)} {data.message}` else data.message,
 			data.kind
+		)
+	end)
+
+	local nextStageListener = GamePackets.nextStageBanner.listen(function(data)
+		Toast.Show(
+			`NEXT: Stage {data.stage} • +{Theme.FormatInteger(data.rewardWins)} Wins • WS {math.floor(
+				data.requiredWalkSpeed
+			)} • need {math.ceil(data.missingWalkSpeed)} more`,
+			"stage"
 		)
 	end)
 
@@ -231,13 +286,6 @@ function HUDController.Start()
 		State.groupChestHasClaimed:set(data.hasClaimed)
 		Manager.OpenGroupChest()
 	end)
-
-	local function updatePlaytime()
-		State.sessionPlaytime:set(localPlayer:GetAttribute("SessionPlaytime") or 0)
-	end
-	updatePlaytime()
-	local playtimeListener = localPlayer:GetAttributeChangedSignal("SessionPlaytime"):Connect(updatePlaytime)
-	State.sweeper:Add(playtimeListener)
 
 	--[[
 		Chấm đỏ "vừa trúng aura Legendary 1%".
@@ -326,6 +374,7 @@ function HUDController.Start()
 	State.sweeper:Add(function()
 		GamePackets.profileSnapshot.disconnect(snapshotListener)
 		GamePackets.toast.disconnect(toastListener)
+		GamePackets.nextStageBanner.disconnect(nextStageListener)
 		GamePackets.dailyState.disconnect(dailyStateListener)
 		GamePackets.groupChestState.disconnect(groupChestStateListener)
 		GamePackets.reviveOffer.disconnect(reviveOfferListener)

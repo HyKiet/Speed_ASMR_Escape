@@ -164,6 +164,8 @@ Theme.TOAST_Z_INDEX = 220
 
 Theme.UI_ASSETS = {
 	Trophy = "rbxassetid://106462244220051",
+	Quest = "rbxassetid://74501522569396",
+	Emotes = "rbxassetid://105037129856663",
 	Lightning = "rbxassetid://94953097483502",
 	Rebirth = "rbxassetid://103236589125008",
 	-- Dùng ở CẢ thẻ Shop lẫn hàng Auto-Rebirth trong RebirthModal — cùng một món thì phải
@@ -2242,8 +2244,7 @@ Theme.RIGHT_COLUMN_MARGIN = Theme.EDGE_MARGIN
 	ra quyết định đó, và còn thêm nút SLIDE mobile (`Movement/MobileSlideButton`) vào đúng
 	vùng ấy nên không thể trì hoãn thêm.
 
-	Tầng 1 — HÀNG NGANG sát mép trên (`TOP_ROW`): StarterPack · Spin · Playtime.
-	          Ba món này đều là "ngó rồi bấm", không phải thứ điều chỉnh liên tục.
+	Tầng 1 — HÀNG NGANG sát mép trên (`TOP_ROW`): StarterPack · Spin.
 	Tầng 2 — CỘT DỌC bên dưới (`RIGHT_STACK`): x2/x4/x8 Speed · x2 Wins · Custom Speed.
 	          Ba ô ĐIỀU KHIỂN, nằm trong tầm ngón cái phải.
 
@@ -2263,14 +2264,15 @@ Theme.RIGHT_COLUMN_MARGIN = Theme.EDGE_MARGIN
 
 	Spin cũng có badge số vé nhô ra ngoài mép phải (tâm x = 102, bán kính 19 ⇒ tới 121).
 
-	Khe hở thật: StarterPack→Spin 32 · Spin→Playtime 24.
+	Khe hở thật: StarterPack→Spin 32.
 ]]
 Theme.TOP_ROW = {
 	starterPack = 0, -- rộng 132 (hào quang trải −54..186)
-	spin = 164, -- rộng 120 (badge vé tới 121)
-	playtime = 304, -- rộng 120 (kết thúc ở 424)
+	daily = 164,
+	emote = 276,
+	spin = 388, -- giữ Spin sát mép phải như trước
 }
-Theme.TOP_ROW_WIDTH = 424
+Theme.TOP_ROW_WIDTH = 508
 Theme.TOP_ROW_HEIGHT = 186
 
 --[[
@@ -2442,7 +2444,7 @@ end
 	`math.max` không phải phòng hờ: nó giữ cho hai cụm không chui lên dưới HÀNG NGANG.
 	  • Vế 1 — `Top + CLUSTER_TOP_MARGIN`: mốc gốc của menu trái (né joystick mobile).
 	  • Vế 2 — đáy hàng ngang + khe: chỉ tính phần hàng ngang THẬT SỰ chồng theo chiều ngang,
-	    tức Spin/Playtime (cao nhất 130), KHÔNG phải cả `TOP_ROW_HEIGHT` = 186. 186 là chiều
+	    tức Spin (cao 130), KHÔNG phải cả `TOP_ROW_HEIGHT` = 186. 186 là chiều
 	    cao của thẻ StarterPack, mà thẻ đó nằm ở mép TRÁI hàng (x 0..132) — đo được ở 1304×801:
 	    StarterPack x 997..1087 còn cột phải x 1139..1284, hai khối không hề chạm nhau. Lấy
 	    186 là đẩy cả hai cụm xuống thêm 56 design px vì một khối không liên quan.

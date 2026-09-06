@@ -59,8 +59,7 @@ thêm dòng nào ở giữa. Sửa gì thêm thì quay lại bước 2.
 
 - [ ] 🤖 `rojo build` thành công — place dựng được từ source
 - [ ] 🤖 `selene` không có error (warning được phép)
-- [ ] 🤖 `luau-lsp analyze` không vượt baseline trong `tests/luau-lsp-baseline.txt`
-- [ ] 🤖 `lune run tests/run.luau` — 52 test logic thuần đều đạt
+- [ ] 🤖 `luau-lsp analyze` không vượt baseline trong `.github/luau-lsp-baseline.txt`
 - [ ] 🤖 StyLua (không chặn) — xem có file nào mới lệch format không
 
 Chạy tay tại máy trước khi push:
@@ -68,7 +67,6 @@ Chạy tay tại máy trước khi push:
 ```bash
 rojo build default.project.json -o build-test.rbxlx
 selene --allow-warnings src
-lune run tests/run.luau
 ```
 
 ---
@@ -128,7 +126,19 @@ lune run tests/run.luau
 - [ ] 👤 Teleport tới từng zone → tới đúng nơi, không rơi khỏi map
 - [ ] 👤 Topbar: Ẩn UI / Cài đặt / Performance mode / Night mode đều đổi đúng
 
-### C7. Anti-cheat
+### C7. Playtime Sprint
+- [x] 🤖 Studio fresh-player: server/client bootstrap không có `[SERVER ERROR]` / `[CLIENT ERROR]`
+- [x] 🤖 Playtime card, `SessionPlaytime` và multiplier biến mất khỏi HUD/snapshot/gain
+- [x] 🤖 Bánh xe Emote mở bằng `G`; mua Inf Dab trừ đúng 10 Wins và ghi Sink
+- [x] 🤖 Inf Dab chạy ở priority Action, dừng khi nhân vật bắt đầu di chuyển
+- [x] 🤖 Skip tutorial mở Quest 1; tracker ẩn trong lúc Daily modal/finale còn hiện
+- [ ] 👤 Chạy đủ Quest 1–6 trên profile mới; mỗi thưởng chỉ phát một lần sau rejoin
+- [ ] 👤 Mua và chạy cả 5 emote trên PC + mobile; xác nhận cấm trong Obby
+- [ ] 👤 Rebirth thủ công/Auto-Rebirth qua đủ bảng 10 · 20 · 32 · 46 · 62 · 80 · 100
+- [ ] 👤 Điền Badge ID Quest 6, publish badge và xác nhận AwardBadgeAsync thành công
+- [ ] 👤 Sau publish QA, xác nhận `CoreLoopV2`, `QuestChain`, `Alive900s/1800s` có dữ liệu
+
+### C8. Anti-cheat
 - [ ] 👤 Chạy bình thường qua zone 12/13/14 (gió, lò xo, quạt) → **không** bị giật ngược oan
 - [ ] 👤 Wall run + slide ở tốc độ cao → không bị phạt oan
 

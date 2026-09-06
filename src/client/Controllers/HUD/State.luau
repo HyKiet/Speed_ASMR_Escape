@@ -25,6 +25,7 @@ export type Snapshot = {
 	xp: number,
 	requiredXP: number,
 	rebirths: number,
+	rebirthWinsCost: number,
 	maxWalkSpeed: number,
 	customSpeedLimit: number,
 	gainMultiplier: number,
@@ -36,7 +37,6 @@ export type Snapshot = {
 	auraMultiplier: number,
 	cosmeticMultiplier: number,
 	rebirthMultiplier: number,
-	playtimeMultiplier: number,
 	friendsMultiplier: number,
 	serverMultiplier: number,
 	liveOpsMultiplier: number,
@@ -84,6 +84,7 @@ local DEFAULT_SNAPSHOT: Snapshot = {
 	xp = 0,
 	requiredXP = Constants.GetRequiredXP(1),
 	rebirths = 0,
+	rebirthWinsCost = Constants.GetRebirthWinsCost(1),
 	maxWalkSpeed = Constants.GetMaxWalkSpeed(1),
 	customSpeedLimit = Constants.GetMaxWalkSpeed(1),
 	gainMultiplier = 1,
@@ -95,7 +96,6 @@ local DEFAULT_SNAPSHOT: Snapshot = {
 	auraMultiplier = 1,
 	cosmeticMultiplier = 1,
 	rebirthMultiplier = 1,
-	playtimeMultiplier = 1,
 	friendsMultiplier = 1,
 	serverMultiplier = 1,
 	liveOpsMultiplier = 1,
@@ -171,12 +171,46 @@ State.levelUpActive = Value(false)
 State.toastText = Value("")
 State.levelUpText = Value("")
 
+-- Quest Chain
+State.questActive = Value(false)
+State.questIndex = Value(0)
+State.questTitle = Value("")
+State.questProgress = Value(0)
+State.questTarget = Value(1)
+State.questRewardText = Value("")
+State.questClaimable = Value(false)
+State.questRewardSpeed = Value(0)
+State.questRewardSpins = Value(0)
+State.dailyQuestActive = Value(false)
+State.dailyQuestRewardText = Value("")
+State.dailyQuestRewardSpeed = Value(0)
+State.dailyQuestRewardWins = Value(0)
+State.dailyQuest1Title = Value("")
+State.dailyQuest1Progress = Value(0)
+State.dailyQuest1Target = Value(1)
+State.dailyQuest1Claimed = Value(false)
+State.dailyQuest2Title = Value("")
+State.dailyQuest2Progress = Value(0)
+State.dailyQuest2Target = Value(1)
+State.dailyQuest2Claimed = Value(false)
+State.dailyQuest3Title = Value("")
+State.dailyQuest3Progress = Value(0)
+State.dailyQuest3Target = Value(1)
+State.dailyQuest3Claimed = Value(false)
+
+--[[
+	Emote đã mở khoá, khoá theo `id`. Server đẩy xuống qua gói `emoteState`.
+
+	Ở đây chứ không phải trong `EmoteController` (chỗ cũ của nó): `Modals/EmoteModal` là thứ VẼ
+	bảng emote, và mọi modal khác đều đọc dữ liệu của mình từ `State` — để riêng một `Value` cấp
+	module trong controller thì modal phải require ngược lên controller, tạo đúng cái vòng
+	require mà cả HUD đang tránh.
+]]
+State.emoteUnlocked = Value({} :: { [string]: boolean })
+
 -- Custom speed input
 State.customSpeedDraft = Value(tostring(Constants.GetMaxWalkSpeed(1)))
 State.isEditingCustomSpeed = false
-
--- Playtime Boost
-State.sessionPlaytime = Value(0)
 
 --[[
 	══ BỘ 4 GIÁ TRỊ CỦA MỘT MODAL — KHAI BẰNG MỘT DÒNG ══════════════════════════════════════
@@ -226,6 +260,14 @@ State.anyModalOpen = Value(false)
 	nên khi hai thứ tranh chỗ, cái nhích phải nhường.
 ]]
 State.tutorialBannerVisible = Value(false)
+
+-- Quest và Emotes dùng chung vòng đời modal với Rebirth/Shop/Cosmetics.
+State.questModalVisible, State.questModalMounted, State.questModalAnimationGoal, State.questModalAnimation =
+	declareModal()
+State.questCloseHovered = Value(false)
+State.emoteModalVisible, State.emoteModalMounted, State.emoteModalAnimationGoal, State.emoteModalAnimation =
+	declareModal()
+State.emoteCloseHovered = Value(false)
 
 -- Rebirth modal
 State.rebirthModalVisible, State.rebirthModalMounted, State.rebirthModalAnimationGoal, State.rebirthModalAnimation =

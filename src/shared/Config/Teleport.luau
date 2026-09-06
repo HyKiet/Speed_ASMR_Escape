@@ -21,21 +21,21 @@
 	`Config/Stages.luau` (STAGE_WINS) — GDD.md §3.B. ⚠️ Đổi STAGE_WINS thì PHẢI soát lại
 	bảng này, hai cận trên/dưới đều bám thẳng vào nó.
 
-	    Đích      | cận dưới (STAGE_WINS[N-1]) | giá  | cận trên (STAGE_WINS[N])
-	    Stage 2   |             1              |    2 |        3
-	    Stage 3   |             3              |    6 |       10
-	    Stage 4   |            10              |   15 |       20
-	    Stage 5   |            20              |   35 |       50
-	    Stage 6   |            50              |   75 |      100
-	    Stage 7   |           100              |  125 |      150
-	    Stage 8   |           150              |  225 |      300
-	    Stage 9   |           300              |  400 |      500
-	    Stage 10  |           500              |  750 |    1,000
-	    Stage 11  |         1,000              | 1750 |    2,500
-	    Stage 12  |         2,500              | 6000 |   10,000
-	    Stage 13  |        10,000              |17500 |   25,000
-	    Stage 14  |        25,000              |37500 |   50,000
-	    Stage 15  |        50,000              |100000|  150,000
+	    Đích      | cận dưới (STAGE_WINS[N-1]) |    giá  | cận trên (STAGE_WINS[N])
+	    Stage 2   |               2            |       3 |         5
+	    Stage 3   |               5            |       8 |        12
+	    Stage 4   |              12            |      20 |        30
+	    Stage 5   |              30            |      50 |        75
+	    Stage 6   |              75            |     120 |       180
+	    Stage 7   |             180            |     300 |       420
+	    Stage 8   |             420            |     700 |     1.000
+	    Stage 9   |           1.000            |   1.700 |     2.400
+	    Stage 10  |           2.400            |   4.000 |     5.500
+	    Stage 11  |           5.500            |   9.000 |    13.000
+	    Stage 12  |          13.000            |  21.000 |    30.000
+	    Stage 13  |          30.000            |  48.000 |    70.000
+	    Stage 14  |          70.000            | 110.000 |   160.000
+	    Stage 15  |         160.000            | 260.000 |   400.000
 
 	MIỄN PHÍ: chỉ còn Lobby — điểm ĐIỀU HƯỚNG, không có pad thưởng nào để ăn khi đáp xuống.
 	(Stage 1 và Training đã gỡ hẳn khỏi danh sách, xem ghi chú ngay trên mục Stage 2.)
@@ -83,7 +83,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone1.Ground.Transition1To2",
 		accentColor = Color3.fromRGB(255, 201, 71),
 		sortOrder = 3,
-		priceWins = 2,
+		priceWins = 3,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -94,7 +94,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone2.Ground.Transition2To3",
 		accentColor = Color3.fromRGB(255, 112, 81),
 		sortOrder = 4,
-		priceWins = 6,
+		priceWins = 8,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -105,7 +105,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone3.Ground.Transition3To4",
 		accentColor = Color3.fromRGB(193, 111, 255),
 		sortOrder = 5,
-		priceWins = 15,
+		priceWins = 20,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -116,7 +116,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone4.Ground.Transition4To5",
 		accentColor = Color3.fromRGB(255, 93, 155),
 		sortOrder = 6,
-		priceWins = 35,
+		priceWins = 50,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -127,7 +127,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone5.Ground.Transition5To6",
 		accentColor = Color3.fromRGB(79, 218, 202),
 		sortOrder = 7,
-		priceWins = 75,
+		priceWins = 120,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -138,7 +138,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone6.Ground.Transition6To7",
 		accentColor = Color3.fromRGB(111, 153, 255),
 		sortOrder = 8,
-		priceWins = 125,
+		priceWins = 300,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -149,7 +149,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone7.Ground.Transition7To8",
 		accentColor = Color3.fromRGB(255, 82, 92),
 		sortOrder = 9,
-		priceWins = 225,
+		priceWins = 700,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -160,7 +160,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone9.Ground.Transition8To9",
 		accentColor = Color3.fromRGB(76, 221, 255),
 		sortOrder = 10,
-		priceWins = 400,
+		priceWins = 1700,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -171,7 +171,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone10.Ground.Transition9To10",
 		accentColor = Color3.fromRGB(90, 238, 96),
 		sortOrder = 11,
-		priceWins = 750,
+		priceWins = 4000,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -182,7 +182,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone11.Ground.Transition10To11",
 		accentColor = Color3.fromRGB(255, 199, 66),
 		sortOrder = 12,
-		priceWins = 1750,
+		priceWins = 9000,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -193,7 +193,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone12.Ground.Transition11To12",
 		accentColor = Color3.fromRGB(103, 169, 255),
 		sortOrder = 13,
-		priceWins = 6000,
+		priceWins = 21000,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -204,7 +204,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone13.Ground.Transition12To13",
 		accentColor = Color3.fromRGB(255, 112, 214),
 		sortOrder = 14,
-		priceWins = 17500,
+		priceWins = 48000,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -215,7 +215,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone14.Ground.Transition13To14",
 		accentColor = Color3.fromRGB(255, 92, 82),
 		sortOrder = 15,
-		priceWins = 37500,
+		priceWins = 110000,
 		priceRobux = 0,
 		productId = 0,
 	},
@@ -226,7 +226,7 @@ local Teleport: { TeleportDestinationConfig } = {
 		targetPath = "Workspace.Zones.Zone15.Ground.Transition14To15",
 		accentColor = Color3.fromRGB(255, 218, 67),
 		sortOrder = 16,
-		priceWins = 100000,
+		priceWins = 260000,
 		priceRobux = 0,
 		productId = 0,
 	},

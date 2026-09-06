@@ -1,7 +1,6 @@
 --!strict
 -- Cụm nút menu trái (Wins counter + Rebirth/Shop/Cosmetics/Teleport).
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
@@ -14,7 +13,6 @@ local Manager = require(script.Parent.Parent.Modals.Manager)
 local Children = Fusion.Children
 local Computed = Fusion.Computed
 local New = Fusion.New
-local OnEvent = Fusion.OnEvent
 local Value = Fusion.Value
 
 local SoundService = game:GetService("SoundService")
@@ -48,6 +46,7 @@ local GRID_TOP = 136
 	Không ai nhìn ra vì khung trong suốt. Nhưng nó là con số mà cột phải soi gương theo để
 	căn giữa, nên sai ở đây là cột phải lệch xuống 67 px và trông "không đối xứng".
 ]]
+-- Daily và Emotes đã chuyển lên hàng icon cạnh Spin, nên menu trái trở lại đúng 3 hàng.
 local GRID_ROWS = 3
 local GRID_H = CELL_H * GRID_ROWS + CELL_GAP * (GRID_ROWS - 1)
 local COLUMN_H = GRID_TOP + GRID_H
@@ -229,7 +228,6 @@ local function makeRebirthsDisplay()
 end
 
 function LeftMenu.Build()
-	local hoveredFriends = Value(false)
 	return New("Frame")({
 		BackgroundTransparency = 1,
 		ZIndex = 10,
@@ -271,17 +269,14 @@ function LeftMenu.Build()
 					-- Đăng ký điểm neo để tutorial chiếu spotlight vào ĐÚNG ô này (xem
 					-- `HUD/UIAnchors`): một dòng ngay cạnh chỗ dựng nút, không phải đi dò cây.
 					UIAnchors.Keep(
-						"dailyButton",
+						"questButton",
 						Theme.MakeMenuButton(
-							"Daily",
-							Theme.UI_ASSETS.Daily,
-							Color3.fromRGB(255, 120, 196),
-							Color3.fromRGB(204, 40, 140),
-							Manager.ToggleDaily,
-							-- Còn phần thưởng đăng nhập chưa nhận hôm nay.
-							Computed(function()
-								return State.dailyCanClaim:get()
-							end)
+							"Quest",
+							Theme.UI_ASSETS.Quest,
+							Color3.fromRGB(255, 203, 54),
+							Color3.fromRGB(225, 116, 28),
+							Manager.ToggleQuest,
+							State.questClaimable
 						)
 					),
 					Theme.MakeMenuButton(

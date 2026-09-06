@@ -29,9 +29,8 @@ local Keyboard = {}
 -- còn gán nốt riêng theo vị trí phím. Bàn phím cơ thật thì mọi phím là cùng một switch
 -- ⇒ cùng một tiếng. KHÔNG thêm biến thể nào vào đây nữa.
 local BODY_ID = 127105730240202 -- Keyboard Click 0.277s (user chọn 2026-08-05)
--- ⚠️ TICK/RELEASE lấy từ `Config.SoundIds`, KHÔNG khai số ở đây: hai ID này dùng chung với
--- `Effects/KeyCapperSFXController` (tiếng gõ phím của HUD). Khai hai nơi thì sửa một chỗ
--- quên chỗ kia là hai âm lệch nhau mà không có lỗi nào báo.
+-- ⚠️ TICK/RELEASE lấy từ `Config.SoundIds`, KHÔNG khai số ở đây. Khai hai nơi thì sửa một
+-- chỗ quên chỗ kia là hai âm lệch nhau mà không có lỗi nào báo.
 local TICK_ID = SoundIds.KEYBOARD_TICK
 local RELEASE_ID = SoundIds.KEYBOARD_RELEASE
 -- Thay BODY_ID bằng một trong các mẫu đã đo (2026-08-05, tất cả load OK) nếu muốn đổi chất.
@@ -148,7 +147,8 @@ local clickCredit = CLICK_BURST
 local lastCreditAt = os.clock()
 
 -- VIBE (2026-07-28) — Zone 15 chia 3 đoạn Fire / Water / Lightning bằng attribute `Vibe`
--- trên MODEL bàn (do `tools/zone15_vibes.luau` gán). Bàn không có attribute (các zone khác)
+-- trên MODEL bàn (gán sẵn trong place, không có script nào trong repo đặt nó). Bàn không có
+-- attribute (các zone khác)
 -- giữ nguyên hiệu ứng sao cầu vồng cũ, nên thay đổi này không đụng tới zone nào khác.
 local VIBE_FX = {
 	Fire = "fire",

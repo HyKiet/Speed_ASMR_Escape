@@ -8,28 +8,39 @@ export type StageGate = {
 
 local Stages = {}
 
--- Đồng bộ theo GDD.md §3.B (2026-07-10)
+--[[
+	Thưởng Wins mỗi stage — GDD 3.0 §4.2.
+
+	Tỉ lệ đều ~2,4× mỗi bậc. Bản cũ nhảy thất thường (×2 → ×3,3 → ×1,5 → ×4) nên không stage nào
+	đọc ra là "bước tiếp theo đáng giá".
+
+	⚠️ Đổi bảng này là PHẢI tính lại `Config/Teleport.priceWins`: giá teleport tới stage N bị kẹp
+	cứng trong khoảng STAGE_WINS[N-1] < giá < STAGE_WINS[N]. Phá cận dưới là sinh Wins vô hạn.
+]]
 Stages.STAGE_WINS = {
-	[1] = 1,
-	[2] = 3,
-	[3] = 10,
-	[4] = 20,
-	[5] = 50,
-	[6] = 100,
-	[7] = 150,
-	[8] = 300,
-	[9] = 500,
-	[10] = 1000,
-	[11] = 2500,
-	[12] = 10000,
-	[13] = 25000,
-	[14] = 50000,
-	[15] = 150000,
+	[1] = 2,
+	[2] = 5,
+	[3] = 12,
+	[4] = 30,
+	[5] = 75,
+	[6] = 180,
+	[7] = 420,
+	[8] = 1000,
+	[9] = 2400,
+	[10] = 5500,
+	[11] = 13000,
+	[12] = 30000,
+	[13] = 70000,
+	[14] = 160000,
+	[15] = 400000,
 } :: { [number]: number }
 
 Stages.MAX_CONFIGURED_STAGE = 15
 Stages.FINISH_REWARD_COOLDOWN = 10
-Stages.STAGE_15_FIRST_CLEAR_BONUS = 50000
+-- GỠ 2026-09-06 (GDD 3.0 §4.2): bonus lần đầu clear Stage 15 và thưởng chuỗi liên tiếp đều bỏ.
+-- Bảng Wins mới đã hào phóng hơn nhiều lần so với những gì chúng từng cộng thêm — clear Stage 15
+-- lần đầu nhận 400.000 thay vì 150.000 + 50.000 bonus. Giữ lại chỉ là hai đường trao thưởng nữa
+-- phải bảo trì.
 
 -- CHỈ LÀ GỢI Ý: dùng cho biển báo "Recommend: Lv X" và UI — KHÔNG chặn người chơi.
 -- (Cơ chế gate chặn theo Level/WalkSpeed đã gỡ bỏ hoàn toàn khỏi gameplay.)

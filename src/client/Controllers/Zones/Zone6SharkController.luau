@@ -12,7 +12,7 @@
 
 	v2 đưa cá về đúng kiến trúc chung của game (Zone 2/3/8/9/11/12/15): nhịp vốn đã là một hàm
 	THUẦN của thời gian, nên client dựng lại được y hệt từ đồng hồ tất định. Server chỉ clone
-	cá + công bố tham số rồi im (xem tools/zone6_shark_inline.luau). Kết quả:
+	cá + công bố tham số rồi im — xem Zone6SharkService. Kết quả:
 	  • 0 byte replicate, cú vọt mượt tuyệt đối bất kể ping.
 	  • Hình và phán xử giờ dùng CHUNG một phép tính, nên "khớp hình" là đúng theo định nghĩa
 	    chứ không còn là xấp xỉ.

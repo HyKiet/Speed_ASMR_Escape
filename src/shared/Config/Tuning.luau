@@ -3,7 +3,9 @@
 -- CORE_LOOP_VERSION bump khi đổi công thức quan trọng — DataService sẽ migrate.
 
 local Tuning = {
-	CORE_LOOP_VERSION = 2,
+	-- 4 → 5 (2026-09-06, GDD 3.0): đường cong XP hai băng + pad chuyển từ ngưỡng ví sang mua
+	-- vĩnh viễn. Cả hai đều cần migration trong `DataService.normalizeData`.
+	CORE_LOOP_VERSION = 5,
 	BASE_SPEED_GAIN = 1,
 	--[[
 		6 → 14 (2026-08-27). PHẢI KHỚP `StarterPlayer.CharacterWalkSpeed` trong map.

@@ -6,7 +6,7 @@
 	Giá NIÊM YẾT cao, bán giảm cực sâu: 999 R$ → 99 R$ (−90%). Con số 999 không phải bịa cho
 	đẹp — nó là tổng giá trị THẬT của những món bên trong nếu mua lẻ trong shop:
 
-	    +25.000 Wins   ≈ 450 R$  (nằm giữa gói 10K/299 và gói 100K/699)
+	    +50.000 Wins   ≈ 450 R$  (nằm giữa gói 40K/299 và gói 300K/699)
 	    x2 Speed       =    3 R$  (pass rẻ nhưng là buff VĨNH VIỄN)
 	    5 vé quay      ≈   79 R$  (gói 5 vé)
 	    x2 Wins 30 phút ≈  50 R$  (gói boost 10 phút = 99 R$ nhưng là toàn server)
@@ -73,7 +73,7 @@ local StarterPack = {
 	WINDOW_SECONDS = 48 * 3600,
 
 	-- ── Nội dung gói ──
-	WINS = 25_000,
+	WINS = 50_000,
 	--[[
 		Buff Speed VĨNH VIỄN. CỘNG vào bậc pass cao nhất đang sở hữu (đổi 2026-08-14):
 		  chưa pass → x2 · có x2 → x4 · có x4 → x6 · có x8 → x10.

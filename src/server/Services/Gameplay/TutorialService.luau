@@ -32,12 +32,13 @@
 
 	Vì vậy `TutorialService` KHÔNG được đụng vào kinh tế. Ràng buộc còn lại chỉ là một phép so:
 
-	    Stage 1 = 1 Win  ≥  giá mở Pad 2 = 1 Win   (bước 1 phải TỰ nuôi được bước 2)
+	    Stage 1 = 2 Wins  ≥  giá mua Pad 2 = 1 Win   (bước 1 phải TỰ nuôi được bước 2)
 
 	⚠️ Hai con số đó khoá chặt nhau. Đổi `MultiplierPads.pad_2.requiredWins` hay
 	`Stages.STAGE_WINS[1]` thì PHẢI kiểm lại phép so này — lệch xuống là bước 2 thành ngõ cụt
 	"Need N Wins" và người chơi mới kẹt ở đó không có đường ra.
-	(Mở pad là so NGƯỠNG `TotalWins`, không trừ tiền — nên vừa đủ là được, không cần dư.)
+	(Từ 2026-09-06 pad là MUA ĐỨT: chạm pad chưa sở hữu sẽ TRỪ `TotalWins` rồi ghi vĩnh viễn
+	vào `HighestPadIndex`. Vừa đủ vẫn qua được — phép so là `≥`, không cần dư.)
 
 	⚠️ 2026-08-17: Daily đã chuyển TỪ đầu phiên XUỐNG bước cuối, nên KHÔNG còn được tính +2 Wins
 	của Ngày 1 vào phép so trên — trước đây chính khoản đó gánh cho Pad 2 giá 3. Xem
@@ -61,7 +62,6 @@ local STEP_INDEX: { [string]: number } = {
 	Farm = 3,
 }
 local STEP_COUNT = 3
-
 
 local DataService: any
 local TelemetryService: any

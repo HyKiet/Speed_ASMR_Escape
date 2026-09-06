@@ -54,8 +54,9 @@ function SquishFloor.make(cfg)
 	-- không theo ô nào bị dẫm.
 	--   uniformSound = true  → luôn dùng SOUND_IDS[1], bỏ random mẫu + random pitch
 	--   speedMix = { volFast, pitchSlow, pitchFast } → càng nhanh càng to và càng trầm
-	-- Cả hai MẶC ĐỊNH TẮT: engine này còn chạy CrystalDrop / SqueakyDuck / Orbeez, các sàn
-	-- đó chưa được yêu cầu đổi nên phải giữ nguyên hành vi cũ.
+	-- Cả hai MẶC ĐỊNH TẮT: engine này còn chạy SqueakyDuck / Orbeez, các sàn đó chưa được
+	-- yêu cầu đổi nên phải giữ nguyên hành vi cũ. (Học thuyết âm 1-mẫu đã bị bác 2 lần cho
+	-- sàn ASMR nói chung — ngoại lệ duy nhất còn giữ là sàn phím.)
 	local UNIFORM = cfg.uniformSound == true
 	local SPEED_MIX = cfg.speedMix
 

@@ -61,8 +61,8 @@ local OfflineEarnings = {}
 ]]
 OfflineEarnings.RATE = 0.25
 
--- Trần tích luỹ. Thoát bao lâu cũng chỉ tính tối đa chừng này. (2h → 3h, 2026-08-27.)
-OfflineEarnings.MAX_SECONDS = 3 * 60 * 60
+-- Trần tích luỹ. Thoát bao lâu cũng chỉ tính tối đa chừng này. (2h → 3h 2026-08-27; → 4h 2026-09-06.)
+OfflineEarnings.MAX_SECONDS = 4 * 60 * 60
 
 --[[
 	Dưới ngưỡng này thì không phát gì cả.

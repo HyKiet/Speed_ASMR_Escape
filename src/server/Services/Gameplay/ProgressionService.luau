@@ -43,7 +43,6 @@ local STUDIO_SPEED_CAP = 1_000_000_000_000_000
 
 local sessions: { [Player]: Session } = {}
 local DataService
-local PlaytimeService
 local FriendService
 local GroupChestService
 local ServerBoostService
@@ -265,14 +264,13 @@ local function getMultiplierBreakdown(player: Player, data: PlayerData)
 	local premiumMult = additiveBucket(treadmillMult, speedPassMult, vipMult)
 	local cosmeticMult = additiveBucket(trailMult, auraMult)
 
-	local playtimeMult = if PlaytimeService then PlaytimeService.GetPlaytimeMultiplier(player) else 1
 	local friendsMult = if FriendService then FriendService.GetFriendsMultiplier(player) else 1
 	-- Server Boost (Dev Product, toàn server) × Personal Boost (Roulette) — x2 mỗi loại.
 	local serverMult = if ServerBoostService then ServerBoostService.GetSpeedMultiplier(player) else 1
 	-- Event thời vụ chỉnh từ Roblox Configs — đổi được mà không cần publish lại game.
 	-- Không có event thì luôn là 1, nên rổ liveOps giữ nguyên hành vi cũ.
 	local eventMult = if RemoteConfigService then RemoteConfigService.GetEventSpeedMultiplier() else 1
-	local liveOpsMult = playtimeMult * friendsMult * serverMult * eventMult
+	local liveOpsMult = friendsMult * serverMult * eventMult
 
 	local totalMult = premiumMult * cosmeticMult * rebirthMult * liveOpsMult
 
@@ -285,7 +283,6 @@ local function getMultiplierBreakdown(player: Player, data: PlayerData)
 		auraMultiplier = auraMult,
 		cosmeticMultiplier = cosmeticMult,
 		rebirthMultiplier = rebirthMult,
-		playtimeMultiplier = playtimeMult,
 		friendsMultiplier = friendsMult,
 		serverMultiplier = serverMult,
 		liveOpsMultiplier = liveOpsMult,
@@ -348,6 +345,7 @@ local function buildSnapshot(player: Player, data: PlayerData)
 		xp = data.XP,
 		requiredXP = requiredXP,
 		rebirths = math.clamp(math.floor(data.Rebirths), 0, 65535),
+		rebirthWinsCost = math.max(0, math.floor(Constants.GetRebirthWinsCost(data.Rebirths + 1))),
 		maxWalkSpeed = maxSpeed,
 		customSpeedLimit = data.CustomSpeedLimit,
 		gainMultiplier = multipliers.totalMultiplier,
@@ -359,13 +357,15 @@ local function buildSnapshot(player: Player, data: PlayerData)
 		auraMultiplier = multipliers.auraMultiplier,
 		cosmeticMultiplier = multipliers.cosmeticMultiplier,
 		rebirthMultiplier = multipliers.rebirthMultiplier,
-		playtimeMultiplier = multipliers.playtimeMultiplier,
 		friendsMultiplier = multipliers.friendsMultiplier,
 		serverMultiplier = multipliers.serverMultiplier,
 		liveOpsMultiplier = multipliers.liveOpsMultiplier,
 		friendsInServer = if FriendService then FriendService.GetFriendsInServer(player) else 0,
 		isOnTreadmill = session.isOnTreadmill,
-		canRebirth = data.Level >= requiredRebirthLevel,
+		-- Phải tính CẢ phí Wins: nếu chỉ so Level thì nút Rebirth sáng lên mà server từ chối,
+		-- người chơi bấm mãi không hiểu vì sao (GDD 3.0 §3.4).
+		canRebirth = data.Level >= requiredRebirthLevel
+			and (data.TotalWins or 0) >= Constants.GetRebirthWinsCost(data.Rebirths + 1),
 		requiredRebirthLevel = math.clamp(requiredRebirthLevel, 0, 65535),
 		ownsAutoRebirth = ProgressionService.OwnsAutoRebirth(player),
 		autoRebirthEnabled = data.AutoRebirthEnabled ~= false,
@@ -404,7 +404,6 @@ local function sendSnapshot(player: Player)
 			auraMultiplier = 1,
 			cosmeticMultiplier = 1,
 			rebirthMultiplier = 1,
-			playtimeMultiplier = 1,
 			friendsMultiplier = 1,
 			serverMultiplier = 1,
 			liveOpsMultiplier = 1,
@@ -445,6 +444,7 @@ local function addSpeed(player: Player, data: PlayerData, amount: number)
 	end
 
 	local previousMaxSpeed = getMaxWalkSpeed(data)
+	local previousLevel = data.Level
 	local wasAtMax = data.CustomSpeedLimit >= previousMaxSpeed
 
 	data.Speed += applied
@@ -458,6 +458,12 @@ local function addSpeed(player: Player, data: PlayerData, amount: number)
 	while data.XP >= Constants.GetRequiredXP(data.Level) do
 		data.XP -= Constants.GetRequiredXP(data.Level)
 		data.Level += 1
+	end
+	if data.Level > previousLevel then
+		local questService = ServiceLocator.Find("QuestService")
+		if questService then
+			questService.Record(player, "level_gain", data.Level - previousLevel)
+		end
 	end
 
 	if wasAtMax then
@@ -635,6 +641,7 @@ function ProgressionService.AwardWins(player: Player, amount: number, reason: st
 		TelemetryService.Economy(player, "Source", finalWins, data.TotalWins, reason or "wins")
 		if reason == "stage" or reason == "stage_x2" then
 			TelemetryService.Onboarding(player, "FirstStage")
+			TelemetryService.CoreLoop(player, "StageClear")
 		end
 	end
 	-- Bước 3 tutorial: đã chạy hết một stage VÀ dậm pad vàng để chốt Wins — trọn vẹn vòng
@@ -688,6 +695,40 @@ function ProgressionService.RefreshGamepassCache(player: Player)
 	sendSnapshot(player)
 end
 
+--[[
+	PHÍ WINS KHI TRÙNG SINH (GDD 3.0 §3.4) — sink Wins duy nhất tăng vô hạn của game.
+
+	5 lần đầu miễn phí; từ lần thứ 6 phí là 50.000 × 2,6^(R−6). Trừ TRƯỚC, cấp SAU (luật kinh
+	tế của repo), và phát event Economy để analytics thấy được sink lớn nhất trong game.
+
+	⚠️ Skip Rebirth (Dev Product 149 R$) KHÔNG đi qua hàm này — người chơi đã trả Robux thì bỏ
+	qua cả điều kiện Level lẫn phí Wins (user chốt 2026-09-06). Xem `ForceRebirth`.
+]]
+local function getRebirthWinsCost(data: PlayerData): number
+	return Constants.GetRebirthWinsCost(data.Rebirths + 1)
+end
+
+-- Trả về (đủ điều kiện, còn thiếu bao nhiêu Wins).
+local function canAffordRebirth(data: PlayerData): (boolean, number)
+	local cost = getRebirthWinsCost(data)
+	local wins = data.TotalWins or 0
+	if wins < cost then
+		return false, cost - wins
+	end
+	return true, 0
+end
+
+local function chargeRebirth(player: Player, data: PlayerData)
+	local cost = getRebirthWinsCost(data)
+	if cost <= 0 then
+		return
+	end
+	data.TotalWins -= cost
+	if TelemetryService then
+		TelemetryService.Economy(player, "Sink", cost, data.TotalWins, "rebirth")
+	end
+end
+
 -- Thân của MỌI lần trùng sinh (thủ công / Skip Rebirth / Auto-Rebirth). Trước đây đoạn
 -- reset này bị chép ra 2 chỗ; gộp lại để không bao giờ lệch nhau khi đổi luật reset.
 local function applyRebirth(player: Player, data: PlayerData)
@@ -695,6 +736,10 @@ local function applyRebirth(player: Player, data: PlayerData)
 	data.Level = 1
 	data.XP = 0
 	data.Rebirths += 1
+	local questService = ServiceLocator.Find("QuestService")
+	if questService then
+		questService.Record(player, "rebirth_event", 1)
+	end
 	data.CustomSpeedLimit = Constants.GetMaxWalkSpeed(1)
 	applyWalkSpeed(player, data)
 	DataService.UpdateLeaderstats(player)
@@ -707,7 +752,13 @@ local function applyRebirth(player: Player, data: PlayerData)
 	end
 end
 
--- Trùng sinh KHÔNG kiểm tra level (Skip Rebirth product). Trả về false nếu data chưa load.
+--[[
+	Skip Rebirth (Dev Product 149 R$): bỏ qua CẢ điều kiện Level LẪN phí Wins.
+
+	Người chơi đã bỏ Robux ra rồi thì không thu thêm tiền trong game nữa (user chốt 2026-09-06).
+	Hệ quả đã biết và chấp nhận: từ R12 trở đi phí Wins tăng rất nhanh nên món 149 R$ này sẽ
+	thành lựa chọn hấp dẫn nhất cuối game — đó là doanh thu, không phải lỗ hổng.
+]]
 function ProgressionService.ForceRebirth(player: Player): boolean
 	local data = DataService.GetData(player)
 	if not data then
@@ -749,9 +800,19 @@ autoRebirthIfEligible = function(player: Player, data)
 		return
 	end
 
+	--[[
+		⚠️ Điều kiện dừng có HAI vế từ 2026-09-06: đủ Level VÀ đủ Wins trả phí. Thiếu vế thứ hai
+		thì vòng này quay tít mỗi tick với người đã thừa Level nhưng chưa đủ Wins — `applyRebirth`
+		vẫn chạy, phí không trừ được, và họ trùng sinh miễn phí vô hạn.
+	]]
 	local chain = 0
-	while data.Level >= Constants.GetRequiredLevelForRebirth(data.Rebirths) and chain < AUTO_REBIRTH_MAX_CHAIN do
+	while
+		data.Level >= Constants.GetRequiredLevelForRebirth(data.Rebirths)
+		and select(1, canAffordRebirth(data))
+		and chain < AUTO_REBIRTH_MAX_CHAIN
+	do
 		chain += 1
+		chargeRebirth(player, data)
 		applyRebirth(player, data)
 	end
 end
@@ -791,7 +852,6 @@ end
 
 function ProgressionService.Init()
 	DataService = ServiceLocator.Get("DataService")
-	PlaytimeService = ServiceLocator.Get("PlaytimeService")
 	FriendService = ServiceLocator.Get("FriendService")
 	GroupChestService = ServiceLocator.Find("GroupChestService")
 	ServerBoostService = ServiceLocator.Find("ServerBoostService")
@@ -1046,6 +1106,16 @@ function ProgressionService.Start()
 		if data.Level < required then
 			return
 		end
+		local affordable, missing = canAffordRebirth(data)
+		if not affordable then
+			GamePackets.toast.sendTo({
+				kind = "rebirth",
+				message = `Need {Constants.FormatNumber(missing)} more Wins to rebirth`,
+				amount = 0,
+			}, player)
+			return
+		end
+		chargeRebirth(player, data)
 		applyRebirth(player, data)
 	end)
 
@@ -1128,12 +1198,30 @@ function ProgressionService.Start()
 			end
 			data.TotalWins -= config.priceWins
 			unlocked[request.itemId] = true
+			-- Sửa 2026-08-28: trước đó KHÔNG chỗ nào ghi Sink, nên Creator Hub → Economy hiện
+			-- `Total Sinks: --` sau 640k Wins đúc ra. Không có số này thì không biết được tiền
+			-- trong game có đường thoát hay không — tức không cân được vòng quay.
+			if TelemetryService then
+				TelemetryService.Economy(
+					player,
+					"Sink",
+					config.priceWins,
+					data.TotalWins,
+					if request.category == "trail" then "trail" else "aura"
+				)
+			end
 		end
 
 		if request.category == "trail" then
 			data.EquippedTrail = if data.EquippedTrail == request.itemId then "none" else request.itemId
 		else
 			data.EquippedAura = if data.EquippedAura == request.itemId then "none" else request.itemId
+		end
+		if not wasUnlocked then
+			local questService = ServiceLocator.Find("QuestService")
+			if questService then
+				questService.Record(player, "cosmetic_purchase", 1)
+			end
 		end
 		syncCosmeticAttributes(player, data)
 

@@ -27,6 +27,7 @@ local DataService: any = nil
 local ProgressionService: any = nil
 local AntiCheatService: any = nil
 local GamepassService: any = nil
+local TelemetryService: any = nil
 
 -- Gamepass "Infinite Revives" (249 R$): hồi sinh tại chỗ không giới hạn số lần khi ngã Obby.
 -- Chỉ hỏi lúc CHẾT (hiếm) nên gọi thẳng OwnsPass, không cần cache như đường tick/snapshot.
@@ -253,9 +254,7 @@ local function onStageStartTouched(stage: number, startPart: BasePart, hit: Base
 	end
 end
 
--- Trả về (thành công, SỐ WINS thực nhận). Số này dùng cho màn ăn mừng ở client — trước đây
--- chỗ gọi tự đọc `Constants.STAGE_WINS[stage]` nên ở stage 15 báo thiếu phần thưởng
--- STAGE_15_FIRST_CLEAR_BONUS mà chính hàm này vừa cộng thêm.
+-- Trả về (thành công, SỐ WINS thực nhận) — số SAU hệ số, dùng cho màn ăn mừng ở client.
 local function completeStage(player: Player, stage: number): (boolean, number)
 	local data = DataService.GetData(player)
 	if not data then
@@ -271,12 +270,14 @@ local function completeStage(player: Player, stage: number): (boolean, number)
 	player:SetAttribute("HighestCompletedStage", dataTable.HighestCompletedStage)
 	player:SetAttribute("CompletedStage", dataTable.HighestCompletedStage)
 	setActiveStage(player, math.min(stage + 1, Constants.MAX_CONFIGURED_STAGE))
-
-	-- Award wins
-	local rewardWins = Constants.STAGE_WINS[stage] or 0
-	if stage == 15 then
-		rewardWins += Constants.STAGE_15_FIRST_CLEAR_BONUS
+	local questService = ServiceLocator.Find("QuestService")
+	if questService then
+		questService.Record(player, "stage_clear", 1)
 	end
+
+	-- Award wins. Không còn bonus lần đầu Stage 15 (gỡ 2026-09-06, GDD 3.0 §4.2): bảng
+	-- STAGE_WINS mới trả 400.000 cho Stage 15, nhiều hơn hẳn 150.000 + 50.000 bonus của bản cũ.
+	local rewardWins = Constants.STAGE_WINS[stage] or 0
 	-- Con số trả về là số SAU hệ số (x2 Wins Boost, buff group, event) — đó mới là số được
 	-- phép hiện lên thẻ ăn mừng. Xem ghi chú ở `ProgressionService.AwardWins`.
 	if rewardWins > 0 then
@@ -286,6 +287,21 @@ local function completeStage(player: Player, stage: number): (boolean, number)
 		ProgressionService.SendSnapshot(player)
 	end
 	DataService.UpdateLeaderstats(player)
+	if stage == 1 and TelemetryService then
+		TelemetryService.CoreLoopV2(player, "Stage1Clear")
+	end
+	if stage == 1 then
+		local nextGate = Constants.GetStageGate(2)
+		if nextGate then
+			local currentWalkSpeed = Constants.GetMaxWalkSpeed(dataTable.Level or 1)
+			GamePackets.nextStageBanner.sendTo({
+				stage = 2,
+				rewardWins = Constants.STAGE_WINS[2] or 0,
+				requiredWalkSpeed = nextGate.minWS,
+				missingWalkSpeed = math.max(0, nextGate.minWS - currentWalkSpeed),
+			}, player)
+		end
+	end
 
 	if stage == 5 and zone5Event then
 		local finishPart = PathResolver.Resolve(getStagePath(stage, "Finish"))
@@ -332,6 +348,14 @@ end
 
 local function onHumanoidDied(player: Player)
 	local activeStage = player:GetAttribute("ActiveStage") or 0
+
+	-- Ghi TRƯỚC các early-return dưới đây: chết ngoài stage (rơi ở lobby, ngã ở đoạn
+	-- dẫn) cũng là trải nghiệm xấu của người mới — bỏ qua chúng là giấu đi đúng cái
+	-- đang giết phiên chơi đầu tiên.
+	if TelemetryService then
+		TelemetryService.Death(player, if typeof(activeStage) == "number" then activeStage else 0)
+	end
+
 	if typeof(activeStage) ~= "number" or activeStage <= 1 then
 		return
 	end
@@ -574,6 +598,10 @@ function StageCheckpointService.ProcessReceipt(receiptInfo: { [string]: any }): 
 			player:SetAttribute("HighestCompletedStage", dataTable.HighestCompletedStage)
 			player:SetAttribute("CompletedStage", dataTable.HighestCompletedStage)
 		end
+		local questService = ServiceLocator.Find("QuestService")
+		if questService then
+			questService.Record(player, "stage_clear", 1)
+		end
 
 		-- Cùng lý do như `completeStage`: thẻ ăn mừng phải đọc số SAU hệ số, không phải số gốc.
 		local _, finalWins = ProgressionService.AwardWins(player, doubleWins, "stage_x2")
@@ -622,6 +650,7 @@ function StageCheckpointService.Init()
 	ProgressionService = ServiceLocator.Get("ProgressionService")
 	AntiCheatService = ServiceLocator.Find("AntiCheatService")
 	GamepassService = ServiceLocator.Find("GamepassService")
+	TelemetryService = ServiceLocator.Find("TelemetryService")
 
 	local existingEvent = ReplicatedStorage:FindFirstChild("Zone5Event")
 	if existingEvent and existingEvent:IsA("RemoteEvent") then

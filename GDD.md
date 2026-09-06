@@ -1,588 +1,624 @@
-# GAME DESIGN DOCUMENT: +1 SPEED ESCAPE
+# +1 SPEED ESCAPE — GAME DESIGN DOCUMENT
 
-> **Tên trò chơi:** +1 Speed Escape  
-> **Thể loại:** Speed Simulator × Obby Hybrid  
-> **Phiên bản GDD:** 2.1 (Đồng bộ chuẩn cơ chế WinCollectionPad & Roblox Studio)  
-> **Max Level World 1:** 120 | **Max Level World 2:** 220  
-> **Định vị sản phẩm:** Trải nghiệm tốc độ bùng nổ, kết hợp giữa cảm giác flex chỉ số ảo (hàng tỷ Speed) và kỹ năng vượt rào cản Obby thực tế. Khóa chặt vòng lặp cày cuốc, giữ chân người chơi lâu dài thông qua cơ chế Lựa chọn Chiến lược (Risk vs. Reward) tại mỗi Điểm dừng chân (Rest Stop Platform).
+| | |
+| :--- | :--- |
+| **Thể loại** | Speed Simulator × Obby |
+| **Nền tảng** | Roblox · canvas 1920×1080 · PC + Mobile |
+| **Phiên bản GDD** | 3.0 — 2026-09-06 |
+| **Quy mô World 1** | 15 stage · 8 multiplier pad · 5 treadmill · trùng sinh vô hạn |
 
----
-
-## 1. TỔNG QUAN & TRIẾT LÝ THIẾT KẾ
-
-### 3 Trụ Cột Cốt Lõi:
-1. **Cảm Giác Tốc Độ Bùng Nổ (Virtual Ego Index):**
-   - Chỉ số **Speed** hiển thị trên UI/Leaderstats có thể nhân lên hàng tỷ/hàng triệu. Đây là thước đo thành tựu và vị thế (Ego) của người chơi. Whale có thể flex chỉ số bằng hệ số nhân khủng từ Treadmill và Gamepass.
-2. **Khống Chế Tốc Độ Thực Tế (WalkSpeed Cap):**
-   - Tốc độ di chuyển thực tế của nhân vật trong Obby (**WalkSpeed**) bị giới hạn cứng theo Level theo công thức:  
-     $$\text{WalkSpeed} = \min\left(250, 12 + (L-1) \times 2\right)$$
-   - Điều này đảm bảo tính thử thách của các chướng ngại vật (Obby), cấm tuyệt đối việc dùng tiền mua đứt game trong vài phút mà vẫn đòi hỏi kỹ năng di chuyển.
-3. **Mô Hình Lựa Chọn Tại Điểm Dừng Chân (Rest Stop Mechanics):**
-   - Vạch đích không tự động trao Wins. Khi vượt qua mỗi Stage, người chơi đứng trước lựa chọn chiến lược: **Chạy tiếp** sang Stage sau để săn lượng Wins lớn hơn hẳn, HOẶC dậm lên **WinCollectionPad** để chốt hạ nhận Wins và quay về Lobby nâng cấp.
+**Tóm tắt:** người chơi cày chỉ số Speed để lên Level, Level mở WalkSpeed thật, dùng WalkSpeed
+vượt 15 màn obby để kiếm Wins, tiêu Wins mua sức mạnh và trang bị, rồi trùng sinh để bắt đầu lại
+với hệ số cày cao hơn.
 
 ---
 
-## 2. VÒNG LẶP CỐT LÕI (CORE LOOP)
+## 1. VÒNG LẶP CỐT LÕI
 
 ```
- [1. FARM] ──► [2. RUN STAGE] ──► [3. REST STOP DECISION]
-   │                 │                        │
-   ├─ Treadmill      └─ Vượt Obby             ├──► A. NHẬN WINS (WinCollectionPad) ──► Teleport về Lobby ──► [4. UPGRADE]
-   └─ Multi Pad                               ├──► B. NHẬN X2 WINS (DoubleWinPad)  ──► Trả Robux ──► Lobby ──► [4. UPGRADE]
-                                              └──► C. CHẠY TIẾP (Cổng Stage Kế)   ──► Sang Stage N+1 (Wins nhiều hơn!)
-                                                                                      │
-                                                                                      └──► [5. REBIRTH] (Khi đủ Level)
+  [1] CÀY SPEED ─────► [2] LÊN LEVEL ─────► [3] MỞ WALKSPEED ─────► [4] CHẠY OBBY
+   treadmill / pad        Speed = XP           +2 studs/s mỗi Lv        15 stage
+        ▲                                                                   │
+        │                                                                   ▼
+        │                                                    [5] BỆ DỪNG CHÂN — chọn 1 trong 4
+        │                                                    ├─ chốt Wins → Lobby
+        │                                                    ├─ x2 Wins (49 R$) → Lobby
+        │                                                    ├─ Skip Stage (39 R$)
+        │                                                    └─ chạy tiếp stage N+1
+        │                                                                   │
+        └──────── [7] TRÙNG SINH ◄──────── [6] TIÊU WINS ◄─────────────────┘
 ```
 
-1. **FARM (Cày chỉ số):** Đứng trên **Multiplier Pad** hoặc **Treadmill** tại Lobby/Checkpoint để tích lũy Speed và XP.
-2. **RUN STAGE (Thách thức Obby):** Dùng WalkSpeed thực tế di chuyển qua các chướng ngại vật của Stage.
-3. **REST STOP DECISION (Điểm dừng chân & Lựa chọn):**
-   - **Chạy tiếp:** Bước thẳng qua cổng Stage kế tiếp ($N+1$) để chinh phục mức thưởng Wins cao hơn gấp nhiều lần.
-   - **Nhận Wins Thường (`WinCollectionPad`):** Dậm lên pad vàng để thu hoạch Wins của Stage hiện tại ➔ Hệ thống tự động dịch chuyển về Lobby.
-   - **Nhận X2 Wins (`DoubleWinCollectionPad`):** Trả 49 R$ để nhân đôi Wins ➔ Tự động dịch chuyển về Lobby.
-4. **UPGRADE (Nâng cấp tài sản tại Lobby):** Dùng Wins thu hoạch được để mua Trail/Aura mới hoặc mở khóa Multiplier Pad cao hơn.
-5. **REBIRTH (Trùng sinh):** Khi đạt Level tối thiểu, thực hiện Trùng sinh để reset Speed & Level về 0 nhưng nhận lại hệ số nhân vĩnh viễn $\text{RebirthMultiplier} = 1 + (R \times 0.5)$.
+---
+
+## 2. TIỀN TỆ
+
+| | **Speed** | **Wins** |
+| :--- | :--- | :--- |
+| Vai trò | XP | tiền tiêu |
+| Nguồn | treadmill, multiplier pad, offline, daily, quest, roulette, code | vượt stage |
+| Reset khi trùng sinh | **Có** | Không |
+| Chi cho | — | pad · trail · aura · emote · teleport · phí trùng sinh |
+
+**Luật:**
+1. Daily / code / roulette / offline phát Speed. Wins chỉ đến từ obby và các mốc ghi ở mục 7.
+2. Mọi thứ mua bằng Wins là sở hữu vĩnh viễn; tiêu Wins không làm giảm sức mạnh.
 
 ---
 
-## 3. HỆ THỐNG TOÁN & CÔNG THỨC SỨC MẠNH
+## 3. TIẾN TRÌNH
 
-### A. Công Thức WalkSpeed Thực Tế
-$$\text{WalkSpeed} = \min\left(250, 12 + (\text{Level} - 1) \times 2\right)$$
-- **Tốc độ khởi đầu (Level 1):** $12\text{ studs/s}$
-- **Tốc độ tối đa World 1 (Level 120):** $250\text{ studs/s}$ (Cập nhật từ `Tuning.luau` & `Formulas.luau`).
+### 3.1 Đường cong Level
 
-### B. Cơ Chế Nhân Hệ Số (4 Xô Độc Lập)
-Tốc độ nhận Speed & XP mỗi tick ($0.35\text{s}$) tính theo công thức:
-$$\text{Gain Per Tick} = \text{BaseStep} \times \text{Bucket}_{\text{Premium}} \times \text{Bucket}_{\text{Cosmetic}} \times \text{Bucket}_{\text{Rebirth}} \times \text{Bucket}_{\text{LiveOps}}$$
+Speed → XP tỉ lệ 1:1. XP cần để lên từ Level *L*:
 
-1. **Xô Nạp (Additive Premium):** Mua bằng Robux.  
-   $$\text{Bucket}_{\text{Premium}} = 1 + (\text{Treadmill} - 1) + (\text{SpeedPass}_{\text{Max}} - 1) + (\text{VIP} - 1)$$
-   - *Treadmill:* Wood (x1), Purple (x3), Blue (x9), Gold (x25), Red Admin (x100).
-   - *Speed Pass:* Double Speed (x2), Quad Speed (x4), Octa Speed (x8). (Ưu tiên kích hoạt gói cao nhất).
-   - *VIP Membership:* +0.5 (tương đương hệ số x1.5).
-
-2. **Xô Đồ Trang Bị (Additive Cosmetics):** Cày bằng Wins.  
-   $$\text{Bucket}_{\text{Cosmetic}} = 1 + (\text{Trail} - 1) + (\text{Aura} - 1)$$
-
-3. **Xô Tiến Trình (Multiplicative Rebirth):** Cày Level.  
-   $$\text{Bucket}_{\text{Rebirth}} = 1 + (\text{Rebirths} \times 0.5)$$
-
-4. **Xô Vận Hành (Live-Ops Boosts):** Buff tạm thời nhân liên hoàn.  
-   $$\text{Bucket}_{\text{LiveOps}} = \text{PlaytimeBoost} \times \text{FriendsBoost} \times \text{ServerBoost}$$
-   - *Playtime Boost:* Tăng dần theo thời gian online (Tối đa x4 ở phút 60).
-   - *Friends Boost:* bảng DỒN VỀ ĐẦU (tính lại 2026-08-21) — 1 bạn = **x1.15 Speed + x1.10 Wins**,
-     2 = x1.25/x1.15, 3 = x1.35/x1.20, 4 = x1.45/x1.23, 5 = **x1.5 / x1.25** (trần).
-     Trần giữ nguyên như bản +10%/bạn cũ; chỉ đổi hình dạng đường cong. Lý do: rủ được 5 bạn
-     vào CÙNG một server gần như không xảy ra, nên bản tuyến tính dồn hết giá trị vào một mốc
-     không ai chạm tới, còn người bạn ĐẦU TIÊN — người duy nhất thật sự rủ được — chỉ đáng
-     x1.1. Xem khối lý do trong `FriendService`.
-     ⚠️ Trước 2026-08-21 phần **Wins hoàn toàn không được cài đặt**: HUD hứa x1.25 Wins mà
-     `AwardWins` chưa bao giờ đọc tới `FriendService`. Nay đã nối, phạm vi hẹp `stage`/`stage_x2`
-     như VIP / x2 Wins / Server Boost.
-   - *Server Boost:* Mua bằng Robux toàn máy chủ (x2 Speed / x2 Wins).
-
----
-
-## 4. CƠ CHẾ ĐIỂM DỪNG CHÂN (REST STOP PLATFORM) & BẢNG THƯỞNG STAGE
-
- World 1 gồm **15 Stage Obby**. Sau khi vượt qua chướng ngại vật của mỗi Stage, người chơi sẽ tiến vào **Điểm Dừng Chân (Rest Stop Platform / Checkpoint Island)**.
-
-### A. Quy Tắc Hoạt Động Tại Bệ Dừng Chân
-> **LƯU Ý QUAN TRỌNG:** Vạch Finish của Stage **KHÔNG tự động trao thưởng Wins**. Thưởng Wins chỉ được trao duy nhất khi người chơi bước lên một trong các Pad chuyên dụng tại Bệ dừng chân (`StageCheckpointService.luau`).
-
-Tại Bệ dừng chân, người chơi có **4 lựa chọn chiến lược**:
-1. 🚪 **Cổng Stage Kế (Chạy Tiếp):** Bước qua cổng sang Stage $N+1$. Người chơi chưa nhận Wins lúc này nhưng được quyền chinh phục các màn tiếp theo với mức thưởng Wins cao hơn hẳn.
-2. 🟨 **`WinCollectionPad` (Nhận Wins & Về Lobby):** Dậm chân lên Pad vàng ➔ Nhận đủ Wins của Stage vừa vượt ➔ Hệ thống lập tức dịch chuyển (Teleport) về Lobby để mua trang bị.
-3. 🟥 **`DoubleWinCollectionPad` (Nhận X2 Wins & Về Lobby):** Mua gói X2 Wins (49 R$) ➔ Nhận gấp đôi lượng Wins ➔ Teleport về Lobby.
-4. 🏃 **`Treadmill` / `SkipStagePad` (Tập Luyện / Bỏ Qua):** Đứng trên Treadmill tại bệ dừng chân để cày thêm Speed tại chỗ, hoặc dậm lên `SkipStagePad` (39 R$) để bỏ qua màn tiếp theo.
-
----
-
-### B. Bảng Chỉ Số Stage, Gợi Ý & Thưởng Wins (World 1)
-
-| Stage | Tên Chướng Ngại Vật | Gợi Ý Level (`minLv`) | Gợi Ý WalkSpeed (`minWS`) | Thưởng Wins Chi Tiết (`STAGE_WINS`) |
-| :---: | :--- | :---: | :---: | :---: |
-| **1** | Keyboard Hop | 1 | 12 | **1 Win** |
-| **2** | Laser Grid | 8 | 26 | **3 Wins** |
-| **3** | Clashing Crushers | 16 | 42 | **10 Wins** |
-| **4** | Boss Chase | 24 | 58 | **20 Wins** |
-| **5** | Conveyor Chaos | 32 | 74 | **50 Wins** |
-| **6** | Shrinking Platform | 40 | 90 | **100 Wins** |
-| **7** | Crumbling Path | 48 | 106 | **150 Wins** |
-| **8** | Spinning Sweeper | 56 | 122 | **300 Wins** |
-| **9** | Tsunami Sprint | 64 | 138 | **500 Wins** |
-| **10** | Slime Avalanche | 72 | 154 | **1,000 Wins** |
-| **11** | Highway Mayhem | 80 | 170 | **2,500 Wins** |
-| **12** | Wind Tunnel | 88 | 186 | **10,000 Wins** |
-| **13** | Momentum Pinball | 96 | 202 | **25,000 Wins** |
-| **14** | Floor Opens Canyon | 104 | 218 | **50,000 Wins** |
-| **15** | Momentum Jumps | 112 | 234 | **150,000 Wins** |
-
-- **Bonus Đặc Biệt Stage 15:** Lần đầu clear Stage 15 thưởng thêm **+50,000 Wins**.
-- **Cooldown Thưởng:** $10\text{s}$ giữa các lần thu hoạch pad để chống spam.
-
----
-
-## 5. KINH TẾ & TRANG BỊ
-
-### A. Multiplier Pads (Bệ cày tốc độ ở Lobby)
-
-| ID Pad | Tốc Độ Cơ Bản (Step) | Yêu Cầu Mở Khóa (Wins) |
-| :--- | :---: | :---: |
-| `pad_1` | +1 | 0 |
-| `pad_2` | +2 | 3 |
-| `pad_3` | +5 | 15 |
-| `pad_4` | +25 | 100 |
-| `pad_5` | +50 | 500 |
-| `pad_6` | +100 | 2,500 |
-| `pad_7` | +250 | 15,000 |
-| `pad_8` | +500 | 50,000 |
-
-
-### B. Treadmills (Máy chạy bộ VIP)
-
-| Tên Treadmills | Multiplier | Giá Robux | Gamepass ID |
-| :--- | :---: | :---: | :---: |
-| **Wood Treadmill** | x1.0 | FREE | 0 |
-| **Purple Treadmill** | x3.0 | 99 R$ | `1899470645` |
-| **Blue Treadmill** | x9.0 | 249 R$ | `1898588703` |
-| **Gold Treadmill** | x25.0 | 699 R$ | `1898528586` |
-| **Red Admin Treadmill** | x100.0 | 1,299 R$ | `1900262663` |
-
-### C. Trails (Vệt đuôi)
-
-#### 1. Standard Trails (Mua bằng Wins HOẶC Robux)
-| Tên Trail | Multiplier | Giá Wins | Giá Robux | Gamepass ID |
-| :--- | :---: | :---: | :---: | :---: |
-| **Green Trail** | x1.5 | 500 | 19 R$ | `1928360029` |
-| **Blue Trail** | x2.0 | 1,500 | 39 R$ | `1928000089` |
-| **Purple Trail** | x3.0 | 5,000 | 79 R$ | `1927832085` |
-| **Red Trail** | x4.0 | 25,000 | 129 R$ | `1928300077` |
-| **Rainbow Trail** | x5.0 | 100,000 | 199 R$ | `1928324050` |
-| **Galaxy Trail** | x10.0 | 500,000 | 299 R$ | `1928756071` |
-
-#### 2. Trail Độc Quyền (KHÔNG bán — chỉ rơi từ chuỗi điểm danh)
-| Tên Trail | Multiplier | Nguồn duy nhất | Cờ chặn mua |
-| :--- | :---: | :--- | :--- |
-| **Streak Aurora** | x5.0 | Phần thưởng **Ngày 7** chuỗi điểm danh hardcore | `dailyOnly = true` |
-
-> **Vì sao x5.0 (nâng từ x2.5):** mức 2.5 đặt nó giữa Blue (x2.0) và Purple (x3.0 – chỉ 5,000 Wins). Tới ngày thứ 7 thì gần như ai cũng đã mua nổi Purple ⇒ phần thưởng của bảy ngày kiên trì hoá ra **yếu hơn thứ họ đang đeo**. Phần thưởng dưới mức kỳ vọng còn hại hơn không có phần thưởng.
-> x5.0 = ngang **Rainbow Trail (100,000 Wins / 199 R$)** — đọc ra là "món 199 R$", xứng với 7 ngày đăng nhập liên tục. Trần vẫn nguyên: Galaxy x10 và ba trail Robux-only x15/x22/x30 không bị đụng.
-> **Đánh đổi:** mất một phần doanh thu Rainbow. Chấp nhận — nhóm đi trọn 7 ngày là nhóm gắn bó nhất, giữ họ đáng hơn vài lần bán lẻ, và họ vẫn còn Galaxy + premium để tiêu tiền.
-> Server chặn mua bằng cờ `dailyOnly` kiểm **tường minh** (giống `spinOnly` của Frozen Bloom), không dựa vào `priceWins = 0`.
-
-#### 3. Premium Display Trails (Bệ 3D Lobby - Mua Robux Pass)
-| Tên Trail | Multiplier | Giá Robux | Gamepass ID |
-| :--- | :---: | :---: | :---: |
-| **Mystic Violet Trail** | x15.0 | 399 R$ | `1911802508` |
-| **Golden Ray Trail** | x22.0 | 599 R$ | `1912472263` |
-| **Crimson Fury Trail** | x30.0 | 899 R$ | `1911958542` |
-
-### D. Auras (Hào quang)
-
-#### 1. Standard Auras (Mua bằng Wins HOẶC Robux)
-| Tên Aura | Multiplier | Giá Wins | Giá Robux | Gamepass ID | Ghi chú |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **Blue Aura** | x1.2 | 200 | 19 R$ | `1930543869` | Standard |
-| **Red Aura** | x1.8 | 2,000 | 39 R$ | `1928120079` | Standard |
-| **Cyan Aura** | x2.5 | 8,000 | 69 R$ | `1927712117` | Standard |
-| **Purple Aura** | x4.5 | 40,000 | 119 R$ | `1928156055` | Standard |
-| **Pink Aura** | x8.0 | 200,000 | 199 R$ | `1930698462` | Standard |
-| **Frozen Bloom** | **x10.0** | — | — | — | **CHỈ có trong Speed Roulette (1%)** — không bán bằng Wins lẫn Robux, không có pass |
-
-> **Vì sao Frozen Bloom là x10.0** (nâng từ x3.5 ngày 2026-08-09): nó phải nằm đúng khe giữa
-> hai tầng — **trên** mọi aura mua được bằng Wins (mạnh nhất là Pink x8.0) để cảm giác trúng
-> 1% xứng đáng và là aura mạnh nhất mà người chơi F2P sở hữu được, nhưng **dưới** tầng premium
-> bán bằng Robux (Dark x12) để không phá giá gamepass. Mức cũ x3.5 còn thua Purple x4.5 vốn
-> mua thẳng bằng 40.000 Wins.
-
-#### 2. Premium Display Auras (Bệ 3D Lobby - Mua Robux Pass)
-| Tên Aura | Multiplier | Giá Robux | Gamepass ID |
-| :--- | :---: | :---: | :---: |
-| **Dark Aura** | x12.0 | 299 R$ | `1912234503` |
-| **Flame Aura** | x18.0 | 499 R$ | `1909292663` |
-| **Red Heart Aura** | x25.0 | 799 R$ | `1912096528` |
-
----
-
-## 6. HỆ THỐNG TRÙNG SINH (REBIRTH SYSTEM)
-
-- **Điều kiện Level tối thiểu:** $\text{Required Level} = 50 + (\text{Rebirths} \times 10)$
-- **Hệ số nhân thưởng:** $\text{RebirthMultiplier} = 1 + (\text{Rebirths} \times 0.5)$
-- **Quy tắc Reset:** Reset Speed về $0$, Level về $1$, XP về $0$.
-- **Bảo lưu tài sản:** Giữ nguyên trọn vẹn Wins, Unlocked Pads, Unlocked Treadmills, Trails, Auras, và Gamepass.
-
----
-
-## 7. CHIẾN LƯỢC MONETIZATION (GAMEPASS & DEV PRODUCTS)
-
-### A. Hệ Thống Gamepass (Sở hữu vĩnh viễn)
-
-| Tên Gamepass | Giá Robux | ID Creator Dashboard | Tính Năng / Quyền Lợi |
-| :--- | :---: | :---: | :--- |
-| **Double Speed (x2)** | 3 R$ | `1900262644` | Nhân đôi tốc độ cày Speed cơ bản |
-| **Quad Speed (x4)** | 9 R$ | `1900160603` | Nhân 4 tốc độ cày Speed |
-| **Octa Speed (x8)** | 27 R$ | `1898810606` | Nhân 8 tốc độ cày Speed |
-| **Double Wins (x2)** | 399 R$ | `1940593812` | Nhân đôi Wins mỗi lần vượt Stage. Lý do giá & phạm vi: mục 7.A2 |
-| **VIP Membership** | 399 R$ | `1899686706` | x1.5 Speed · x1.25 Wins/stage · VIP Gold Trail x6 + Aura x6 · vé quay 8 phút (trần 5) · teleport miễn phí · tag `[VIP]`. Chi tiết & lý do cân bằng: mục 7.A1 |
-| **Auto-Rebirth** | 99 R$ | `1899434608` | Tự động Trùng sinh ngay khi đủ Level (có công tắc ON/OFF trong Rebirth modal) |
-| **Infinite Revives** | 249 R$ | `1930442093` | Hồi sinh tại chỗ **không giới hạn số lần** khi ngã Obby (thay cho Revive 19 R$/lần) |
-
-> **Sửa 2026-08-23 — hai lỗi của bảng cũ:** (a) dòng *Infinite Revives* bị lặp hai lần;
-> (b) còn dòng **Extra Spin 149 R$ *(In Dev)***, nhưng gamepass đó **đã gỡ ngày 2026-07-31** —
-> xem `Config/Economy/Gamepass.luau`: lượt quay giờ bán bằng Dev Product 1/5/10 Spins
-> (`3610356888` / `3610357071` / `3610357149`), liệt kê ở mục 7.B.
-
-### A2. Double Wins (x2) — 399 R$ (2026-08-21, **ĐÃ TẠO & BẬT** — pass `1940593812`)
-
-> Trạng thái: **đang bán**. Pass `1940593812` (managed pricing bật), nút cầu vồng bảy sắc ở
-> cột phải HUD, server nhân đúng phạm vi `stage`/`stage_x2`.
->
-> Cơ chế tắt an toàn vẫn còn: đặt `Config/Economy/Gamepass.DoubleWins = 0` thì nút TỰ ẨN và
-> server không nhân gì — dùng khi cần gỡ pass khỏi bán mà không phải đụng vào code.
-
-#### Vì sao 399 R$
-
-Món này cạnh tranh trực tiếp với **`DoubleWinCollectionPad` (49 R$ / lượt)**, nên giá phải trả
-lời được câu "mua bao nhiêu lần thì nên mua đứt":
-
-| Giá pass | Hoà vốn sau | Hệ quả |
+| Băng | Level | Công thức |
 | :--- | :---: | :--- |
-| 249 R$ | 5 lượt | Gần như xoá sổ doanh thu pad, và làm VIP 399 R$ (chỉ x1.25 Wins) trông hớ |
-| **399 R$** | **~8 lượt** | Người chơi thường vẫn dùng pad; người cày nhiều mới mua đứt. Pad giữ được doanh thu |
-| 699 R$ | ~14 lượt | An toàn cho pad nhưng ít người mua — món whale |
+| Sprint | 1 – 30 | `req(L) = 5 × 1,25^(L−1)` |
+| Marathon | 31 + | `req(L) = 3.675 × 1,157^(L−30)` |
 
-399 cũng **bằng đúng VIP Membership**, mà VIP chỉ cho x1.25 Wins trong một gói 7 quyền lợi ⇒
-hai món không dẫm chân nhau: ai chỉ cần Wins thì mua pass này, ai cần cosmetic + tiện nghi thì
-mua VIP. Đây là lần đầu shop có một món bán THUẦN bằng Wins.
+| Level | 2 | 10 | 20 | 30 | 50 | 80 | 111 | 120 |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| XP cần | 6 | 37 | 347 | 3.235 | 67.900 | 5,39M | 495,75M | 1,84B |
+| Cộng dồn | 5 | 129 | 1.400 | 12.900 | 421.600 | 34,35M | 3,16B | 11,73B |
+| WalkSpeed | 16 | 32 | 52 | 72 | 112 | 172 | 234 | 250 |
 
-#### Phạm vi — y hệt VIP, và vì y hệt lý do
+### 3.2 WalkSpeed
 
-Chỉ nhân ở `reason == "stage"` / `"stage_x2"` (`ProgressionService.AwardWins`). Đây là pass
-MẠNH NHẤT trong nhóm nhân Wins (x2, không phải x1.25) nên phạm vi càng phải chặt:
+```
+WalkSpeed = min(250 , 14 + (Level − 1) × 2)
+```
 
-- Nhân cả `product` ⇒ Ultra Wins Pack 1.299 R$ tự nhân đôi cho người có pass — **tự phá giá
-  món đắt nhất shop bằng một món rẻ hơn ba lần**.
-- Nhân `daily` / `roulette` / `code` ⇒ phá lại phép siết bảng điểm danh xuống 1.177 Wins/tuần
-  (mục 8.A1).
+- Level 1 = 14 studs/s. Trần 250 chạm ở Level 119.
+- ⚠️ Phải khớp `StarterPlayer.CharacterWalkSpeed` trong map. Đổi số nền = đổi tầm nhảy của cả
+  15 zone (tầm nhảy = WalkSpeed × 0,542 s); phải đo lại hố rộng nhất mọi stage trước khi hạ.
 
-#### Cộng dồn: có, thành x4
+### 3.3 Hệ số cày
 
-`stage_x2` KHÔNG bị loại trừ, nên **có pass + dậm `DoubleWinCollectionPad` = x4 Wins**. Đây là
-ý đồ, không phải sơ suất: nếu chặn, pad 49 R$ trở thành nút chết với đúng nhóm khách đã chi
-nhiều nhất. Cộng dồn tiếp với group chest (+10%), VIP (x1.25), Server Boost và event — cùng
-cách mọi hệ số Wins khác đang cộng dồn.
+```
+Speed mỗi tick (0,35 s) = PadStep × Premium × Cosmetic × Rebirth × LiveOps
+```
 
-### A1. VIP Membership — Thiết kế lại (2026-08-12, **ĐÃ TRIỂN KHAI**)
+| Xô | Cách cộng | Thành phần |
+| :--- | :--- | :--- |
+| Premium | cộng dồn | Treadmill *(chỉ khi đang đứng trên treadmill)* + Speed Pass (bậc cao nhất) + VIP (+0,5) |
+| Cosmetic | cộng dồn | Trail + Aura đang trang bị |
+| Rebirth | **nhân liên hoàn** | mục 3.4 |
+| LiveOps | nhân liên hoàn | Friends × Server Boost × Event |
 
-> Trạng thái: đã code đủ 7 quyền lợi. Mục này ghi lại **vì sao từng con số là con số đó** —
-> đọc trước khi chỉnh bất cứ giá trị nào ở đây.
+Cộng dồn = `1 + (a−1) + (b−1)`. Hai món x3 và x9 cho ra x11.
+⚠️ Không quyền lợi gamepass nào được đưa vào xô Rebirth.
 
-#### Hai vấn đề của bản cũ (đã sửa)
+### 3.4 Trùng sinh
 
-**1. Thẻ shop từng quảng cáo thứ không tồn tại.** `HUD/Theme.luau` →
-`SHOP_CATALOG.utility.vip_membership` ghi *"x1.5 Speed + x1.2 Wins"* và *"[VIP] tag + VIP
-Trail + VIP Aura"*, trong khi code chỉ có x1.5 Speed + tag chat: không có hệ số Wins, và cả
-`Trails.luau` lẫn `Auras.luau` đều không có mục VIP nào. Người bỏ 399 R$ không nhận được thứ
-họ đọc trên thẻ. Giờ cả năm quyền lợi đều có thật và thẻ shop mang chú thích chỉ tới đúng
-nơi sinh ra từng con số.
+Reset Speed → 0, Level → 1, XP → 0. Giữ nguyên Wins, pad, treadmill, trail, aura, emote,
+gamepass, tiến trình stage.
 
-**2. Món đắt nhất shop từng là món yếu nhất tính trên mỗi Robux.** Cả VIP lẫn Speed Pass đều đổ
-vào cùng **xô Premium cộng dồn**, nên so được trực tiếp:
+```
+Level cần   = {10,20,32,46,62,80,100,120}[R]      nếu R ≤ 8
+              120 + (R − 8) × 4                    nếu R ≥ 9
+Hệ số cày   = 1 + 0,5R                             nếu R ≤ 3
+              2,5 × 1,45^(R−3)                     nếu R ≥ 4
+Phí Wins    = 0                                    nếu R ≤ 5
+              50.000 × 2,6^(R−6)                   nếu R ≥ 6
+```
 
-| Món | Giá | Cộng vào xô Premium | Robux / mỗi +1 |
-| :--- | :---: | :---: | :---: |
-| Double Speed x2 | 3 R$ | +1 | 3 |
-| Octa Speed x8 | 27 R$ | +7 | **3.9** |
-| Purple Treadmill x3 | 99 R$ | +2 | 49.5 |
-| **VIP Membership** | **399 R$** | **+0.5** | **798** |
+| Lần | R1 | R2 | R3 | R4 | R5 | R6 | R7 | **R8** | R9 | R10 | R12 | R15 | R20 |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Level | 10 | 20 | 32 | 46 | 62 | 80 | 100 | **120** | 124 | 128 | 136 | 148 | 168 |
+| Hệ số | 1,50 | 2,00 | 2,50 | 3,63 | 5,26 | 7,62 | 11,05 | **16,02** | 23,24 | 33,69 | 70,84 | 215,95 | 1.384,19 |
+| Phí Wins | — | — | — | — | — | 50K | 130K | **338K** | 879K | 2,28M | 15,45M | 271,5M | 32,25B |
 
-Người chơi biết tính sẽ không bao giờ mua VIP để lấy tốc độ. Vậy VIP **không được** bán bằng
-hệ số tốc độ — nó phải bán bằng thứ Speed Pass không có: **cosmetic độc quyền + dòng chảy
-tài nguyên đều đặn + tiện nghi**. Đó là định nghĩa của "membership", khác hẳn "pass".
+**R8 = điều kiện mở World 2.**
 
-#### Gói VIP mới — giữ giá 399 R$
+### 3.5 Nhịp mục tiêu
 
-| # | Quyền lợi | Số | Nơi thực thi |
+| Mốc | F2P | 129 R$ | 525 R$ | 2.523 R$ |
+| :--- | ---: | ---: | ---: | ---: |
+| Stage 5 | 9 phút | — | — | — |
+| Stage 10 | 38 phút | — | — | — |
+| Stage 15 | 6,1 giờ | 45 phút | 34 phút | 20 phút |
+| Trùng sinh 8 (World 2) | 15,0 giờ | 1,6 giờ | 1,1 giờ | 23 phút |
+| Trùng sinh 12 | 99,8 giờ | 10,1 giờ | 6,5 giờ | 1,7 giờ |
+| Trùng sinh 16 | 297,6 giờ | 59,0 giờ | 45,3 giờ | 21,2 giờ |
+
+Từ R8 trở đi mỗi bậc trùng sinh dài hơn bậc trước ~1,23×.
+
+**Chỉ số sức khoẻ mục tiêu:** Wins tiêu / Wins kiếm ≥ 60% · thời gian trong obby ≥ 30%.
+Đo được ở cấu hình hiện tại: **86%** và **36%**.
+
+---
+
+## 4. OBBY
+
+### 4.1 Bệ dừng chân
+
+Vạch Finish không trao thưởng. Wins chỉ đến từ pad tại bệ dừng chân.
+
+| Thành phần | Chức năng | Giá |
+| :--- | :--- | :--- |
+| 🟨 `WinCollectionPad` | nhận Wins của stage vừa qua → teleport về Lobby | — |
+| 🟥 `DoubleWinCollectionPad` | nhận x2 Wins → teleport về Lobby | 49 R$ |
+| ⏭️ `SkipStagePad` | bỏ qua stage kế tiếp | 39 R$ |
+| 🏃 `Treadmill_x1` | cày Speed tại chỗ | — |
+| 🚪 Cổng stage kế | chạy tiếp sang stage N+1 | — |
+
+Cooldown giữa hai lần dậm pad: 10 giây.
+*(Zone 15 hiện thiếu `SkipStagePad` — đúng ý đồ — và thiếu `Treadmill_x1` — cần bổ sung.)*
+
+### 4.2 Bảng stage
+
+| Stage | Tên | Gợi ý Lv | Gợi ý WS | Wins |
+| :---: | :--- | :---: | :---: | ---: |
+| 1 | Keyboard Hop | 1 | 12 | 2 |
+| 2 | Laser Grid | 8 | 26 | 5 |
+| 3 | Clashing Crushers | 16 | 42 | 12 |
+| 4 | Boss Chase | 24 | 58 | 30 |
+| 5 | Conveyor Chaos | 32 | 74 | 75 |
+| 6 | Shrinking Platform | 40 | 90 | 180 |
+| 7 | Crumbling Path | 48 | 106 | 420 |
+| 8 | Spinning Sweeper | 56 | 122 | 1.000 |
+| 9 | Tsunami Sprint | 64 | 138 | 2.400 |
+| 10 | Slime Avalanche | 72 | 154 | 5.500 |
+| 11 | Highway Mayhem | 80 | 170 | 13.000 |
+| 12 | Wind Tunnel | 88 | 186 | 30.000 |
+| 13 | Momentum Pinball | 96 | 202 | 70.000 |
+| 14 | Floor Opens Canyon | 104 | 218 | 160.000 |
+| 15 | Momentum Jumps | 112 | 234 | 400.000 |
+
+Cột Gợi ý là biển báo, **không chặn người chơi**. Không có bonus lần đầu, không có thưởng chuỗi.
+
+### 4.3 Teleport
+
+| Đích | S2 | S3 | S4 | S5 | S6 | S7 | S8 | S9 | S10 | S11 | S12 | S13 | S14 | S15 |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Wins | 3 | 8 | 20 | 50 | 120 | 300 | 700 | 1.700 | 4.000 | 9.000 | 21.000 | 48.000 | 110.000 | 260.000 |
+
+- Lobby miễn phí. Chỉ bán bằng Wins.
+- VIP miễn phí tới `HighestCompletedStage + 1`, ngoài phạm vi đó trả đủ.
+- ⚠️ Ràng buộc cứng: `Wins(N−1) < giá(N) < Wins(N)`. Đổi bảng 4.2 là phải tính lại bảng này.
+
+---
+
+## 5. KINH TẾ
+
+### 5.1 Multiplier Pad
+
+Mua một lần bằng Wins, sở hữu vĩnh viễn.
+
+| Pad | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Speed / bước | +1 | +3 | +8 | +25 | +50 | +100 | +250 | +500 |
+| Giá Wins | 0 | 1 | 12 | 40 | 120 | 600 | 3.500 | 18.000 |
+
+- ⚠️ Bảng dừng ở 8 vì map chỉ dựng 8 pad. Thêm pad = dựng trong map trước.
+- ⚠️ `pad_2` (1 Wins) ≤ `Stage 1` (2 Wins) — bước 2 tutorial phải tự nuôi được.
+
+### 5.2 Trail
+
+| Trail | Hệ số | Wins | Robux | Nguồn |
+| :--- | :---: | ---: | ---: | :--- |
+| Green | x1,5 | 500 | 19 R$ | shop |
+| Blue | x2,0 | 1.500 | 39 R$ | shop |
+| Purple | x3,0 | 5.000 | 79 R$ | shop |
+| Red | x4,0 | 25.000 | 129 R$ | shop |
+| Rainbow | x5,0 | 100.000 | 199 R$ | shop |
+| Galaxy | x10,0 | 500.000 | 299 R$ | shop |
+| Rookie Rocket | x2,5 | — | — | Starter Pack |
+| Streak Aurora | x5,0 | — | — | Điểm danh Ngày 7 |
+| VIP Gold | x6,0 | — | — | VIP Membership |
+| Mystic Violet | x15,0 | — | 399 R$ | bệ 3D Lobby |
+| Golden Ray | x22,0 | — | 599 R$ | bệ 3D Lobby |
+| Crimson Fury | x30,0 | — | 899 R$ | bệ 3D Lobby |
+
+### 5.3 Aura
+
+| Aura | Hệ số | Wins | Robux | Nguồn |
+| :--- | :---: | ---: | ---: | :--- |
+| Blue | x1,2 | 200 | 19 R$ | shop |
+| Red | x1,8 | 2.000 | 39 R$ | shop |
+| Cyan | x2,5 | 8.000 | 69 R$ | shop |
+| Purple | x4,5 | 40.000 | 119 R$ | shop |
+| Pink | x8,0 | 200.000 | 199 R$ | shop |
+| VIP Gold | x6,0 | — | — | VIP Membership |
+| Frozen Bloom | x10,0 | — | — | Roulette 1% |
+| Dark | x12,0 | — | 299 R$ | bệ 3D Lobby |
+| Flame | x18,0 | — | 499 R$ | bệ 3D Lobby |
+| Red Heart | x25,0 | — | 799 R$ | bệ 3D Lobby |
+
+### 5.4 Emote
+
+Không mang hệ số. Bánh xe radial phím `G` / nút HUD.
+
+| # | Emote | Giá Wins |
+| ---: | :--- | ---: |
+| 1 | Inf Dab | 10 |
+| 2 | Peter Parker | 250 |
+| 3 | Kazotsky Kick | 1.500 |
+| 4 | Electro Shuffle | 7.500 |
+| 5 | Electro Swing | 30.000 |
+
+Bậc giá để dành cho emote bổ sung: 100.000 · 400.000 · 1.200.000 · 3.000.000.
+
+**Luật sử dụng:**
+- Dùng được trong Lobby và trên treadmill. Cấm trong obby.
+- Huỷ khi di chuyển / nhảy / trúng bẫy.
+- Bật emote ⇒ dừng animation treadmill. Tắt emote ⇒ khôi phục. Sáu lối thoát phải khôi phục:
+  kết thúc tự nhiên · bấm huỷ · di chuyển · rời treadmill · chết · respawn.
+- Tên hiển thị là tên tự đặt; `assetId` giữ ở tầng config để thay được mà không mất quyền sở hữu.
+
+### 5.5 Treadmill
+
+| Treadmill | Wood | Purple | Blue | Gold | Red Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Hệ số | x1 | x3 | x9 | x25 | x100 |
+| Giá | — | 99 R$ | 249 R$ | 699 R$ | 1.299 R$ |
+
+Hệ số chỉ áp dụng khi đang đứng trên treadmill.
+
+---
+
+## 6. MONETIZATION
+
+### 6.1 Gamepass
+
+| Gamepass | Giá | Quyền lợi |
+| :--- | ---: | :--- |
+| Double Speed | 3 R$ | +1 xô Premium |
+| Quad Speed | 9 R$ | +3 xô Premium |
+| Octa Speed | 27 R$ | +7 xô Premium |
+| Auto-Rebirth | 99 R$ | tự trùng sinh khi đủ điều kiện, có công tắc ON/OFF |
+| Infinite Revives | 249 R$ | hồi sinh tại chỗ không giới hạn |
+| Double Wins | 399 R$ | x2 Wins mỗi lần vượt stage |
+| VIP Membership | 399 R$ | mục 6.2 |
+| Treadmill ×4 | 99 – 1.299 R$ | mục 5.5 |
+| Trail & Aura ×11 | 19 – 899 R$ | mục 5.2 / 5.3 |
+
+**Phạm vi hệ số Wins** (VIP · Double Wins · Friends · Server Boost · Event): chỉ áp ở
+`reason == "stage"` / `"stage_x2"`. Không áp cho `product` / `daily` / `roulette` / `code`.
+Double Wins Pass + `DoubleWinCollectionPad` cộng dồn thành **x4**.
+
+### 6.2 VIP Membership — 399 R$
+
+| # | Quyền lợi | Số |
+| :---: | :--- | :--- |
+| 1 | Speed farm | x1,5 (+0,5 xô Premium) |
+| 2 | Wins khi vượt stage | x1,25 |
+| 3 | VIP Gold Trail | x6,0 |
+| 4 | VIP Gold Aura | x6,0 |
+| 5 | Vé quay | hồi 8 phút · tích tối đa 5 |
+| 6 | Teleport | miễn phí tới `HighestCompletedStage + 1` |
+| 7 | Tag `[VIP]` vàng trong chat | — |
+
+### 6.3 Developer Products
+
+| Sản phẩm | Giá | Nội dung |
+| :--- | ---: | :--- |
+| Revive | 19 R$ | hồi sinh tại vị trí chết |
+| Skip Stage | 39 R$ | bỏ qua stage hiện tại |
+| x2 Wins tại pad | 49 R$ | nhân đôi Wins lần chốt này |
+| Skip Rebirth | 149 R$ | trùng sinh ngay — bỏ qua cả điều kiện Level và phí Wins |
+| Small Wins Pack | 99 R$ | +5.000 Wins |
+| Medium Wins Pack | 299 R$ | +40.000 Wins |
+| Large Wins Pack | 699 R$ | +300.000 Wins |
+| Ultra Wins Pack | 1.299 R$ | +2.500.000 Wins |
+| Server x2 Speed (10m) | 99 R$ | toàn server |
+| Server x2 Wins (10m) | 99 R$ | toàn server |
+| MEGA Server Boost (10m) | 149 R$ | x2 Speed & x2 Wins toàn server |
+| Vé quay 1 / 5 / 10 | 19 / 79 / 149 R$ | vé Roulette |
+| Double Offline | 6 R$ | nhân đôi phần thưởng offline |
+| Starter Pack | 99 R$ | mục 6.4 |
+
+### 6.4 Starter Pack "Rookie Rocket" — 99 R$
+
+Cửa sổ **48 giờ** từ lần đầu vào game, chạy cả khi offline. Hết hạn là biến mất vĩnh viễn.
+Giá niêm yết 999 R$ (−90%).
+
+| Nội dung | |
+| :--- | ---: |
+| Wins | 50.000 |
+| Speed Multiplier vĩnh viễn | x2 (cộng lên bậc pass đang có) |
+| Vé quay | 5 |
+| x2 Wins Boost | 30 phút |
+| Rookie Rocket Trail x2,5 | không bán ở đâu khác |
+
+Bán bằng Developer Product. ⚠️ `LEGACY_PASS_ID` phải giữ để phát bù cho người mua đời gamepass.
+
+---
+
+## 7. GIỮ CHÂN
+
+### 7.1 FTUE — ba phút đầu
+
+```
+Vào game ──► TUTORIAL 3 BƯỚC (beam + mũi tên, có SKIP, không chặn điều khiển)
+              1. Chạy Stage 1 → dậm pad vàng chốt Wins        (+2 Wins)
+              2. Mua Multiplier Pad 2                          (−1 Wins)
+              3. Bước lên Treadmill x1
+                            ▼
+              DAILY NGÀY 1   →  +2.000 Speed · +5 Wins
+                            ▼
+              GROUP CHEST    →  +5.000 Speed · +25 Wins · x1,1 Wins vĩnh viễn
+                            ▼
+              QUEST CHAIN (7.2)
+```
+
+- Tutorial không phát thưởng. Mọi bước gắn vào sự kiện gameplay server tự biết.
+- Người bấm SKIP đánh dấu `TutorialSkipped`, tách khỏi phễu onboarding.
+- Kết thúc FTUE người chơi ở ~7.000 Speed ≈ Level 27 ≈ WalkSpeed 66.
+
+### 7.2 Quest Chain
+
+Chạy một lần, phút 2–10. Xong thì Daily Quests chiếm chỗ trên HUD vĩnh viễn.
+
+| # | Mục tiêu | Thưởng |
+| :---: | :--- | :--- |
+| 1 | Vượt Stage 2 | +1.500 Speed |
+| 2 | Đạt Level 10 | +3.000 Speed |
+| 3 | **Trùng sinh lần đầu** | +20.000 Speed · 🎟️1 |
+| 4 | Mua Multiplier Pad 4 | +60.000 Speed |
+| 5 | Vượt Stage 5 | +150.000 Speed |
+| 6 | **Trùng sinh lần hai** | +250.000 Speed · 🎟️2 · badge |
+
+- Tổng chuỗi: **484.500 Speed · 3 vé quay**.
+- ⚠️ Không mắt xích nào được vượt phần thưởng Speed lớn nhất của một ngày điểm danh (400.000).
+- ⚠️ Số vé của chuỗi khoá với bảng chốt chặn Roulette ở 7.5 — chuỗi + mã + online phải giữ
+  tổng vé của **giờ đầu ở mức 12**.
+
+### 7.3 Daily Quests
+
+3 quest mỗi ngày, reset 00:00 UTC. Rút 1 quest Obby + 1 quest Farm/Kinh tế + 1 quest tự do.
+
+| Loại | Ví dụ |
+| :--- | :--- |
+| Obby | vượt 3 stage · vượt stage cao nhất của bạn |
+| Farm | cày X Speed · lên 2 Level |
+| Kinh tế | mua 1 cosmetic |
+| Tiến trình | trùng sinh 1 lần |
+| Vận may | quay Roulette 3 lần |
+| Xã hội | dùng emote 5 lần · chơi cùng 1 người bạn |
+
+**Phần thưởng mỗi quest — server tính riêng cho từng người chơi tại thời điểm nhận.**
+
+Mục tiêu quest thì cố định ("vượt 3 stage"), nhưng **con số thưởng thì không**. Lúc người chơi
+bấm nhận, server đọc hai chỉ số của chính họ rồi tính ra thưởng:
+
+| Server đọc | Dùng để tính |
+| :--- | :--- |
+| Đang ở lần trùng sinh thứ mấy → còn phải leo bao nhiêu XP nữa | phần **Speed** |
+| Stage cao nhất đã qua · phí Wins của lần trùng sinh kế tiếp | phần **Wins** |
+
+```
+Speed = max( 2.000 , 2% × tổng XP còn phải leo tới lần trùng sinh kế tiếp )
+Wins  = max( Wins(stage cao nhất đã qua) × 0,5 , 2% × phí Wins trùng sinh kế tiếp )
+```
+
+Nghĩa là mỗi quest luôn đẩy người chơi tiến **đúng 2% quãng đường tới mốc kế tiếp của họ** —
+người mới và người chơi 300 giờ nhận hai con số khác nhau hàng tỉ lần nhưng **cảm giác tiến bộ
+là như nhau**:
+
+| Người chơi | R0 / Stage 3 | R4 / Stage 8 | R6 / Stage 12 | R8 / Stage 15 | R15 / Stage 15 |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Speed | 2.000 | 49.600 | 12,70M | 420,46M | 24,95B |
+| Wins | 6 | 500 | 15.000 | 200.000 | 5,43M |
+
+3 quest/ngày = **6% một bậc trùng sinh**, ở mọi cấp, mãi mãi.
+
+> **UI hiển thị con số đã tính**, không hiển thị công thức. Người chơi chỉ thấy
+> *"Vượt 3 stage → +200.000 Wins · +420M Speed"*.
+
+⚠️ Mọi phần thưởng lặp lại trong game định nghĩa bằng **% mục tiêu hiện tại**, không bằng số
+tuyệt đối. Ngoại lệ duy nhất: Speed Roulette (7.5) — nhãn trên bánh xe phải đọc được trước khi
+bấm nên nó dùng số cố định.
+
+### 7.4 Điểm danh 7 ngày
+
+Lỡ một ngày → reset về Ngày 1. Nhận đủ Ngày 7 → **hôm sau quay lại Ngày 1 và chạy lại chuỗi**,
+lặp vô hạn.
+
+| Ngày | Vòng 1 (7 ngày đầu tiên) | Vòng 2 trở đi |
+| :---: | :--- | :--- |
+| 1 | +2.000 Speed · +5 Wins | *giống vòng 1* |
+| 2 | +10.000 Speed · x2 Speed Boost (15 phút) | *giống vòng 1* |
+| 3 | +150 Wins · 🎟️1 | *giống vòng 1* |
+| 4 | +60.000 Speed · x2 Wins Boost (15 phút) | *giống vòng 1* |
+| 5 | +1.200 Wins · 🎟️2 | *giống vòng 1* |
+| 6 | +400.000 Speed · MEGA Server Boost (15 phút) | *giống vòng 1* |
+| **7** | 🌈 **Streak Aurora Trail x5,0** · +12.000 Wins · 🎟️3 | **Gói bù** (dưới) · 🎟️3 |
+
+**Chỉ Ngày 7 đổi.** Sáu ngày đầu giống hệt nhau ở mọi vòng. Ngày 7 vòng 1 trao Streak Aurora
+Trail — món chỉ có một cái; từ vòng 2 người chơi đã sở hữu nó rồi nên **thay bằng gói bù tính
+theo tiến trình hiện tại của họ**:
+
+| Ngày 7 vòng 2+ | Công thức | Ví dụ (người chơi R8) |
+| :--- | :--- | ---: |
+| Wins | 20% phí Wins trùng sinh kế tiếp, tối thiểu 12.000 | 175.760 |
+| Speed | 15% quãng đường trùng sinh kế tiếp | 3,15B |
+| Vé quay | 🎟️3 (cố định) | 🎟️3 |
+
+Nhờ vậy vòng 5, vòng 20 vẫn đáng đi trọn — thay vì phát lại một cái trail đã có trong túi.
+
+Chỉ số `LifetimeStreak` đếm tổng ngày liên tục qua mọi vòng, hiển thị cạnh chuỗi 7 ngày, không
+trao thưởng.
+
+### 7.5 Speed Roulette
+
+Phần thưởng là **số cố định, ghi thẳng trên ô** — người chơi đọc được trước khi bấm.
+
+| # | Ô | Tỉ lệ |
+| :---: | :--- | :---: |
+| 1 | **+50 Wins** | 25% |
+| 2 | **+15.000 Speed** | 22% |
+| 3 | **+400 Wins** | 16% |
+| 4 | x2 Speed Boost 15 phút | 15% |
+| 5 | x2 Wins Boost 15 phút | 12% |
+| 6 | **+4.000 Wins** | 6% |
+| 7 | **+400.000 Speed** | 3% |
+| 8 | 🌸 **Frozen Bloom Aura** — đền +10.000 Wins nếu đã sở hữu | 1% |
+
+**EV mỗi lượt: 416 Wins · 15.300 Speed.**
+
+#### Nguồn vé
+
+| Nguồn | Số vé |
+| :--- | :--- |
+| Online | 1 vé / 15 phút, tích tối đa **3** (VIP: 8 phút / 5 vé) |
+| Quest Chain | 3 vé — một lần, xem 7.2 |
+| Mã `RELEASE` + `ASMR` | 5 vé — một lần |
+| Điểm danh D3 + D5 + D7 | 6 vé / tuần |
+| Starter Pack | 5 vé |
+| Gói Robux | 1 / 5 / 10 vé |
+
+Trần tuyệt đối 99 vé.
+
+#### Bốn chốt chặn cân bằng
+
+| Chốt | Ngưỡng | Hiện tại |
+| :--- | :--- | :--- |
+| Roulette chiếm bao nhiêu **Wins** giờ đầu | ≤ 20% | **17%** (12 vé × 416 so với 24,9K thu từ stage) |
+| Roulette chiếm bao nhiêu **Speed** giờ đầu | ≤ 30% | **28%** (12 vé × 15,3K so với 484,5K của Quest Chain) |
+| Ô thường nhất so với `pad_2+3+4` (53 Wins) | phải **thấp hơn** | **50 Wins** ✅ — không tự mua nổi ba pad đầu |
+| Tổng weight | = 100 | ✅ |
+
+| 1 lượt quay bằng mấy lượt clear stage | S3 | S5 | S8 | S10 | S12 | S15 |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| | 31,5 | 5,0 | 0,38 | 0,07 | 0,01 | 0,00 |
+
+Ô Speed soi vào đường cong XP: **+15.000 → Level 30** (WS 72) · **+400.000 → Level 49** (WS 110).
+Jackpot Wins **4.000 < 4.273** = tổng giá `pad_2`…`pad_7`, nên một cú may mắn vẫn không mua đứt
+cả thang pad.
+
+Đây là hệ thống của **~15 giờ đầu**. Về sau số cố định mất dần ý nghĩa, và giá trị còn lại của
+bánh xe nằm ở hai ô boost (tự co giãn theo thu nhập hiện tại) cùng jackpot Frozen Bloom — aura
+x10 vĩnh viễn, đáng giá như nhau ở mọi cấp. Ba gói vé Robux bán chính món đó.
+
+⚠️ Đổi giá `pad_4` hoặc bảng Wins ở 4.2 là phải kiểm lại bảng chốt chặn trên.
+
+### 7.6 Xã hội
+
+| Hệ thống | Nội dung |
+| :--- | :--- |
+| **Group Chest** (`GROUP_ID 675923086`) | +5.000 Speed · +25 Wins ngay · x1,1 Wins vĩnh viễn |
+| **Friends Boost** | 1 bạn x1,15 Speed / x1,10 Wins · 2 x1,25/x1,15 · 3 x1,35/x1,20 · 4 x1,45/x1,23 · 5 x1,5/x1,25 (trần) |
+| **Chat tag** | `[VIP]` · `[Fan]` · `[Member]` |
+
+**Mã quà tặng** — phát Speed + vé quay, không phát Wins:
+
+| Mã | Phần thưởng |
+| :--- | :--- |
+| `RELEASE` | +500.000 Speed · 🎟️3 |
+| `ASMR` | +200.000 Speed · 🎟️2 |
+
+⚠️ Mỗi mã nhận một lần/tài khoản. Phát đợt mới thì thêm mã mới, không sửa mã cũ.
+
+### 7.7 Treadmill offline
+
+| Tham số | Giá trị |
+| :--- | :--- |
+| Tỉ lệ so với online | 25% |
+| Trần tích luỹ | 4 giờ |
+| Thời gian tối thiểu | 3 phút |
+| Speed tối thiểu để phát | 500 |
+| Ngưỡng hiện nút "Double It" | phần thưởng ≥ 2% quãng đường trùng sinh kế tiếp |
+
+- **Tính:** treadmill · Speed Pass · VIP · trail · aura · rebirth.
+- **Không tính:** Friends · Server Boost · Event.
+- Chỉ phát Speed, không phát Wins.
+- ⚠️ Tỉ lệ 25% chỉ được đi xuống, không bao giờ đi lên.
+
+---
+
+## 8. WORLD 2 (LEVEL 121 – 220)
+
+| | |
+| :--- | :--- |
+| Điều kiện mở | Trùng sinh lần 8 |
+| Chủ đề | Neon Cyber City — cyberpunk, glitch lighting, laser di động |
+| Nội dung | Stage 16–30 · multiplier pad cấp triệu |
+| Trần WalkSpeed | 250 (không đổi) |
+
+Người chơi giữ nguyên toàn bộ chỉ số và vật phẩm; chỉ WalkSpeed reset về mốc đầu và leo lại trên
+một trục tiến trình riêng.
+
+**Việc kỹ thuật phải xong trước:**
+1. Thêm trục tiến trình theo world trong `DataTemplate` (WalkSpeed hiện không được lưu, được
+   tính lại từ Level mỗi lần cần).
+2. `Config/Formulas.GetMaxWalkSpeed` — số 250 đang gõ thẳng, hàm cần biết đang ở world nào.
+3. `Services/Core/DataService` — `CustomSpeedLimit` kẹp theo `GetMaxWalkSpeed(Level)` lúc nạp
+   profile, sang World 2 sẽ kẹp theo trần sai.
+4. `Shared/Util/Env` — place World 2 phải khai là Live.
+
+`Config/AntiCheat.luau` không phải đụng. **Còn để ngỏ:** quan hệ giữa trục XP/Level và trục
+WalkSpeed mới.
+
+---
+
+## 9. TRẠNG THÁI TRIỂN KHAI
+
+Bản 3.0 **đã áp vào code** (2026-09-06, `CORE_LOOP_VERSION` 4 → 5). §9.1 và §9.2 giữ lại làm
+nhật ký delta. Còn mở: §9.2 mục 9.
+
+### 9.1 Đổi giá trị — ✅ xong
+
+| File | Hằng số | Mới |
+| :--- | :--- | :--- |
+| `Config/Formulas` | `GetRequiredXP` | 2 băng — 3.1 |
+| `Config/Formulas` | `GetRebirthMultiplier` | `2,5 × 1,45^(R−3)` từ R4 |
+| `Config/Formulas` | `GetRequiredLevelForRebirth` | `120 + (R−8)×4` từ R9 |
+| `Config/Formulas` | *(mới)* `GetRebirthWinsCost` | `50.000 × 2,6^(R−6)` |
+| `Config/Stages` | `STAGE_WINS` | 4.2 |
+| `Config/Stages` | `STAGE_15_FIRST_CLEAR_BONUS` | **gỡ** |
+| `Config/Teleport` | `priceWins` ×14 | 4.3 |
+| `Config/Economy/MultiplierPads` | `speedPerStep` | 1/**3**/**8**/25/50/100/250/500 |
+| `Config/Economy/MultiplierPads` | `requiredWins` → giá mua | 0/1/12/40/120/600/3.500/18.000 |
+| `Config/Economy/StreakBonuses` | cả file | **gỡ** |
+| `Config/Economy/Products` | `WINS_PACKS` | 5K/40K/300K/2,5M |
+| `Config/Economy/Products` | `OFFLINE_DOUBLE_MIN_SPEED` | ngưỡng tương đối — 7.7 |
+| `Config/Economy/StarterPack` | `WINS` | 50.000 |
+| `Config/Economy/Codes` | `RELEASE` / `ASMR` | 500K / 200K Speed |
+| `Config/GroupChest` | `INSTANT_WINS_REWARD` | 25 |
+| `Config/OfflineEarnings` | `MAX_SECONDS` | 4 giờ |
+| `Config/Quests` | `Chain` | 7.2 |
+| `DailyService` | `DAILY_REWARDS` | 7.4 |
+
+`Config/Economy/Emotes` không đổi.
+
+### 9.2 Đổi hành vi
+
+| # | Thay đổi | Chỗ sửa | Trạng thái |
 | :---: | :--- | :--- | :--- |
-| 1 | Speed farm | **x1.5** (+0.5 xô Premium) | `ProgressionService.computeVipMultiplier` |
-| 2 | Wins khi vượt Stage | **x1.25** | `ProgressionService.AwardWins` (`VIP_WINS_MULTIPLIER`) |
-| 3 | **VIP Gold Trail** (độc quyền, không bán) | **x6.0** | `Trails.luau` → `trail_vip` |
-| 4 | **VIP Gold Aura** (độc quyền, không bán) | **x6.0** | `Auras.luau` → `aura_vip`, rig `Aura_Vip` |
-| 5 | Vé quay miễn phí | hồi **15 → 8 phút**, trần tích **3 → 5 vé** | `Config/Roulette.VIP_TICKET_*` |
-| 6 | Teleport | **miễn phí tới nơi ĐÃ TỪNG ĐẾN** (stage ≤ cao nhất +1) | `TeleportService.tryPayWins` |
-| 7 | Tag `[VIP]` vàng trong chat | — | `ChatTagController` (attribute `IsVIP`) |
+| 1 | Pad: ngưỡng số dư ví → mua vĩnh viễn | `MultiplierPadService`, `DataTemplate` | ✅ — migration grandfather theo ngưỡng cũ |
+| 2 | Phí Wins khi trùng sinh (R ≥ 6) | `ProgressionService`, `RebirthModal` | ✅ — Auto-Rebirth bỏ qua lượt khi thiếu Wins |
+| 3 | Skip Rebirth bỏ qua cả Level lẫn phí Wins | `ProductService` | ✅ |
+| 4 | Migration đường cong XP: Level tính lại từ Speed tích luỹ | `DataService.normalizeData` | ✅ — kẹp lại `CustomSpeedLimit` sau khi tính |
+| 5 | Daily Quest: thưởng theo % quãng đường | `QuestService` | ✅ |
+| 6 | Điểm danh vòng 2+ · `LifetimeStreak` | `DailyService`, `DataTemplate` | ✅ |
+| 7 | Thêm `Treadmill_x1` vào Zone 15 | map | ✅ — `Zone15.Mechanics.Treadmill_x1` tại (6635, 204.8, 3450) trên bệ hoàn thành |
+| 8 | Roulette: cập nhật 8 ô theo bảng 7.5 | `Config/Roulette.SLOTS` | ✅ |
+| 9 | Hệ số Treadmill chỉ chạy khi đứng trên treadmill; người nạp ở trong obby 96–97% thời gian | `ProgressionService.getTreadmillMultiplier` | ⏳ **Chưa quyết định thiết kế** |
 
-Đường trao hai món cosmetic: `GamepassService.grantVipCosmetics` — chạy cả lúc mua trong
-session lẫn lúc profile load (người mua trên web / mua trước khi có hai món này).
+### 9.3 Kiểm tra trước khi publish
 
-#### Vì sao từng con số — và vì sao nó KHÔNG phá kinh tế
-
-**Mục 2 — x1.25 Wins, chỉ ở `reason == "stage"` / `"stage_x2"`.** Đúng phạm vi mà Group Chest
-(+10%), Server Boost và event đang dùng. Cộng dồn với group ⇒ **x1.375**, không phải x1.5.
-Phạm vi hẹp này là điều kiện sống còn: nếu nhân cả `product`, gói Ultra Wins Pack 1.299 R$
-tự nhiên thành 1.250.000 Wins cho người có VIP — tự phá giá chính món đắt thứ hai của shop.
-Cũng không nhân `daily` / `roulette` / `code`, vì bảng daily đã bị siết xuống 1.177 Wins/tuần
-có chủ đích (mục 8.A1) — nhân lên là phá lại chính phép siết đó.
-
-**Mục 3 & 4 — vì sao đúng x6.0.** Hai món này rơi vào **xô Cosmetic cộng dồn**, nên người mua
-VIP tay trắng vẫn có ngay $1 + 5 + 5 = \mathbf{x11}$. Mức 6.0 được chọn để nằm lọt đúng khe
-giữa hai tầng đang bán:
-
-| Tầng | Trail | Aura |
-| :--- | :--- | :--- |
-| Cày bằng Wins (F2P) | Rainbow x5.0 (100k Wins / 199 R$) | Pink x8.0 (200k Wins / 199 R$) |
-| **VIP x6.0** | **trên** Rainbow, **dưới** Galaxy | **dưới** Pink — Pink vẫn đáng mua |
-| Robux tầng cao | Galaxy x10 (299 R$), Mystic x15 (399), Golden x22 (599), Crimson x30 (899) | Dark x12 (299), Flame x18 (499), Red Heart x25 (799) |
-
-Hai kiểm tra bắt buộc đều đạt: (a) người bỏ 399 R$ phải nhận được thứ **mạnh hơn** món 199 R$
-— trail x6 > Rainbow x5 ✅; (b) **không** được chạm tới tầng 299 R$ trở lên — x6 < Galaxy x10
-và < Dark x12 ✅. Riêng aura cố ý để **thấp hơn** Pink x8: nếu không, aura bán bằng Wins
-mạnh nhất của F2P trở thành vô nghĩa với mọi người mua VIP.
-
-Về mặt tài nguyên: cosmetic **không sinh ra Wins hay Speed** ngoài hệ số của chính nó, nên
-đây là quyền lợi có giá trị cảm nhận cao nhất mà tốn của nền kinh tế ít nhất — đúng vai trò
-mà Rookie Rocket đang gánh cho Starter Pack.
-
-**Mục 5 — vé quay.** 15 → 8 phút là **~x1.9 tốc độ farm vé**, trần 3 → 5 để người AFK dài
-không bị phí. Vẫn phải **online** mới hồi, và cơ cấu ô không đổi — Frozen Bloom vẫn 1%, trung
-bình ~100 lượt. Nghĩa là VIP rút ngắn thời gian chờ chứ không mua được jackpot. Gói vé Robux
-(19/79/149 R$) vẫn còn nguyên lý do tồn tại: ai muốn quay **ngay bây giờ** vẫn phải trả.
-
-**Mục 6 — teleport miễn phí, nhưng CHỈ TỚI CHỖ ĐÃ TỪNG ĐẾN.**
-
-> ⚠️ **Lỗi đã sửa trong ngày (2026-08-12).** Bản đầu cho VIP miễn phí MỌI điểm đến. Nhưng trong
-> game này **giá Wins chính là cổng khoá duy nhất** — `TeleportService` ghi rõ ở dòng đầu:
-> *"Player được TỰ DO teleport: không còn chặn theo Level/WalkSpeed"*. Bỏ giá cho VIP là bỏ
-> luôn cổng: mua pass xong nhảy thẳng Stage 15 mà chưa chạy màn nào. **Toàn bộ nội dung obby —
-> thứ mà cả game được dựng quanh nó — bị bỏ qua trong một cú bấm.** Người chơi phát hiện ngay
-> khi trang bị thử.
-
-Luật đúng: miễn phí trong phạm vi người chơi **đã tự đi tới**, ngoài phạm vi đó trả giá như mọi
-người. Mốc là `HighestCompletedStage + 1`, không phải `+0`: về đích stage N là người chơi đứng
-ngay đầu stage N+1, chỗ đó họ đã đến rồi nên bắt trả tiền để quay lại là vô lý; còn N+2 trở đi
-thì chưa từng đặt chân — đó là ranh giới.
-
-Bài học chung, đáng nhớ hơn cả con số: **trước khi cho một quyền lợi "miễn phí X", phải hỏi X
-đang gánh vai trò gì trong hệ thống.** Ở đây giá Wins trông như một sink kinh tế, nhưng thực ra
-nó là cổng tiến trình — miễn phí nó không phải là giảm giá, mà là gỡ khoá.
-
-Sink Wins vẫn còn nguyên với nhóm VIP ở đúng chỗ đáng kể nhất: teleport vượt tuyến (stage chưa
-tới) vẫn phải trả đủ, kể cả 100.000 Wins của Stage 15.
-
-**Cố ý KHÔNG đụng xô Rebirth.** Đó là xô duy nhất **nhân liên hoàn** ($1 + \text{Rebirths}
-\times 0.5$). Mọi quyền lợi VIP ở trên đều nằm trong các xô **cộng dồn**, nên tác động của
-chúng bị chặn trên; nhét VIP vào xô Rebirth là mở cửa cho lạm phát cuối game.
-
-#### Thẻ shop đọc ra thế nào
-
-```
-VIP MEMBERSHIP                             399 R$
-x1.5 Speed · x1.25 Wins · FREE Teleport
-Gold Trail x6 + Gold Aura x6 · 2x spins · [VIP]
-```
-
-Cộng riêng phần cosmetic đã ngang hai món 199 R$, chưa tính x1.25 Wins vĩnh viễn — thẻ tự
-biện minh được cái giá 399 mà không cần bịa con số "giá gốc" nào.
-
-#### Bộ mặt của hai món cosmetic VIP
-
-**VIP Gold Trail** — dùng **bộ 5 ribbon của dòng trail cao cấp**, tức đúng cấu trúc mà Mystic
-Violet và Crimson Fury đang dùng (2 lớp hoạ tiết sáng chồng trên 3 lớp nền); hai món đó vốn
-chỉ khác nhau ở bảng màu, nên một bản vàng là cách nhập gia đúng ngôn ngữ của dòng này. Template:
-`ReplicatedStorage.CosmeticTemplates.PremiumTrails.trail_vip`, đi qua đường dựng premium sẵn có.
-
-> **Vì sao bỏ hướng "một ribbon + texture sparkles" (2026-08-12):** texture đốm lặp dọc vệt,
-> mà chiều dài vệt lại co giãn theo tốc độ chạy ⇒ các đốm tách rời và vệt nhìn **đứt quãng**.
-> Ribbon liền không có bệnh đó. Bảng `TRAIL_VISUALS.trail_vip` giờ chỉ còn là bản dự phòng khi
-> thiếu template, và cũng đã bỏ texture.
-
-Màu: thân vàng ròng (ánh kim → vàng → hổ phách) trên nền **đồng sẫm** — giữ đúng tỉ lệ
-"nền tối hơn thân" của Mystic, vì chính cái chênh đó tạo chiều sâu. Hai lớp khói của Mystic bị
-gỡ: khói tím đọc ra là bí ẩn, còn khói trên nền vàng chỉ thành vệt xám bẩn.
-
-**VIP Gold Aura** — rig `Aura_Vip` dựng từ model **Aura_SusanooArms**, đã gỡ hết phần "hai cánh
-tay" (10 Beam trên HumanoidRootPart + 2 cụm lửa ở gốc tay) và nhuộm sang palette uy quyền:
-**vàng ròng trên nền tím hoàng gia gần đen**. Lớp tối được giữ lại có chủ đích — vàng cần nền
-tương phản mới ra vẻ uy quyền — nhưng thưa và mờ bớt, vì dày quá thì đọc ra là bồ hóng bám người.
-Đỉnh sáng cố ý **không** phải ivory gần trắng: 5-6 lớp chồng lên nhau là bão hoà cả ba kênh, lõi
-cháy trắng và nuốt luôn nhân vật. Nguyên tắc rút ra: một aura mà nhìn không ra người chơi thì
-không phải aura, đó là màn khói.
-
-Model gốc `Workspace.Aura_SusanooArms` **giữ nguyên** (còn cả hai tay) — nó là asset nguồn, bản
-VIP là bản sao đã cắt.
-
-#### Đường hồi quy khi cần chỉnh
-
-| Muốn đổi | Sửa ở đâu | Cẩn thận |
-| :--- | :--- | :--- |
-| Hệ số Wins | `ProgressionService.VIP_WINS_MULTIPLIER` | giữ nguyên bộ lọc `reason` — nới ra là phá giá Wins Packs |
-| Hệ số 2 cosmetic | `Trails.luau` / `Auras.luau` | phải ở giữa tầng Wins và tầng premium Robux; xem hai bảng trên |
-| Nhịp vé quay | `Config/Roulette.VIP_TICKET_*` | dưới 8 phút là VIP tự cày ra Frozen Bloom, giết ba gói vé Robux |
-| Teleport | `TeleportService.tryPayWins` | client `TeleportModal` cũng phải biết, nếu không UI chặn trước khi packet đi |
-| Hình/màu trail | `CosmeticTemplates.PremiumTrails.trail_vip` | sửa ở TEMPLATE, không phải `TRAIL_VISUALS` (bảng đó chỉ là dự phòng). Đừng quay lại texture đốm — vệt sẽ đứt quãng |
-| VFX aura | `CosmeticTemplates.Aura_Vip` | part phải NEO; rig này KHÔNG được fallback về aura standard (`RIG_AURAS`) |
-
-### B. Developer Products (Tiêu hao & Tiện ích)
-
-| Gói Sản Phẩm | Giá Robux | Product ID | Mô Tả Tính Năng |
-| :--- | :---: | :---: | :--- |
-| **Revive (Hồi sinh)** | 19 R$ | `3608405576` | Hồi sinh tại vị trí chết khi đi Obby |
-| **Skip Stage** | 39 R$ | `3608405926` | Bỏ qua Stage hiện tại, sang màn kế tiếp |
-| **Double Wins (`DoubleWinCollectionPad`)** | 49 R$ | `3608406804` | Nhận x2 Wins khi dậm pad ở bệ dừng chân & về Lobby |
-| **Skip Rebirth** | 149 R$ | `3608406966` | Trùng sinh ngay lập tức không cần đủ Level |
-| **Small Wins Pack** | 99 R$ | `3608400621` | Cộng +1,000 Wins ngay |
-| **Medium Wins Pack** | 299 R$ | `3608400807` | Cộng +10,000 Wins ngay |
-| **Large Wins Pack** | 699 R$ | `3608401003` | Cộng +100,000 Wins ngay |
-| **Ultra Wins Pack** | 1,299 R$ | `3608401110` | Cộng +1,000,000 Wins ngay |
-| **Server x2 Speed (10m)** | 99 R$ | `3608407713` | Buff x2 Speed cho toàn bộ server |
-| **Server x2 Wins (10m)** | 99 R$ | `3608407843` | Buff x2 Wins cho toàn bộ server |
-| **MEGA Server Boost (10m)**| 149 R$ | `3608407916` | Buff x2 Speed & x2 Wins toàn server |
-| **1 Roulette Spin Ticket** | 19 R$ | `3610356888` | Mua 1 lượt quay Vòng quay may mắn |
-| **5 Roulette Spin Tickets**| 79 R$ | `3610357071` | Mua 5 lượt quay Vòng quay may mắn |
-| **10 Roulette Spin Tickets**| 149 R$ | `3610357149` | Mua 10 lượt quay Vòng quay may mắn |
+| # | Bất biến | Kết quả đo 2026-09-06 |
+| :---: | :--- | :--- |
+| 1 | Không tài khoản nào tụt Level, tụt pad, mất cosmetic sau migration | ✅ — mô phỏng 13 mốc Speed/Wins, Level mới ≥ Level cũ ở mọi mốc |
+| 2 | `Stage 1 Wins ≥ pad_2 giá` | ✅ — 2 ≥ 1 |
+| 3 | `Wins(N−1) < teleport(N) < Wins(N)` cho cả 14 điểm đến | ✅ — 14/14 |
+| 4 | Tổng weight Roulette = 100 | ✅ |
+| 5 | Emote bậc 1 (10 Wins) < thu nhập cộng dồn sau Stage 3 (19 Wins) | ✅ |
+| 6 | `Tuning.BASE_MAX_WALK_SPEED` = `StarterPlayer.CharacterWalkSpeed` = 14 | ✅ |
+| 7 | Không còn tham chiếu `StreakBonuses` / `STAGE_15_FIRST_CLEAR_BONUS` | ✅ — 0 kết quả trong `src/` |
+| 8 | Chạy `docs/REGRESSION.md` trên QA trước, không publish thẳng Live | ⏳ chưa chạy |
 
 ---
 
-## 8. RETENTION, SOCIAL & LIVE-OPS
+## 10. NGUỒN CHÂN LÝ
 
-### A0. Trải Nghiệm 3 Phút Đầu (FTUE) — Daily trước, Tutorial sau
+| Cần gì | Ở đâu |
+| :--- | :--- |
+| Đường cong, bảng giá, phần thưởng, nhịp | tài liệu này |
+| ID gamepass / product / asset | `src/shared/Config/Economy/*` |
+| ID môi trường (PlaceId, UniverseId) | `src/shared/Util/Env.luau` |
+| 15 zone, Lobby, pad, treadmill, terrain | Roblox Cloud — repo không chứa map |
 
-Thứ tự cố ý: **món quà đầu tiên phải tới trước công việc đầu tiên.**
-
-```
-Vào game ──► [DAILY REWARDS mở ngay]  ──► CLAIM: +1,000 Speed & +2 Wins
-                                              │
-                                              ▼
-                    [TUTORIAL 3 BƯỚC — tia sáng + mũi tên chỉ đường, có nút SKIP]
-                                              │
-   Bước 1 ─ Chạy Stage 1 → dậm pad vàng chốt Wins    (+1 Win của Stage 1)
-   Bước 2 ─ (tự teleport về Lobby) → mở khoá Multiplier Pad 2
-   Bước 3 ─ Bước lên Treadmill x1                    ──► HOÀN THÀNH
-                                              │
-                          KHÔNG thưởng gì ──► [GROUP CHEST mở]
-```
-
-**Tutorial KHÔNG phát phần thưởng.** Toàn bộ quà của người chơi mới nằm ở Daily Ngày 1, phát **trước** khi tutorial bắt đầu. Nhờ vậy `TutorialService` không đụng gì vào kinh tế, và cũng không cần bù Wins để mở Pad 2 (xem ràng buộc ngay dưới).
-
-**Vì sao đảo ngược thứ tự so với tutorial simulator thường thấy (farm trước, chạy sau):**
-Bước 1 ném thẳng người chơi vào Obby + khoảnh khắc ăn Wins — phần vui nhất và **khác biệt nhất** của game (sàn ASMR, quyết định tham lam) — trong vòng một phút đầu. Cày cuốc để sau, khi họ đã có lý do để cày.
-
-**Ràng buộc số học đã chốt — ba con số khoá chặt nhau:**
-
-```
-Daily Ngày 1 = 2 Wins   +   Stage 1 = 1 Win   =   3 Wins   =   ĐÚNG mốc mở Pad 2
-```
-
-Mở pad là so **ngưỡng** `TotalWins` (không trừ tiền) nên 3 Wins vừa khít. ⚠️ Đổi `requiredWins` của pad_2, thưởng Wins Ngày 1, hoặc `STAGE_WINS[1]` thì **phải kiểm lại phép cộng này** — lệch xuống là bước 2 thành ngõ cụt "Need 3 Wins" và người chơi mới kẹt không có đường ra.
-
-**Nguyên tắc triển khai:**
-- Tutorial **không chặn điều khiển**, không hộp thoại chữ, không làm tối màn hình. Chỉ Beam cong + mũi tên nhấp nhô + một dòng nhắc.
-- Mọi bước gắn vào **sự kiện gameplay server đã tự biết** (chốt Wins / mở pad / lên treadmill) ⇒ không có packet "tôi xong rồi" nào để giả mạo.
-- Người bấm **SKIP** được đánh dấu riêng (`TutorialSkipped`) để số liệu phễu không trộn với người đi hết. Không ai mất gì khi skip vì tutorial vốn không thưởng.
-- 3 bước khớp phễu `TelemetryService.Onboarding` ⇒ đọc tỉ lệ rơi thẳng trên Creator Hub.
-
-### A1. Điểm Danh 7 Ngày (Daily Rewards — Hardcore Streak)
-
-Lỡ **một** ngày → chuỗi reset về Ngày 1. Luật khắc nghiệt này chỉ có sức nặng vì cuối chuỗi là món **không mua được**.
-
-| Ngày | Phần thưởng |
-| :---: | :--- |
-| **1** | +1,000 Speed · **+2 Wins** |
-| **2** | +5,000 Speed · x2 Speed Boost (10 phút) |
-| **3** | +25 Wins · 🎟️ 1 Spin |
-| **4** | +25,000 Speed · x2 Wins Boost (10 phút) |
-| **5** | +150 Wins · 🎟️ 2 Spins |
-| **6** | +150,000 Speed · MEGA Server Boost (10 phút) |
-| **7** | 🌈 **STREAK AURORA TRAIL (độc quyền)** · +1,000 Wins · 🎟️ 3 Spins |
-
-**Triết lý cân bằng (sửa 2026-08-10):** bản cũ phát **14,300 Wins/tuần**, riêng Ngày 1 đã 300 Wins — bấm một cái là nhảy thẳng qua pad_2/3/4 (3/15/100 Wins), bỏ qua trọn đoạn chơi mà phần đầu game được thiết kế để dạy. Bảng mới đảo trục:
-
-- **Speed là xương sống** (ngày 2/4/6: 5K → 25K → 150K). Speed cộng thẳng vào XP ⇒ thành Level ⇒ thành WalkSpeed — thứ **cảm nhận được ngay dưới chân** và **không dùng để mua vượt cấp** bất cứ gì.
-- **Wins bị siết còn 1,177/tuần** (từ 14,300): đủ để thấy tiến lên, không đủ để nhảy cóc.
-- **Ngày 7 là món độc quyền**, không phải một đống số.
-
-> Hạn chế đã biết: bảng thưởng đang **cố định**, nên với người chơi cuối game (Stage 14 = 50,000 Wins/lượt) phần Wins gần như vô nghĩa. Hướng nâng cấp: cho thưởng **thang theo Rebirth/Level**. Chưa làm.
-
-### A. Vòng Quay May Mắn (Speed Roulette)
-- **Tự động tặng lượt quay:** Mỗi **15 phút online** liên tục nhận 1 lượt quay miễn phí (Tối đa tích trữ 3 vé).
-- **Cơ cấu phần thưởng (8 Ô):**
-  1. `+500 Wins` (Common - 25%)
-  2. `+5,000 Speed` (Common - 25%)
-  3. `+2,500 Wins` (Uncommon - 15%)
-  4. `x2 Speed Boost (10 Phút)` (Uncommon - 15%)
-  5. `x2 Wins Boost (10 Phút)` (Rare - 10%)
-  6. `+15,000 Wins` (Epic - 6%)
-  7. `+100,000 Speed` (Epic - 3%)
-  8. **Frozen Bloom Aura** (Legendary - 1%) *(Đền bù 50,000 Wins nếu đã sở hữu)*
-
-### B. Group Join Rewards & Social Features
-- Tag Chat `[Fan]` / `[Member]`.
-- Thưởng vĩnh viễn: **+10% Wins** mỗi khi hoàn thành Stage.
-- Thưởng khởi nghiệp: **+5,000 Speed** khi nhận Group Chest.
-
-### C. Mã Quà Tặng (Promo Codes)
-
-| Mã Code | Phần Thưởng Kích Hoạt | Dùng cho |
-| :--- | :--- | :--- |
-| **`RELEASE`** | +250,000 Speed & 🎟️ 3 Spin Tickets | Quà ra mắt, phát cho tất cả |
-| **`ASMR`** | +100,000 Speed & 🎟️ 2 Spin Tickets | Bài đăng mạng xã hội / video |
-
-> **Viết lại 2026-08-23 — từ 4 mã xuống 2, và bỏ hẳn phần thưởng Wins.**
->
-> Bản cũ mắc đúng lỗi mà mục 8.A1 vừa sửa cho bảng điểm danh: `FREEWINS` cho thẳng **2.500
-> Wins**, nhập một cái là nhảy qua pad_2 (3) → pad_6 (2.500), bỏ qua trọn đoạn chơi mà phần
-> đầu game được dựng ra để dạy. Siết daily xuống 1.177 Wins/tuần mà để mã quà phát 2.500 Wins
-> thì phép siết đó vô nghĩa.
->
-> **Luật mới: mã phát Speed + vé quay, không phát Wins.** Speed là xương sống (cộng vào XP ⇒
-> Level ⇒ WalkSpeed, cảm nhận ngay mà không mua vượt cấp được gì). Vé quay là phần thưởng
-> **không mất giá theo cấp** — với người mới lẫn người Level 98, một vé vẫn là 1% cơ hội
-> Frozen Bloom. Đó là cách duy nhất khiến mã "đáng" ở cả hai đầu đường cong, thay vì thành
-> con số vô nghĩa với người chơi cuối game.
->
-> Thang độ mạnh: `RELEASE` (250K Speed + 3 vé) **mạnh hơn** ngày Speed to nhất của daily
-> (ngày 6 = 150K) nhưng vẫn **dưới ngày 7** — chuỗi 7 ngày phải hơn một mã gõ trong 5 giây.
->
-> ⚠️ Mỗi mã chỉ nhận MỘT LẦN/tài khoản. Sửa thưởng của mã đã phát hành thì người nhập rồi
-> không nhận lại được — phát đợt mới thì **thêm mã mới**.
-
----
-
-## 9. ROADMAP WORLD 2 & ĐỊNH HƯỚNG MỞ RỘNG (LEVEL 121 - 220)
-
-- **Điều kiện mở khóa World 2:** Hoàn thành Stage 15 (World 1).
-- **Chủ đề thiết kế (Theme):** Neon Cyber City (Cyberpunk, Glitch Lighting, Moving Lasers).
-- **Đường cong lạm phát XP:** Hàm mũ `1.082^(Level - 120)` từ Level 120 trở lên.
-- **Hệ thống Kinh tế Mới:** Thêm 15 Stage mới (Stage 16 - 30), Multiplier Pads cấp số nhân hàng triệu.
-
-### ⚠️ SỬA 2026-08-23 — chốt lại luật WalkSpeed ở World 2
-
-Bản cũ ghi *"mở rộng giới hạn WalkSpeed tối đa lên **444 studs/s**"*. **Không còn đúng.**
-Luật đã chốt:
-
-> **Trần WalkSpeed vẫn là 250 ở cả hai world. Sang World 2, người chơi GIỮ NGUYÊN toàn bộ
-> chỉ số và vật phẩm (Wins, Level, Rebirth, Trail, Aura, Pad, Gamepass) — chỉ WalkSpeed bị
-> reset về mốc đầu và leo lại từ đầu.**
-
-**Vướng mắc kỹ thuật phải xử lý trước khi code World 2:** hiện tại WalkSpeed **không được lưu**
-ở đâu cả — nó được tính lại từ Level mỗi lần cần (`Formulas.GetMaxWalkSpeed`). Giữ Level thì
-đương nhiên giữ luôn WalkSpeed; không có chỗ nào để reset.
-
-Hướng gỡ: thêm một trục tiến trình riêng theo world trong `DataTemplate` (ví dụ `World2Level`,
-khởi điểm 1). World 2 tính WalkSpeed từ trục đó; `Level` cũ giữ nguyên làm chỉ số tích luỹ.
-
-Kèm theo là hai chỗ phải sửa:
-1. `Config/Formulas.luau` — số `250` đang gõ thẳng trong `GetMaxWalkSpeed`, không nằm trong
-   `Tuning`. Hàm cần biết đang ở world nào.
-2. `Services/Core/DataService.luau` — `CustomSpeedLimit` được kẹp theo `GetMaxWalkSpeed(Level)`
-   lúc nạp profile; sang World 2 sẽ kẹp theo trần sai.
-3. `Shared/Util/Env.luau` — place World 2 phải được khai là Live, nếu không nó bị xếp vào QA
-   và người chơi thật ghi vào kho dữ liệu QA.
-
-`Config/AntiCheat.luau` thì **không phải đụng**, vì trần vẫn 250.
-
-**Còn để ngỏ:** trục XP/Level của World 2. Mục này vẫn ghi Max Level 220 với đường cong
-`1.082^(Level-120)` — nhưng nếu WalkSpeed chạy trên một trục riêng thì quan hệ giữa hai trục
-cần chốt lại. Chưa quyết.
+Mâu thuẫn giữa ba nơi thì đo lại trong Studio.

@@ -54,6 +54,8 @@ export type ModalShellProps = {
 	Id: string,
 
 	Width: number,
+	-- Modal có UIScale riêng có thể truyền viền bù để độ dày sau scale khớp Tokens.BORDER.
+	Border: number?,
 	-- Chiều cao vỏ. Nhận số THƯỜNG hoặc state Fusion (Settings đổi chiều cao theo tab đang mở).
 	Height: any,
 	--[[
@@ -147,7 +149,7 @@ local function buildHeader(props: ModalShellProps, closeHovered: any)
 		Size = UDim2.fromOffset(headerWidth, Tokens.MODAL.HEADER_HEIGHT),
 		ZIndex = Tokens.Z.MODAL_HEADER,
 		Radius = Tokens.RADIUS.HEADER,
-		Border = Tokens.MODAL.BORDER,
+		Border = props.Border or Tokens.MODAL.BORDER,
 		-- Mặc định đen như 7/10 modal cũ. Ba modal từng dùng (18,18,30) / (6,20,26) — chênh lệch
 		-- đó không nhìn ra được trên viền 4px, nên gom hết về một màu; modal nào thật sự cần khác
 		-- thì truyền `HeaderBorderColor`.
@@ -195,7 +197,8 @@ function ModalShell.BuildPanel(props: ModalShellProps)
 		table.insert(canvasChildren, New("UIScale")({ Scale = props.Scale }))
 	end
 	table.insert(bodyChildren, Theme.MakeCorner(Tokens.RADIUS.MODAL))
-	table.insert(bodyChildren, Theme.MakeStroke(Tokens.COLOR.OUTLINE, Tokens.MODAL.BORDER))
+	local shellBorder = props.Border or Tokens.MODAL.BORDER
+	table.insert(bodyChildren, Theme.MakeStroke(Tokens.COLOR.OUTLINE, shellBorder))
 	for _, child in props.Content do
 		table.insert(bodyChildren, child)
 	end
@@ -222,7 +225,7 @@ function ModalShell.BuildPanel(props: ModalShellProps)
 		⚠️ Nội dung nằm trong `body` (không phải trong CanvasGroup) để vẫn được `ClipsDescendants`
 		cắt gọn theo thân modal; toạ độ con GIỮ NGUYÊN vì `body` cũng bắt đầu từ gốc của nó.
 	]]
-	local border = Tokens.MODAL.BORDER
+	local border = shellBorder
 	local height = props.Height
 	local bodySize = if typeof(height) == "number"
 		then UDim2.fromOffset(props.Width, height)

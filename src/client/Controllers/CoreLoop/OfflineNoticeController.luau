@@ -41,9 +41,34 @@ local localPlayer = Players.LocalPlayer
 
 local OfflineNoticeController = {}
 
-local overlay: Frame? = nil
-local fadeTargets: { any } = {}
-local showToken = 0
+--[[
+	══ VÌ SAO MỖI LỚP PHỦ GIỮ DANH SÁCH FADE CỦA RIÊNG NÓ ═══════════════════════════════════
+
+	Bản trước dùng MỘT bảng `fadeTargets` cấp module dùng chung cho mọi lần dựng, cộng với một
+	`showToken` để quyết định có huỷ lớp cũ hay không. Spam mở/đóng menu Roblox làm vỡ cả hai:
+
+	    show()  → dựng lớp A
+	    hide()  → `overlay = nil`, A bắt đầu mờ dần, hẹn huỷ NẾU token còn khớp
+	    show()  → token TĂNG (⇒ lời hẹn huỷ A vĩnh viễn không chạy), và vì `overlay` đã là nil
+	              nên nhánh "bỏ lớp cũ đi" cũng không chạy ⇒ A NẰM LẠI TRÊN MÀN HÌNH MÃI MÃI
+
+	Ghép với lỗi thứ hai — `titleStroke`/`subStroke` KHÔNG hề được nhét vào `fadeTargets`, nên
+	`Transparency` của chúng đứng nguyên 0 suốt đời — thì A tuy đã mờ hết phần nền lẫn ruột chữ
+	nhưng VIỀN chữ vẫn đặc: đúng cái bóng chữ đen khổng lồ "YOUR TREADMILL KEEPS RUNNING" đè lên
+	game mà user chụp lại được. Mỗi lần spam lại chồng thêm một lớp nữa.
+
+	Sửa tận gốc, không vá bằng token:
+	  1. mỗi lớp phủ là một `Overlay` mang theo danh sách fade CỦA CHÍNH NÓ (không dùng chung);
+	  2. `show()` huỷ lớp trước VÔ ĐIỀU KIỆN — kể cả khi nó đang mờ dần dở;
+	  3. `show()` quét sạch mọi con còn sót trong ScreenGui trước khi dựng (lưới an toàn cuối);
+	  4. `hide()` huỷ ĐÚNG lớp của mình khi tween xong, không phán xét bằng token nữa.
+]]
+type Overlay = {
+	root: Frame,
+	targets: { any },
+}
+
+local current: Overlay? = nil
 
 local function getGui(): ScreenGui
 	local playerGui = localPlayer:WaitForChild("PlayerGui")
@@ -73,13 +98,13 @@ local function subtitleText(): string
 	return `Earning {math.floor(OfflineConfig.RATE * 100)}% speed for up to {hoursText} — come back to collect!`
 end
 
-local function buildOverlay(gui: ScreenGui): Frame
+local function buildOverlay(gui: ScreenGui): Overlay
 	local k1 = math.clamp(gui.AbsoluteSize.Y / 1080, 0.5, 1)
 	local function k(value: number): number
 		return math.round(value * k1)
 	end
 
-	table.clear(fadeTargets)
+	local fadeTargets: { any } = {}
 
 	local root = Instance.new("Frame")
 	root.BackgroundColor3 = Color3.fromRGB(8, 6, 20)
@@ -157,10 +182,19 @@ local function buildOverlay(gui: ScreenGui): Frame
 	titleCap.MaxTextSize = k(80)
 	titleCap.Parent = title
 
+	--[[
+		⚠️ VIỀN CHỮ PHẢI NẰM TRONG DANH SÁCH FADE.
+
+		`UIStroke` trên một `TextLabel` có `Transparency` RIÊNG: kéo `TextTransparency` về 1 chỉ
+		xoá phần RUỘT chữ, viền vẫn vẽ đủ nét. Bỏ sót nó ở đây (đúng lỗi cũ) thì lúc ẩn đi người
+		chơi thấy chữ rỗng viền đen nằm giữa màn hình chứ không phải thấy nó biến mất.
+	]]
 	local titleStroke = Instance.new("UIStroke")
 	titleStroke.Color = Color3.fromRGB(10, 8, 20)
 	titleStroke.Thickness = math.max(2, k(6))
+	titleStroke.Transparency = 1
 	titleStroke.Parent = title
+	table.insert(fadeTargets, titleStroke :: any)
 
 	--[[
 		KHỐI DƯỚI — dòng phụ. Neo theo mép DƯỚI (AnchorPoint Y = 1): panel menu cao bao nhiêu
@@ -188,29 +222,42 @@ local function buildOverlay(gui: ScreenGui): Frame
 	subCap.MaxTextSize = k(42)
 	subCap.Parent = sub
 
+	-- Cùng lý do với `titleStroke` ở trên.
 	local subStroke = Instance.new("UIStroke")
 	subStroke.Color = Color3.fromRGB(10, 8, 20)
 	subStroke.Thickness = math.max(1.5, k(4))
+	subStroke.Transparency = 1
 	subStroke.Parent = sub
+	table.insert(fadeTargets, subStroke :: any)
 
-	overlay = root
-	return root
+	return { root = root, targets = fadeTargets }
 end
 
 local function show()
 	local gui = getGui()
-	showToken += 1
 
-	-- Mở/đóng menu liên tục: bỏ lớp cũ đi rồi dựng lại, không chồng hai lớp lên nhau.
-	if overlay then
-		overlay:Destroy()
-		overlay = nil
+	--[[
+		Mở/đóng menu liên tục: bỏ lớp cũ đi rồi dựng lại, không chồng hai lớp lên nhau.
+
+		VÔ ĐIỀU KIỆN — kể cả lớp đang mờ dần dở dang (`hide()` cố tình GIỮ `current` trỏ vào nó
+		đúng để chỗ này với tới được). Đây là chỗ bản cũ bỏ lọt: nó xoá `current` ngay trong
+		`hide()` nên lớp đang mờ trở thành mồ côi, không ai huỷ nữa.
+	]]
+	if current then
+		current.root:Destroy()
+		current = nil
+	end
+	-- Lưới an toàn cuối: quét sạch mọi lớp còn sót vì bất kỳ lý do gì. ScreenGui này chỉ chứa
+	-- duy nhất lớp phủ, nên không có gì khác để mất.
+	for _, child in gui:GetChildren() do
+		child:Destroy()
 	end
 
-	local root = buildOverlay(gui)
+	local overlay = buildOverlay(gui)
+	current = overlay
 	local info = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(root, info, { BackgroundTransparency = 0.45 }):Play()
-	for _, target in fadeTargets do
+	TweenService:Create(overlay.root, info, { BackgroundTransparency = 0.45 }):Play()
+	for _, target in overlay.targets do
 		if target:IsA("ImageLabel") then
 			TweenService:Create(target, info, { ImageTransparency = 0 }):Play()
 		elseif target:IsA("UIStroke") then
@@ -224,16 +271,21 @@ local function show()
 end
 
 local function hide()
-	local root = overlay
-	if not root then
+	local overlay = current
+	if not overlay then
 		return
 	end
-	overlay = nil
 
-	showToken += 1
-	local token = showToken
+	--[[
+		⚠️ CỐ Ý KHÔNG xoá `current` ở đây.
+
+		Lớp này còn sống thêm 0.18s nữa để mờ dần; trong khoảng đó người chơi hoàn toàn có thể mở
+		lại menu. `current` vẫn trỏ vào nó chính là sợi dây để `show()` với tới mà huỷ — bản cũ
+		cắt sợi dây này ngay lập tức và đó là lý do lớp phủ nằm lại vĩnh viễn khi spam menu.
+	]]
+	local root = overlay.root
 	local info = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	for _, target in fadeTargets do
+	for _, target in overlay.targets do
 		if target:IsA("ImageLabel") then
 			TweenService:Create(target, info, { ImageTransparency = 1 }):Play()
 		elseif target:IsA("UIStroke") then
@@ -246,10 +298,17 @@ local function hide()
 	end
 	local tween = TweenService:Create(root, info, { BackgroundTransparency = 1 })
 	tween.Completed:Once(function()
-		-- `token` chặn trường hợp người chơi mở lại menu giữa lúc đang mờ dần: lớp mới đã dựng
-		-- xong rồi thì lệnh Destroy của lớp cũ không được đụng vào gì nữa.
-		if token == showToken and root.Parent then
-			root:Destroy()
+		--[[
+			Huỷ ĐÚNG lớp của mình, không điều kiện. Nếu người chơi đã mở lại menu giữa chừng thì
+			`show()` huỷ nó trước rồi — gọi `Destroy` lần nữa lên một Instance đã huỷ là vô hại,
+			nên ở đây không cần (và không được) phán xét bằng token: chính phép phán xét đó là
+			thứ đã bỏ sót lớp cũ lại trên màn hình.
+		]]
+		root:Destroy()
+		-- Chỉ dọn con trỏ khi nó vẫn là lớp của mình; `show()` xen giữa thì `current` đã là lớp
+		-- MỚI và không được đụng tới.
+		if current == overlay then
+			current = nil
 		end
 	end)
 	tween:Play()

@@ -25,6 +25,7 @@ local destinationByProductId: { [number]: DestinationConfig } = {}
 
 local DataService
 local AntiCheatService: any
+local TelemetryService: any
 
 local TeleportService = {}
 
@@ -172,6 +173,11 @@ local function tryPayWins(player: Player, destination: DestinationConfig): boole
 	end
 
 	data.TotalWins -= priceWins
+	-- Sửa 2026-08-28: sink duy nhất còn lại của Wins ngoài cosmetic. Xem giải thích ở
+	-- `ProgressionService` chỗ mua trail/aura.
+	if priceWins > 0 and TelemetryService then
+		TelemetryService.Economy(player, "Sink", priceWins, data.TotalWins, "teleport")
+	end
 	DataService.UpdateLeaderstats(player)
 	-- Đẩy snapshot ngay: huy hiệu Wins trên HUD đọc từ `State.snapshot`, KHÔNG đọc
 	-- leaderstats. Trước 2026-08-09 mọi giá đều bằng 0 nên không ai thấy; giờ trừ Wins
@@ -212,6 +218,7 @@ end
 function TeleportService.Init()
 	DataService = ServiceLocator.Get("DataService")
 	AntiCheatService = ServiceLocator.Find("AntiCheatService")
+	TelemetryService = ServiceLocator.Find("TelemetryService")
 
 	table.clear(destinationById)
 	table.clear(destinationByProductId)

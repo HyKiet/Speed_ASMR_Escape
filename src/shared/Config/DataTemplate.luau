@@ -17,7 +17,13 @@ local DataTemplate = {
 	Rebirths = 0,
 	Level = 1,
 	XP = 0,
-	-- Pad cao nhất ĐÃ MỞ KHÓA (mua tuần tự, không cắt ngang). pad_1 free => mặc định 1.
+	--[[
+		Pad cao nhất ĐÃ MUA — SỞ HỮU VĨNH VIỄN (GDD 3.0 §5.1).
+
+		Từ 2026-09-06 đây lại là nguồn chân lý thật sự. Giữa 2026-08-22 và 2026-09-06 trường này
+		chỉ là bản sao của "pad cao nhất mà số dư ví với tới", tính lại mỗi lần gọi — nên tiêu
+		Wins làm người chơi tụt pad. Giờ nó chỉ tăng, không bao giờ giảm.
+	]]
 	HighestPadIndex = 1,
 	EquippedTreadmill = "treadmill_1",
 	EquippedTrail = "none",
@@ -51,6 +57,10 @@ local DataTemplate = {
 	UnseenAuraUnlock = false,
 	-- Daily login (7-Day hardcore streak)
 	DailyStreakDay = 0, -- số ngày đã nhận trong chuỗi hiện tại (0..7)
+	-- Tổng số ngày điểm danh liên tục qua MỌI vòng 7 ngày. Không trao thưởng — chỉ để người đi
+	-- 40 ngày liền có một con số để khoe, và để đo được nhóm gắn bó nhất. Reset cùng lúc với
+	-- `DailyStreakDay` khi lỡ một ngày.
+	LifetimeStreak = 0,
 	DailyLastClaimDay = 0, -- số thứ tự ngày (os.time // 86400) của lần nhận gần nhất
 	-- Auto-Rebirth (gamepass): bật sẵn khi mua pass, người chơi tự tắt được khi muốn dừng
 	-- ở một level cao để chạy obby thay vì bị reset ngay lúc đủ điều kiện.
@@ -62,6 +72,19 @@ local DataTemplate = {
 	TutorialStep = 0,
 	TutorialSkipped = false,
 	TutorialRewarded = false,
+	-- Quest Chain sau tutorial. 0 = chưa khởi tạo; QuestService tự đặt vào mắt xích phù hợp
+	-- với tiến trình hiện có mà không phát lại thưởng của các quest đã vượt qua.
+	QuestIndex = 0,
+	QuestProgress = 0,
+	-- Daily Quests take over the same HUD after Quest Chain. Seed is the UTC day
+	-- number; progress/claim arrays always have exactly three server-owned slots.
+	DailyQuestSeed = 0,
+	DailyQuestProgress = { 0, 0, 0 },
+	DailyQuestClaimedAt = { 0, 0, 0 },
+	DailyQuestRewardWins = 0,
+	DailyQuestRewardSpeed = 0,
+	-- Quyền sở hữu lưu bằng id ổn định, tách khỏi Animation assetId để asset có thể thay.
+	UnlockedEmotes = {} :: { [string]: boolean },
 	-- Speed Roulette
 	SpinTickets = 0, -- vé quay hiện có (free tích tối đa 3, mua Robux/daily cộng thêm)
 	--[[

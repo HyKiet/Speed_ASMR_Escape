@@ -99,8 +99,8 @@ end
 	Có grace vài phần giây đầu: nếu không, cú bấm S còn sót lại từ trước lúc nhấn C sẽ
 	cắt luôn slide vừa mở.
 
-	Quyết định nằm ở MovementMath.ShouldStopForBackward — hàm thuần, có unit test trong
-	tests/run.luau (suite "Slide — dừng khi ấn lùi").
+	Quyết định nằm ở MovementMath.ShouldStopForBackward — hàm thuần, sửa được và thử được
+	mà không cần vào game.
 ]]
 local function pressingBackward(session: Session): boolean
 	return MovementMath.ShouldStopForBackward(

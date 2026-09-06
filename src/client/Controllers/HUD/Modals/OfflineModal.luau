@@ -38,6 +38,7 @@ local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local OfflineConfig = require(ReplicatedStorage.Shared.Config.OfflineEarnings)
+local Constants = require(ReplicatedStorage.Shared.Constants)
 local Products = require(ReplicatedStorage.Shared.Config.Economy.Products)
 local ModalShell = require(script.Parent.Parent.Components.ModalShell)
 local State = require(script.Parent.Parent.State)
@@ -106,7 +107,21 @@ local function buildContent(): { any }
 
 	-- Có đủ lớn để chào bán Double không (xem khối lý do ở đầu file).
 	local showDouble = Computed(function()
-		return State.offlineSpeed:get() >= Products.OFFLINE_DOUBLE_MIN_SPEED
+		--[[
+			NGƯỠNG TƯƠNG ĐỐI (GDD 3.0 §7.7). Số tuyệt đối 5.000 Speed là vô nghĩa với người chơi
+			R10 — nút chào bán 6 R$ cho một phần thưởng không đáng nhìn, và một khi họ học được
+			nút Double không đáng bấm thì lần thật sự đáng bấm cũng bị bỏ qua.
+
+			Giữ CẢ sàn tuyệt đối: người chơi mới có quãng đường rất ngắn nên riêng phần trăm sẽ
+			cho nút hiện ra với vài trăm Speed.
+		]]
+		local reward = State.offlineSpeed:get()
+		if reward < Products.OFFLINE_DOUBLE_MIN_SPEED then
+			return false
+		end
+		local snapshot = State.GetSnapshot()
+		local climb = math.max(0, Constants.GetCumulativeXP(snapshot.requiredRebirthLevel) - snapshot.speed)
+		return climb <= 0 or reward >= climb * Products.OFFLINE_DOUBLE_MIN_REBIRTH_FRACTION
 	end)
 
 	return {

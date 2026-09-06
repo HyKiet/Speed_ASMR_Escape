@@ -81,38 +81,38 @@ type RewardPart = { icon: string, label: string }
 local REWARD_CONFIGS: { { parts: { RewardPart } } } = {
 	{
 		parts = {
-			{ icon = Theme.UI_ASSETS.Shoe, label = "+1.00K Speed" },
-			{ icon = Theme.UI_ASSETS.Trophy, label = "+2 Wins" },
+			{ icon = Theme.UI_ASSETS.Shoe, label = "+2.00K Speed" },
+			{ icon = Theme.UI_ASSETS.Trophy, label = "+5 Wins" },
 		},
 	},
 	{
 		parts = {
-			{ icon = Theme.UI_ASSETS.Shoe, label = "+5.00K Speed" },
-			{ icon = Theme.UI_ASSETS.BoostSpeed, label = "x2 Speed 10m" },
-		},
-	},
-	{
-		parts = {
-			{ icon = Theme.UI_ASSETS.Trophy, label = "+25 Wins" },
-			{ icon = Theme.UI_ASSETS.Spin, label = "+1 Spin" },
-		},
-	},
-	{
-		parts = {
-			{ icon = Theme.UI_ASSETS.Shoe, label = "+25.00K Speed" },
-			{ icon = Theme.UI_ASSETS.BoostWins, label = "x2 Wins 10m" },
+			{ icon = Theme.UI_ASSETS.Shoe, label = "+10.00K Speed" },
+			{ icon = Theme.UI_ASSETS.BoostSpeed, label = "x2 Speed 15m" },
 		},
 	},
 	{
 		parts = {
 			{ icon = Theme.UI_ASSETS.Trophy, label = "+150 Wins" },
+			{ icon = Theme.UI_ASSETS.Spin, label = "+1 Spin" },
+		},
+	},
+	{
+		parts = {
+			{ icon = Theme.UI_ASSETS.Shoe, label = "+60.00K Speed" },
+			{ icon = Theme.UI_ASSETS.BoostWins, label = "x2 Wins 15m" },
+		},
+	},
+	{
+		parts = {
+			{ icon = Theme.UI_ASSETS.Trophy, label = "+1.20K Wins" },
 			{ icon = Theme.UI_ASSETS.Spin, label = "+2 Spins" },
 		},
 	},
 	{
 		parts = {
-			{ icon = Theme.UI_ASSETS.Shoe, label = "+150.00K Speed" },
-			{ icon = Theme.UI_ASSETS.BoostMega, label = "MEGA Boost 10m" },
+			{ icon = Theme.UI_ASSETS.Shoe, label = "+400.00K Speed" },
+			{ icon = Theme.UI_ASSETS.BoostMega, label = "MEGA Boost 15m" },
 		},
 	},
 	{
@@ -120,7 +120,7 @@ local REWARD_CONFIGS: { { parts: { RewardPart } } } = {
 			-- Trail đứng ĐẦU hàng: đây là món kéo người chơi đi hết bảy ngày, không phải
 			-- số Wins đi kèm. Thứ tự icon = thứ tự dòng chữ nên nó cũng là dòng đầu tiên.
 			{ icon = STREAK_AURORA_ICON, label = "STREAK AURORA TRAIL" },
-			{ icon = Theme.UI_ASSETS.Trophy, label = "+1.00K Wins" },
+			{ icon = Theme.UI_ASSETS.Trophy, label = "+12.00K Wins" },
 			{ icon = Theme.UI_ASSETS.Spin, label = "+3 Spins" },
 		},
 	},

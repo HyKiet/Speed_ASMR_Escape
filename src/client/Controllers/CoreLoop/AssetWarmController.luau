@@ -32,6 +32,7 @@ local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PreloadManifest = require(ReplicatedStorage.Shared.Config.PreloadManifest)
+local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local AssetWarmController = {}
@@ -96,6 +97,10 @@ function AssetWarmController.Start()
 				failedBatches
 			)
 		)
+		GamePackets.earlySessionState.send({
+			assetsLoaded = true,
+			controlsTouched = false,
+		})
 	end)
 end
 

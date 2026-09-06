@@ -45,14 +45,14 @@ export type CodeReward = {
 local Codes: { [string]: CodeReward } = {
 	-- Quà ra mắt, dành cho tất cả người chơi.
 	["RELEASE"] = {
-		description = "+250,000 Speed & 🎟️ 3 Spin Tickets",
-		speed = 250000,
+		description = "+500,000 Speed & 🎟️ 3 Spin Tickets",
+		speed = 500000,
 		spin = 3,
 	},
 	-- Mã thương hiệu, dùng cho bài đăng mạng xã hội / video.
 	["ASMR"] = {
-		description = "+100,000 Speed & 🎟️ 2 Spin Tickets",
-		speed = 100000,
+		description = "+200,000 Speed & 🎟️ 2 Spin Tickets",
+		speed = 200000,
 		spin = 2,
 	},
 }

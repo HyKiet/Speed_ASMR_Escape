@@ -56,6 +56,7 @@ local lastPacketAt: { [Player]: number } = {}
 local DataService: any
 local ProgressionService: any
 local GamepassService: any
+local TelemetryService: any
 
 -- Root có nằm trong hitbox (theo hệ trục hitbox) + margin không? Thuần toán học, không physics query.
 local function isWithinHitbox(root: BasePart, hitbox: BasePart): boolean
@@ -76,6 +77,11 @@ local function findValidTreadmill(root: BasePart): TreadmillEntry?
 end
 
 local function setOff(player: Player)
+	-- Đang farm mà tắt ⇒ vừa rời treadmill. Đây là bước 3 của phễu `CoreLoop`: ranh giới
+	-- giữa "đang farm" và "bước vào obby" — chỗ nghi ngờ nhất trong 90 giây đầu.
+	if activeFarmers[player] and TelemetryService then
+		TelemetryService.CoreLoop(player, "LeaveTreadmill")
+	end
 	activeFarmers[player] = nil
 	ProgressionService.SetTreadmillState(player, "treadmill_1", 1, false)
 end
@@ -119,6 +125,10 @@ local function tryActivate(player: Player)
 	end
 
 	activeFarmers[player] = entry
+	if TelemetryService then
+		TelemetryService.CoreLoop(player, "TreadmillStart")
+		TelemetryService.CoreLoopV2(player, "TreadmillStart")
+	end
 	ProgressionService.SetTreadmillState(player, entry.id, entry.multiplier, true)
 end
 
@@ -126,6 +136,7 @@ function TreadmillService.Init()
 	DataService = ServiceLocator.Get("DataService")
 	ProgressionService = ServiceLocator.Get("ProgressionService")
 	GamepassService = ServiceLocator.Find("GamepassService")
+	TelemetryService = ServiceLocator.Find("TelemetryService")
 end
 
 function TreadmillService.Start()

@@ -7,15 +7,20 @@ Speed Simulator + Obby Hybrid game trên Roblox.
 ## Cho AI Model: Đọc ngay các file này theo thứ tự
 
 ```
-1. CLAUDE.md         ← Kiến trúc, patterns, rules bắt buộc
-2. PROJECT_STATE.md  ← Trạng thái hiện tại + việc cần làm
-3. GDD_v2.md         ← Game design document đầy đủ
+1. AGENTS.md          ← LUẬT KỸ THUẬT DUY NHẤT — đọc hết trước khi viết dòng nào
+2. GDD.md             ← Game design document đầy đủ
+3. docs/PLAYTIME.md   ← Sprint giữ chân đang chạy: vì sao, đo được gì, còn việc nào
 ```
 
+`CLAUDE.md` chỉ là mẩu trỏ sang `AGENTS.md` — Claude đọc file trước, Codex đọc file sau, cả hai
+phải theo cùng một bộ luật nên chỉ có một bản nội dung.
+
 **Câu hỏi nhanh:**
-- *Tôi đang làm gì?* → Xem `PROJECT_STATE.md` phần "Việc cần làm"
-- *Code viết kiểu gì?* → Xem `CLAUDE.md` phần "Patterns & Rules"
+- *Tôi đang làm gì, và vì sao?* → `docs/PLAYTIME.md`
+- *Code viết kiểu gì?* → `AGENTS.md`
+- *API Roblox hoạt động ra sao?* → tra https://github.com/Roblox/creator-docs, đừng nhớ theo trí nhớ
 - *Workflow ra sao?* → Edit VSCode → Rojo sync tự động → Studio
+- *Trước khi publish?* → `docs/REGRESSION.md`
 
 ---
 
@@ -98,17 +103,21 @@ rojo serve
 
 ```
 SpeedEscape/
-├── src/
-│   ├── client/        ← LocalScript, UI Controllers
-│   ├── server/        ← Script, Services
-│   └── shared/        ← ModuleScript, Constants, Config
-├── Packages/          ← Wally packages (Fusion, ByteNet, Janitor)
-├── ServerPackages/    ← Wally server packages (ProfileStore)
-├── default.project.json  ← Rojo config
-├── wally.toml         ← Package dependencies
-├── CLAUDE.md          ← AI collaboration guide
-├── PROJECT_STATE.md   ← Current state tracker
-└── GDD_v2.md          ← Game design document
+├── src/                    ← MÃ NGUỒN (Rojo sync vào Studio)
+│   ├── client/             ← LocalScript, UI Controllers
+│   ├── server/             ← Script, Services
+│   └── shared/             ← ModuleScript, Constants, Config
+├── docs/
+│   ├── PLAYTIME.md         ← Sprint giữ chân (chốt 12/09/2026)
+│   └── REGRESSION.md       ← Checklist bắt buộc trước mỗi lần publish
+├── Packages/               ← Wally packages (Fusion, ByteNet, Janitor)
+├── ServerPackages/         ← Wally server packages (ProfileStore)
+├── SpeedEscape.rbxl        ← Snapshot THẾ GIỚI GAME (xem "Nguồn chân lý")
+├── default.project.json    ← Rojo config
+├── wally.toml              ← Package dependencies
+├── AGENTS.md               ← LUẬT KỸ THUẬT DUY NHẤT cho mọi AI (Claude, Codex, …)
+├── CLAUDE.md               ← mẩu trỏ sang AGENTS.md
+└── GDD.md                  ← Game design document
 ```
 
 ---

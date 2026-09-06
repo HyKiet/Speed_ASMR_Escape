@@ -5,6 +5,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
@@ -45,16 +46,31 @@ local DailyService = {}
 	— lệch nhau là người chơi thấy một đằng nhận một nẻo.
 ]]
 local DAILY_REWARDS = {
-	-- 2 Wins KHÔNG phải con số tuỳ ý: cộng với 1 Win của Stage 1 là đúng 3 — mốc mở khoá
-	-- Multiplier Pad 2, tức bước 2 của tutorial. Xem TutorialService để hiểu ràng buộc.
-	{ wins = 2, speed = 1000 },
-	{ speed = 5000, boostSpeed = 600 },
-	{ wins = 25, spin = 1 },
-	{ speed = 25000, boostWins = 600 },
-	{ wins = 150, spin = 2 },
-	{ speed = 150000, megaServerBoost = true },
-	{ wins = 1000, spin = 3, trail = "trail_streak_aurora" },
+	-- Ngày 1 cố tình NGHÈO Wins: người chơi mới không được nhảy cóc qua đoạn đầu game. Toàn bộ
+	-- Wins đáng kể của chuỗi nằm ở Ngày 5 và Ngày 7, tức phải đi gần trọn chuỗi mới chạm tới.
+	{ wins = 5, speed = 2_000 },
+	{ speed = 10_000, boostSpeed = 900 },
+	{ wins = 150, spin = 1 },
+	{ speed = 60_000, boostWins = 900 },
+	{ wins = 1_200, spin = 2 },
+	{ speed = 400_000, megaServerBoost = true },
+	{ wins = 12_000, spin = 3, trail = "trail_streak_aurora" },
 }
+
+--[[
+	NGÀY 7 TỪ VÒNG 2 TRỞ ĐI (GDD 3.0 §7.4).
+
+	Chuỗi lặp vô hạn: hết Ngày 7 thì hôm sau quay lại Ngày 1. Nhưng Streak Aurora Trail chỉ có
+	MỘT cái — từ vòng 2 người chơi đã sở hữu nó, nên nếu vẫn phát trail thì phần thưởng đỉnh của
+	cả tuần biến thành một lệnh không làm gì, và người đi trọn 14 ngày nhận ít giá trị hơn người
+	đi trọn 7 ngày.
+
+	Gói bù dùng lại đúng nguyên tắc "% mục tiêu hiện tại" của Daily Quest (§7.3) nên nó không bao
+	giờ lỗi thời, dù người chơi đang ở R2 hay R20.
+]]
+local REPEAT_DAY7_FEE_SHARE = 0.20 -- % phí Wins trùng sinh kế tiếp
+local REPEAT_DAY7_CLIMB_SHARE = 0.15 -- % quãng đường trùng sinh kế tiếp
+local REPEAT_DAY7_MIN_WINS = 12_000 -- không bao giờ tệ hơn Ngày 7 vòng 1
 
 local SECONDS_PER_DAY = 86400
 
@@ -139,13 +155,34 @@ local function grantReward(player: Player, day: number)
 	end
 
 	if reward.megaServerBoost and serverBoostService then
-		serverBoostService.ActivateServerBoost(player, "both", 600)
+		serverBoostService.ActivateServerBoost(player, "both", 900)
 	end
 
-	-- Trail độc quyền Ngày 7. `equip = true`: mặc luôn cho người chơi — phần thưởng của bảy
-	-- ngày kiên trì phải HIỆN RA sau lưng họ ngay, không bắt đi tìm trong menu Cosmetics.
+	--[[
+		Trail độc quyền Ngày 7. `equip = true`: mặc luôn cho người chơi — phần thưởng của bảy
+		ngày kiên trì phải HIỆN RA sau lưng họ ngay, không bắt đi tìm trong menu Cosmetics.
+
+		`UnlockCosmetic` trả về false nếu người chơi ĐÃ sở hữu ⇒ đây là vòng 2 trở đi ⇒ trả gói
+		bù co giãn thay thế. Không cần thêm trường dữ liệu nào để biết đang ở vòng mấy.
+	]]
 	if reward.trail then
-		ProgressionService.UnlockCosmetic(player, "trail", reward.trail, true)
+		local isFirstTime = ProgressionService.UnlockCosmetic(player, "trail", reward.trail, true)
+		if not isFirstTime then
+			local data = DataService.GetData(player)
+			if data then
+				local rebirths = math.max(0, math.floor(tonumber(data.Rebirths) or 0))
+				local nextLevel = Constants.GetRequiredLevelForRebirth(rebirths)
+				local climb = math.max(0, Constants.GetCumulativeXP(nextLevel) - (tonumber(data.Speed) or 0))
+				local feeShare = Constants.GetRebirthWinsCost(rebirths + 1) * REPEAT_DAY7_FEE_SHARE
+
+				local bonusWins = math.floor(math.max(REPEAT_DAY7_MIN_WINS, feeShare))
+				local bonusSpeed = math.floor(climb * REPEAT_DAY7_CLIMB_SHARE)
+				ProgressionService.AwardWins(player, bonusWins, "daily")
+				if bonusSpeed > 0 then
+					ProgressionService.GrantSpeed(player, bonusSpeed)
+				end
+			end
+		end
 	end
 end
 
@@ -155,11 +192,14 @@ local function onClaim(player: Player)
 		return
 	end
 
-	local _, canClaim, nextDay = computeState(data)
+	local currentStreak, canClaim, nextDay = computeState(data)
 	if not canClaim then
 		sendState(player)
 		return
 	end
+	-- `computeState` đọc `DailyStreakDay`, mà dòng dưới ghi đè nó ngay — giữ lại bản cũ trong
+	-- biến cục bộ (KHÔNG ghi field rác vào profile) để phân biệt "vòng mới liền mạch" với
+	-- "chuỗi vừa đứt" khi cập nhật LifetimeStreak.
 
 	-- Ghi cờ chống-trùng TRƯỚC khi cấp thưởng. grantReward → AwardWins có thể yield
 	-- (GroupChestService.IsGroupMember gọi web API); nếu ghi cờ sau, hai gói claim cùng
@@ -168,6 +208,16 @@ local function onClaim(player: Player)
 	-- nextDay đã được chốt ở computeState nên đặt cờ sớm không đổi phần thưởng.
 	data.DailyStreakDay = nextDay
 	data.DailyLastClaimDay = todayNumber()
+	--[[
+		Tổng ngày liên tục qua MỌI vòng — chỉ để khoe và để đo nhóm gắn bó nhất, không trao
+		thưởng. `nextDay == 1` sau khi bỏ lỡ nghĩa là chuỗi vừa đứt: `computeState` trả
+		(0, true, 1) ở nhánh đó, phân biệt được với vòng mới liền mạch nhờ `streak >= 7`.
+	]]
+	if nextDay == 1 and currentStreak < 7 then
+		data.LifetimeStreak = 1
+	else
+		data.LifetimeStreak = (tonumber(data.LifetimeStreak) or 0) + 1
+	end
 
 	grantReward(player, nextDay)
 

@@ -39,6 +39,7 @@ type Entry = {
 }
 
 local entries: { [Player]: Entry } = {}
+local emoteSuppressed: { [Player]: boolean } = {}
 
 -- Anim chạy THẬT của avatar từng player (từ HumanoidDescription, 1 web call/player, cache).
 -- Cần thiết vì `Animate.run` do script Animate tạo LÚC RUNTIME trên máy chính chủ —
@@ -118,7 +119,7 @@ local function refresh(player: Player)
 		return
 	end
 
-	local farming = player:GetAttribute("TreadmillFarming") == true
+	local farming = player:GetAttribute("TreadmillFarming") == true and emoteSuppressed[player] ~= true
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
@@ -202,6 +203,7 @@ function TreadmillAnimController.Start()
 	Players.PlayerRemoving:Connect(function(player)
 		local entry = entries[player]
 		entries[player] = nil
+		emoteSuppressed[player] = nil
 		if entry then
 			stopTrack(player, entry)
 			for _, connection in entry.connections do
@@ -216,7 +218,7 @@ function TreadmillAnimController.Start()
 		while true do
 			task.wait(POLL_INTERVAL)
 			for player, entry in entries do
-				local farming = player:GetAttribute("TreadmillFarming") == true
+				local farming = player:GetAttribute("TreadmillFarming") == true and emoteSuppressed[player] ~= true
 				local playing = entry.track ~= nil and (entry.track :: AnimationTrack).IsPlaying
 				if farming ~= playing then
 					refresh(player)
@@ -228,6 +230,17 @@ function TreadmillAnimController.Start()
 	if DEBUG then
 		Log.Boot("[TreadmillAnim] ready — attribute-driven + 1s self-healing poll")
 	end
+end
+
+-- Emote owns the character animation while active. Suppression prevents the 1s
+-- self-healing poll from immediately restarting the treadmill track underneath it.
+function TreadmillAnimController.SetEmoteSuppressed(player: Player, suppressed: boolean)
+	if suppressed then
+		emoteSuppressed[player] = true
+	else
+		emoteSuppressed[player] = nil
+	end
+	refresh(player)
 end
 
 return TreadmillAnimController

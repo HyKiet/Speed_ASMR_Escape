@@ -18,6 +18,9 @@ return ByteNet.defineNamespace("speedEscape", function()
 				xp = ByteNet.float64,
 				requiredXP = ByteNet.float64,
 				rebirths = ByteNet.uint16,
+				-- Phí Wins của lần trùng sinh KẾ TIẾP (GDD 3.0 §3.4). float64 vì ở R20 phí đã
+				-- là 32 tỉ — uint32 tràn từ R17.
+				rebirthWinsCost = ByteNet.float64,
 				maxWalkSpeed = ByteNet.float32,
 				customSpeedLimit = ByteNet.float32,
 				gainMultiplier = ByteNet.float32,
@@ -29,7 +32,6 @@ return ByteNet.defineNamespace("speedEscape", function()
 				auraMultiplier = ByteNet.float32,
 				cosmeticMultiplier = ByteNet.float32,
 				rebirthMultiplier = ByteNet.float32,
-				playtimeMultiplier = ByteNet.float32,
 				friendsMultiplier = ByteNet.float32,
 				serverMultiplier = ByteNet.float32,
 				liveOpsMultiplier = ByteNet.float32,
@@ -167,6 +169,74 @@ return ByteNet.defineNamespace("speedEscape", function()
 		}),
 		requestTutorialSkip = ByteNet.definePacket({
 			value = ByteNet.struct({}),
+		}),
+		nextStageBanner = ByteNet.definePacket({
+			value = ByteNet.struct({
+				stage = ByteNet.uint8,
+				rewardWins = ByteNet.float64,
+				requiredWalkSpeed = ByteNet.float32,
+				missingWalkSpeed = ByteNet.float32,
+			}),
+		}),
+		requestEmoteAction = ByteNet.definePacket({
+			value = ByteNet.struct({
+				action = ByteNet.string,
+				emoteId = ByteNet.string,
+			}),
+		}),
+		emoteState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				unlocked = ByteNet.map(ByteNet.string, ByteNet.bool),
+			}),
+		}),
+		emoteBroadcast = ByteNet.definePacket({
+			value = ByteNet.struct({
+				userId = ByteNet.float64,
+				action = ByteNet.string,
+				emoteId = ByteNet.string,
+			}),
+		}),
+		questState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				active = ByteNet.bool,
+				index = ByteNet.uint8,
+				title = ByteNet.string,
+				progress = ByteNet.float64,
+				target = ByteNet.float64,
+				rewardText = ByteNet.string,
+				rewardSpeed = ByteNet.float64,
+				rewardSpins = ByteNet.uint8,
+			}),
+		}),
+		dailyQuestState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				active = ByteNet.bool,
+				rewardText = ByteNet.string,
+				rewardSpeed = ByteNet.float64,
+				rewardWins = ByteNet.float64,
+				quest1Title = ByteNet.string,
+				quest1Progress = ByteNet.float64,
+				quest1Target = ByteNet.float64,
+				quest1Claimed = ByteNet.bool,
+				quest2Title = ByteNet.string,
+				quest2Progress = ByteNet.float64,
+				quest2Target = ByteNet.float64,
+				quest2Claimed = ByteNet.bool,
+				quest3Title = ByteNet.string,
+				quest3Progress = ByteNet.float64,
+				quest3Target = ByteNet.float64,
+				quest3Claimed = ByteNet.bool,
+			}),
+		}),
+		requestDailyQuestClaim = ByteNet.definePacket({
+			value = ByteNet.struct({ index = ByteNet.uint8 }),
+		}),
+		-- Chỉ phục vụ chẩn đoán 30 giây đầu; không cấp thưởng hay thay đổi gameplay.
+		earlySessionState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				assetsLoaded = ByteNet.bool,
+				controlsTouched = ByteNet.bool,
+			}),
 		}),
 		dailyState = ByteNet.definePacket({
 			value = ByteNet.struct({

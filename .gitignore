@@ -22,6 +22,6 @@ globalTypes.d.luau
 .claude/worktrees/
 .codegraph/
 
-# Bí mật cục bộ — API key Open Cloud (xem docs/OPEN_CLOUD.md). KHÔNG BAO GIỜ commit.
+# Bí mật cục bộ — API key Open Cloud. KHÔNG BAO GIỜ commit.
 .env
 .env.local

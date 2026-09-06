@@ -2,27 +2,28 @@
 --[[
 	Khi player đặt chân lên PadPart trong Workspace.MultiplierPads.Pad_{N} (nhận diện bằng
 	quét hình học mỗi frame — xem khối `ENTER_MARGIN_STUDS` bên dưới, KHÔNG dùng `Touched`):
-	  - Nếu TotalWins >= requiredWins: set ActivePadId attribute (client tô màu vàng/xanh)
-	  - Nếu chưa đủ: gửi toast "Need X Wins"
-	Pad mặc định khi player join = pad CAO NHẤT mà số Wins hiện tại với tới (2026-08-22).
-	Nhưng mặc định KHÔNG PHẢI là ép buộc: người chơi tự chọn lại pad nào cũng được trong số
-	pad đã mở — lên pad cao hơn thì ăn ngay khi chạm, xuống pad thấp hơn thì phải ĐỨNG YÊN
-	trên đó ~1.2 giây (xem `DOWNGRADE_DWELL_SECONDS`) để không bị đổi nhầm lúc chạy ngang qua.
+	  - Pad ĐÃ SỞ HỮU  → set ActivePadId (client tô màu vàng/xanh).
+	  - Pad chưa sở hữu → thử MUA ngay tại chỗ; thiếu Wins thì toast "Need N more Wins".
 
-	── MỞ KHOÁ LÀ TRẠNG THÁI, KHÔNG PHẢI CỘT MỐC (chốt 2026-08-10, user) ─────────────────
-	Trước đây `HighestPadIndex` là cột mốc VĨNH VIỄN: đạt 15 Wins một lần là giữ Pad 3 mãi
-	mãi. Mà Wins TIÊU ĐƯỢC (teleport, pad tính phí ở ProgressionService) nên người chơi có
-	thể đứng trên pad +5/step với 0 Wins trong túi — hưởng sức mạnh mình không còn nuôi nổi.
+	Pad mặc định khi player join = pad CAO NHẤT đã sở hữu. Nhưng mặc định KHÔNG PHẢI ép buộc:
+	người chơi tự chọn lại pad nào cũng được trong số pad đã mở — lên pad cao hơn thì ăn ngay
+	khi chạm, xuống pad thấp hơn thì phải ĐỨNG YÊN trên đó ~1.2 giây (xem
+	`DOWNGRADE_DWELL_SECONDS`) để không bị đổi nhầm lúc chạy ngang qua.
 
-	Giờ quyền dùng pad được tính LẠI theo số Wins HIỆN TẠI:
-	  - `eligibleIndex(data)` = pad cao nhất mà Wins hiện tại với tới.
-	  - Wins tụt xuống dưới ngưỡng ⇒ `enforcePad` tự HẠ người chơi về đúng pad họ còn đủ,
-	    kèm toast giải thích (im lặng hạ cấp thì họ chỉ thấy "sao tự nhiên farm chậm đi").
-	  - `data.HighestPadIndex` giữ nguyên tên (client đọc để tô màu) nhưng đổi vai: từ cột
-	    mốc đã lưu thành BẢN SAO của mức đang đủ điều kiện.
+	── MUA VĨNH VIỄN, KHÔNG PHẢI NGƯỠNG VÍ (đảo lại 2026-09-06, GDD 3.0 §5.1) ─────────────
+	Từ 2026-08-22 tới 2026-09-06, quyền dùng pad được tính LẠI theo số Wins HIỆN TẠI: tiêu tiền
+	xuống dưới ngưỡng là bị `enforcePad` hạ pad. Ý đồ khi đó là "không cho hưởng sức mạnh mình
+	không còn nuôi nổi", nhưng hệ quả đo được trên Live là **người chơi ngừng tiêu Wins hẳn** —
+	Sinks/Sources = 2,3%. Trong một simulator, tiêu tiền phải làm mạnh lên, không bao giờ yếu đi.
 
-	Ngưỡng `requiredWins` tăng dần đều theo pad nên không cần luật "mua tuần tự" nữa: đủ Wins
-	cho pad N thì đương nhiên đủ cho mọi pad dưới N.
+	Giờ:
+	  - `data.HighestPadIndex` = pad đã MUA, lưu trong profile, CHỈ TĂNG.
+	  - `tryPurchasePad` trừ Wins một lần, mua tuần tự từng bậc.
+	  - `enforcePad` chỉ còn việc phát pad cao nhất đã sở hữu lúc vào game; không còn hạ ai.
+
+	⚠️ Migration cấp bù nằm ở `DataService.normalizeData` (CORE_LOOP_VERSION 5): mọi tài khoản
+	được cấp miễn phí pad mà `TotalWins` đủ theo bảng ngưỡng CŨ. Thiếu bước đó là cướp pad của
+	người đang chơi.
 ]]
 
 local Players = game:GetService("Players")
@@ -36,9 +37,9 @@ local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
 
 type PadConfig = Constants.MultiplierPadConfig
 
-local ENFORCE_INTERVAL_SECONDS = 1
 local PADS_FOLDER_NAME = "MultiplierPads"
 local PAD_PART_NAME = "PadPart"
+local INFO_PART_NAME = "InfoPart"
 
 --[[
 	NHẬN DIỆN BẰNG QUÉT MỖI FRAME, KHÔNG DÙNG `Touched` NỮA (2026-08-26, user: "nhận diện
@@ -113,6 +114,7 @@ local lastRootPosition: { [Player]: Vector3 } = {}
 local DataService
 local ProgressionService
 local TutorialService
+local TelemetryService
 
 local MultiplierPadService = {}
 
@@ -122,24 +124,54 @@ local function padIndexFromId(id: string): number
 	return n and tonumber(n) or 1
 end
 
--- Pad cao nhất mà số Wins HIỆN TẠI với tới. Ngưỡng tăng dần nên gặp pad đầu tiên không đủ
--- là dừng được luôn.
+--[[
+	Pad cao nhất người chơi ĐÃ SỞ HỮU.
+
+	══ ĐỔI 2026-09-06 (GDD 3.0 §5.1) ═══════════════════════════════════════════════════════
+	Trước đây hàm này tính lại từ `data.TotalWins` mỗi lần gọi, tức pad là ngưỡng SỐ DƯ VÍ.
+	Hệ quả: mua một trail 100.000 Wins là tự đánh tụt pad của chính mình, và `enforcePad` bên
+	dưới hạ người chơi xuống ngay. Người chơi học được rằng tiêu tiền thì bị phạt — đó là
+	nguyên nhân gốc của Sinks/Sources = 2,3% đo trên Live.
+
+	Giờ quyền sở hữu nằm ở `data.HighestPadIndex`, mua một lần và giữ mãi.
+]]
 local function eligibleIndex(data: any): number
-	local wins = tonumber(data.TotalWins) or 0
-	local best = 1
-	for index, config in Constants.MULTIPLIER_PADS do
-		if wins >= config.requiredWins then
-			best = index
-		else
-			break
-		end
+	local owned = math.floor(tonumber(data.HighestPadIndex) or 1)
+	return math.clamp(owned, 1, #Constants.MULTIPLIER_PADS)
+end
+
+--[[
+	Mua pad `padIndex`. Trừ Wins TRƯỚC, cấp quyền SAU (luật kinh tế của repo).
+	Trả về (thành công, thiếu bao nhiêu Wins).
+]]
+local function tryPurchasePad(player: Player, data: any, padIndex: number): (boolean, number)
+	local config = Constants.MULTIPLIER_PADS[padIndex]
+	if not config then
+		return false, 0
 	end
-	return best
+	-- Chỉ mua được bậc KẾ TIẾP: thang giá tăng dần nên mua tuần tự vừa rẻ hơn vừa giữ cho
+	-- người chơi không nhảy thẳng lên pad 8 bằng một cú trúng Roulette.
+	if padIndex ~= eligibleIndex(data) + 1 then
+		return false, 0
+	end
+	local price = config.requiredWins
+	local wins = tonumber(data.TotalWins) or 0
+	if wins < price then
+		return false, price - wins
+	end
+	data.TotalWins = wins - price
+	data.HighestPadIndex = padIndex
+	if TelemetryService then
+		TelemetryService.Economy(player, "Sink", price, data.TotalWins, "pad")
+	end
+	DataService.UpdateLeaderstats(player)
+	return true, 0
 end
 
 -- Đồng bộ attribute HighestPadIndex (client đọc để tô màu vàng/xanh/xám).
-local function publishHighestPad(player: Player, data: any, eligible: number)
-	data.HighestPadIndex = eligible
+-- Chỉ ĐỒNG BỘ attribute cho client; KHÔNG ghi ngược vào `data.HighestPadIndex` nữa —
+-- trường đó giờ là quyền sở hữu vĩnh viễn, chỉ `tryPurchasePad` và migration được đụng vào.
+local function publishHighestPad(player: Player, eligible: number)
 	if player:GetAttribute("HighestPadIndex") ~= eligible then
 		player:SetAttribute("HighestPadIndex", eligible)
 	end
@@ -148,6 +180,9 @@ end
 local function applyPad(player: Player, config: PadConfig)
 	player:SetAttribute("ActivePadId", config.id)
 	ProgressionService.SetActivePad(player, config.id, config.speedPerStep)
+	if config.id == "pad_2" and TelemetryService then
+		TelemetryService.CoreLoopV2(player, "Pad2")
+	end
 end
 
 local function activeIndex(player: Player): number
@@ -169,7 +204,7 @@ local function enforcePad(player: Player, announce: boolean)
 	end
 
 	local eligible = eligibleIndex(data)
-	publishHighestPad(player, data, eligible)
+	publishHighestPad(player, eligible)
 
 	local current = activeIndex(player)
 
@@ -376,7 +411,7 @@ local function onPadEntered(player: Player, entry: PadEntry)
 	local now = os.clock()
 	local padIndex = entry.index
 	local eligible = eligibleIndex(data)
-	publishHighestPad(player, data, eligible)
+	publishHighestPad(player, eligible)
 
 	--[[
 		ĐI QUA PAD THẤP HƠN KHÔNG PHẢI LÀ CHỌN NÓ (2026-08-26, user báo qua video quay trên
@@ -405,15 +440,27 @@ local function onPadEntered(player: Player, entry: PadEntry)
 		⚠️ Tutorial vẫn phải báo NGAY khi chạm (không đợi đứng đủ giờ): người đã ở Pad 3+ mà
 		quay lại giẫm Pad 2 thì bước 2 vẫn phải tính là xong, nếu không họ kẹt tutorial.
 	]]
-	-- Chưa đủ Wins cho pad này → đứng lên cũng không được hưởng.
+	--[[
+		Pad chưa sở hữu → THỬ MUA ngay tại chỗ (GDD 3.0 §5.1). Đủ Wins thì trừ tiền, cấp vĩnh
+		viễn rồi kích hoạt luôn; thiếu thì báo còn thiếu bao nhiêu.
+	]]
 	if padIndex > eligible then
 		pendingSelect[player] = nil
+		local bought, missing = tryPurchasePad(player, data, padIndex)
+		if not bought then
+			local message = if missing > 0
+				then `Need {Constants.FormatNumber(missing)} more Wins`
+				else `Unlock Pad {padIndex - 1} first`
+			GamePackets.toast.sendTo({ kind = "pad", message = message, amount = 0 }, player)
+			return
+		end
+		eligible = padIndex
+		publishHighestPad(player, eligible)
 		GamePackets.toast.sendTo({
 			kind = "pad",
-			message = `Need {Constants.FormatNumber(config.requiredWins)} Wins`,
+			message = `Pad {padIndex} unlocked! −{Constants.FormatNumber(config.requiredWins)} Wins`,
 			amount = 0,
 		}, player)
-		return
 	end
 
 	if padIndex < activeIndex(player) then
@@ -461,6 +508,55 @@ local function onPadEntered(player: Player, entry: PadEntry)
 	ProgressionService.SendSnapshot(player)
 end
 
+--[[
+	Ghi hai dòng chữ trên biển `InfoPart` của pad TỪ CONFIG, mỗi lần server khởi động.
+
+	⚠️ VÌ SAO PHẢI LÀM Ở ĐÂY chứ không gõ tay trong Studio: text này từng là chuỗi tĩnh nằm
+	trong map. Map không nằm trong git, không ai grep ra, không có gì đối chiếu nó với
+	`Config/Economy/MultiplierPads` — nên sau đợt đổi giá 2026-09-06 cả 8 biển vẫn quảng cáo
+	bảng giá cũ (+2/step · "Requires 15 Wins") suốt một thời gian mà không có lỗi nào nổi lên.
+	Người chơi đọc biển rồi bị trừ một số Wins khác hẳn: đó là mất lòng tin, không phải bug hiển thị.
+
+	Mỗi `InfoPart` có hai `SurfaceGui` (Front/Back), mỗi cái một `Frame` chứa ĐÚNG hai
+	`TextLabel` — và cả hai đều tên "TextLabel", nên KHÔNG tra được bằng tên. Phân biệt bằng
+	vị trí dọc: trên (`Position.Y.Scale` nhỏ hơn) = bậc Speed, dưới = giá. Layout này đồng nhất
+	ở cả 16 GUI (đo 2026-09-06); lệch đi thì warn chứ không ghi bừa.
+]]
+local function writePadSign(padModel: Instance, config: PadConfig)
+	local infoPart = padModel:FindFirstChild(INFO_PART_NAME)
+	if not infoPart then
+		return
+	end
+
+	local stepText = `+{config.speedPerStep}/step`
+	local priceText = if config.requiredWins <= 0
+		then "FREE"
+		else `{Constants.FormatNumber(config.requiredWins)} Win{if config.requiredWins == 1 then "" else "s"}`
+
+	for _, gui in infoPart:GetChildren() do
+		local frame = gui:IsA("SurfaceGui") and gui:FindFirstChild("Frame")
+		if frame then
+			local labels = {}
+			for _, child in frame:GetChildren() do
+				if child:IsA("TextLabel") then
+					table.insert(labels, child)
+				end
+			end
+			if #labels == 2 then
+				table.sort(labels, function(a, b)
+					return a.Position.Y.Scale < b.Position.Y.Scale
+				end)
+				labels[1].Text = stepText
+				labels[2].Text = priceText
+			else
+				warn(
+					`[MultiplierPadService] {gui:GetFullName()} có {#labels} TextLabel (cần 2) — biển giữ chữ cũ`
+				)
+			end
+		end
+	end
+end
+
 local function connectPad(padModel: Instance)
 	if padModel.Name == "BasePads" then
 		return
@@ -483,6 +579,7 @@ local function connectPad(padModel: Instance)
 	padPart:SetAttribute("PadId", config.id)
 	padPart:SetAttribute("SpeedPerStep", config.speedPerStep)
 	padPart:SetAttribute("RequiredWins", config.requiredWins)
+	writePadSign(padModel, config)
 
 	for _, existing in padEntries do
 		if existing.padPart == padPart then
@@ -616,6 +713,7 @@ function MultiplierPadService.Init()
 	ProgressionService = ServiceLocator.Get("ProgressionService")
 	-- Find: tutorial là thứ phụ, thiếu nó thì pad vẫn phải chạy.
 	TutorialService = ServiceLocator.Find("TutorialService")
+	TelemetryService = ServiceLocator.Find("TelemetryService")
 end
 
 function MultiplierPadService.Start()
@@ -648,25 +746,13 @@ function MultiplierPadService.Start()
 	RunService.Heartbeat:Connect(scanPlayers)
 
 	--[[
-		Vòng canh: Wins bị TIÊU ở nhiều nơi (TeleportService, pad tính phí trong
-		ProgressionService, và bất cứ thứ gì thêm sau này). Móc vào từng chỗ tiêu là kiểu hỏng
-		âm thầm — quên một chỗ là người chơi giữ được pad không còn nuôi nổi, mà chẳng ai thấy.
-		Quét 1 giây/lần rẻ hơn nhiều so với việc phải nhớ luật này ở mọi service tương lai, và
-		`enforcePad` không làm gì khi trạng thái đã đúng.
+		VÒNG CANH 1 GIÂY ĐÃ GỠ (2026-09-06).
+
+		Nó tồn tại để hạ pad khi Wins tụt xuống dưới ngưỡng. Từ khi pad là món mua vĩnh viễn
+		(GDD 3.0 §5.1) thì không còn trường hợp nào pad phải hạ, nên vòng lặp đó chỉ còn là
+		25 lần `pcall` mỗi giây không làm gì cả. `enforcePad` vẫn được gọi lúc vào game
+		(`ensureDefaultPad`) để phát pad cao nhất đã sở hữu.
 	]]
-	task.spawn(function()
-		while true do
-			task.wait(ENFORCE_INTERVAL_SECONDS)
-			for _, player in Players:GetPlayers() do
-				if DataService.IsLoaded(player) then
-					local ok, err = pcall(enforcePad, player, true)
-					if not ok then
-						warn(`[MultiplierPadService] enforcePad lỗi cho {player.Name}: {err}`)
-					end
-				end
-			end
-		end
-	end)
 end
 
 return MultiplierPadService

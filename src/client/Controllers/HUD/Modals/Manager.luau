@@ -11,6 +11,7 @@
 ]]
 
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -243,6 +244,8 @@ Manager.OpenDaily, Manager.CloseDaily, Manager.ToggleDaily = defineModal("daily"
 Manager.OpenGroupChest, Manager.CloseGroupChest, Manager.ToggleGroupChest = defineModal("groupChest")
 Manager.OpenStarterPack, Manager.CloseStarterPack, Manager.ToggleStarterPack = defineModal("starterPack")
 Manager.OpenSettings, Manager.CloseSettings, Manager.ToggleSettings = defineModal("settings")
+Manager.OpenQuest, Manager.CloseQuest, Manager.ToggleQuest = defineModal("quest")
+Manager.OpenEmote, Manager.CloseEmote, Manager.ToggleEmote = defineModal("emote")
 Manager.OpenOffline, Manager.CloseOffline, Manager.ToggleOffline = defineModal("offline")
 
 -- Roulette xin state mới từ server ngay lúc mở: số vé và đồng hồ quay miễn phí thay đổi cả khi
@@ -343,6 +346,43 @@ function Manager.OpenRevive(
 			State.reviveCountdownFraction:set(0)
 			Manager.CloseRevive()
 		end
+	end)
+end
+
+--[[
+	[Studio-only test hook] MỞ / ĐÓNG MỘT MODAL BẤT KỲ TỪ NGOÀI.
+
+	    LocalPlayer:SetAttribute("StudioOpenModal", "quest")   -- mở modal id "quest"
+	    LocalPlayer:SetAttribute("StudioOpenModal", "")        -- đóng hết
+
+	Cùng kiểu với `StudioOfflineNotice` / `StudioTutorialFinale` / `StudioTestCelebration`, và
+	có mặt vì đúng lý do đó: công cụ MCP `execute_luau` chạy trong MỘT VM RIÊNG, không với được
+	bảng module `Manager` mà HUD đang giữ, nên không có cách nào gọi thẳng `Manager.OpenQuest()`
+	từ ngoài. Attribute là sợi dây duy nhất đi qua được ranh giới đó.
+
+	`id` lấy từ `Modals/Registry.IDS`, nên hook này tự phủ mọi modal mới mà không phải sửa gì.
+	⚠️ "revive" cần tham số nên hook bỏ qua nó — mở bằng `Manager.OpenRevive` như bình thường.
+]]
+if RunService:IsStudio() then
+	local localPlayer = Players.LocalPlayer
+	localPlayer:GetAttributeChangedSignal("StudioOpenModal"):Connect(function()
+		local id = localPlayer:GetAttribute("StudioOpenModal")
+		if typeof(id) ~= "string" then
+			return
+		end
+		localPlayer:SetAttribute("StudioOpenModal", nil)
+
+		if id == "" then
+			hideAll()
+			Manager.RefreshModalFx()
+			return
+		end
+		if id == "revive" or not table.find(Registry.IDS, id) then
+			warn(`[Manager] StudioOpenModal: không mở được "{id}"`)
+			return
+		end
+		hideAll(id)
+		setModalOpen(id, true)
 	end)
 end
 

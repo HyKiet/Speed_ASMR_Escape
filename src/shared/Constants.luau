@@ -20,7 +20,6 @@ local Treadmills = require(Config.Economy.Treadmills)
 local Trails = require(Config.Economy.Trails)
 local Auras = require(Config.Economy.Auras)
 local MultiplierPads = require(Config.Economy.MultiplierPads)
-local StreakBonuses = require(Config.Economy.StreakBonuses)
 local Gamepass = require(Config.Economy.Gamepass)
 local Format = require(script.Parent.Util.Format)
 
@@ -28,7 +27,6 @@ export type TreadmillConfig = Treadmills.TreadmillConfig
 export type TrailConfig = Trails.TrailConfig
 export type AuraConfig = Auras.AuraConfig
 export type MultiplierPadConfig = MultiplierPads.MultiplierPadConfig
-export type StreakBonusConfig = StreakBonuses.StreakBonusConfig
 export type TeleportDestinationConfig = Teleport.TeleportDestinationConfig
 export type StageGate = Stages.StageGate
 
@@ -43,8 +41,8 @@ for key, value in Tuning :: { [string]: any } do
 	Constants[key] = value
 end
 
--- Stages (STAGE_WINS, MAX_CONFIGURED_STAGE, FINISH_REWARD_COOLDOWN, STAGE_15_FIRST_CLEAR_BONUS,
--- STAGE_GATES, REVIVE_*, SKIP_REBIRTH_*)
+-- Stages (STAGE_WINS, MAX_CONFIGURED_STAGE, FINISH_REWARD_COOLDOWN, STAGE_GATES, REVIVE_*,
+-- SKIP_REBIRTH_*)
 for key, value in Stages :: { [string]: any } do
 	Constants[key] = value
 end
@@ -55,27 +53,28 @@ Constants.TREADMILLS = Treadmills
 Constants.TRAILS = Trails
 Constants.AURAS = Auras
 Constants.MULTIPLIER_PADS = MultiplierPads
-Constants.STREAK_BONUSES = StreakBonuses
 Constants.TELEPORT_DESTINATIONS = Teleport
 Constants.GAMEPASS_IDS = Gamepass
 
 -- Công thức
-Constants.XP_CURVE_ANCHOR_LEVEL = Formulas.XP_CURVE_ANCHOR_LEVEL
-Constants.XP_CURVE_ANCHOR_REQUIRED_SPEED = Formulas.XP_CURVE_ANCHOR_REQUIRED_SPEED
-Constants.XP_CURVE_NEXT_REQUIRED_SPEED = Formulas.XP_CURVE_NEXT_REQUIRED_SPEED
-Constants.XP_CURVE_GROWTH_RATE = Formulas.XP_CURVE_GROWTH_RATE
+Constants.XP_SPRINT_MAX_LEVEL = Formulas.XP_SPRINT_MAX_LEVEL
+Constants.XP_SPRINT_BASE = Formulas.XP_SPRINT_BASE
+Constants.XP_SPRINT_GROWTH = Formulas.XP_SPRINT_GROWTH
+Constants.XP_MARATHON_ANCHOR = Formulas.XP_MARATHON_ANCHOR
+Constants.XP_MARATHON_GROWTH = Formulas.XP_MARATHON_GROWTH
 
 Constants.GetRequiredXP = Formulas.GetRequiredXP
+Constants.GetCumulativeXP = Formulas.GetCumulativeXP
 Constants.GetMaxWalkSpeed = Formulas.GetMaxWalkSpeed
 Constants.GetLevelUpWinsReward = Formulas.GetLevelUpWinsReward
 Constants.GetRequiredLevelForRebirth = Formulas.GetRequiredLevelForRebirth
 Constants.GetRebirthMultiplier = Formulas.GetRebirthMultiplier
+Constants.GetRebirthWinsCost = Formulas.GetRebirthWinsCost
 Constants.GetStageGate = Formulas.GetStageGate
 Constants.GetTreadmillById = Formulas.GetTreadmillById
 Constants.GetMultiplierPadById = Formulas.GetMultiplierPadById
 Constants.GetTrailMultiplier = Formulas.GetTrailMultiplier
 Constants.GetAuraMultiplier = Formulas.GetAuraMultiplier
-Constants.GetStreakBonus = Formulas.GetStreakBonus
 
 -- Format
 Constants.FormatNumber = Format.Number

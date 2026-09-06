@@ -237,6 +237,10 @@ local function onSpinRequest(player: Player)
 		return
 	end
 	data.SpinTickets = tickets - 1
+	local questService = ServiceLocator.Find("QuestService")
+	if questService then
+		questService.Record(player, "roulette_spin", 1)
+	end
 
 	local slotIndex = rollSlotIndex()
 

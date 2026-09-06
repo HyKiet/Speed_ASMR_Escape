@@ -3,7 +3,7 @@
 	MovementMath.luau — phần TOÁN THUẦN của hệ di chuyển.
 
 	Chỉ nhận số và Vector3, KHÔNG chạm Instance / service / os.clock. Nhờ vậy chạy được
-	bằng Lune ngoài Roblox và có unit test trong tests/run.luau.
+	bằng Lune ngoài Roblox — giữ tính chất đó khi sửa, kể cả khi repo không còn thư mục test.
 
 	Vì sao tách: các cơ chế này chỉ kéo dài khoảng 1 giây, mà mỗi lệnh điều khiển Studio
 	từ xa mất vài giây khứ hồi — không thể quan sát đúng thời điểm. Đưa phần quyết định

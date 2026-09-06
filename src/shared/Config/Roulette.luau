@@ -122,45 +122,39 @@ Roulette.VIP_TICKET_INTERVAL_SECONDS = 8 * 60
 Roulette.VIP_TICKET_STOCK_CAP = 5
 
 Roulette.SLOTS = {
+	--[[
+		⚠️ Ô THƯỜNG NHẤT: 50 < 53 = tổng giá pad_2 + pad_3 + pad_4.
+
+		Đây là ô người chơi mới gần như chắc chắn trúng ở vé chào mừng trong tutorial. Giữ nó
+		dưới tổng ba pad đầu là chốt chặn duy nhất còn lại nối bảng này với `Economy/MultiplierPads`
+		— trúng ô thường vẫn không tự mua nổi ba pad, vẫn phải chạy obby.
+	]]
 	{
-		id = "wins_75",
-		label = "+75 Wins",
+		id = "wins_50",
+		label = "+50 Wins",
 		kind = "wins",
-		--[[
-			DƯỚI mốc Pad 4 (100 Wins) — ô THƯỜNG NHẤT là ô duy nhất còn giữ luật "không nhảy
-			cóc pad", vì nó là thứ người chơi mới gần như chắc chắn trúng ở vé chào mừng.
-			Ba ô Wins còn lại đã được thả ra (xem điểm 1 trong khối cân lần ba ở đầu file).
-		]]
-		amount = 75,
-		weight = 23,
-		rarity = "23%",
+		amount = 50,
+		weight = 25,
+		rarity = "25%",
 		color = Color3.fromRGB(255, 205, 46),
 	},
 	{
 		id = "speed_15k",
 		label = "+15K Speed",
 		kind = "speed",
-		--[[
-			⚠️ TRẦN CỦA Ô NÀY BỊ ĐƯỜNG CONG XP KHOÁ, không phải tự do chọn.
-
-			Đo 2026-08-27 trên người chơi mới (Level 1, Speed 0):
-			    +10K → Level 23 (WS 58)   ·   +15K → Level 26 (WS 64)   ·   +25K → Level 29 (WS 70)
-			Bản nháp đầu tiên của lần cân này để 25K và nó đẩy người mới lên thẳng Level 29 —
-			qua luôn gate Stage 3 (minWS 42) chỉ bằng một ô 22%. 15K giữ mức nhảy ở Level 26,
-			vẫn phê nhưng không xoá mất mấy stage đầu.
-		]]
+		-- Soi vào đường cong XP mới: +15.000 đưa người chơi vừa reset lên Level 30 (WS 72),
+		-- vừa đủ mở Stage 4. Mọi ô Speed phải soi vào `Formulas.GetCumulativeXP`, không phải
+		-- soi vào các ô khác trên cùng bánh xe.
 		amount = 15_000,
 		weight = 22,
 		rarity = "22%",
 		color = Color3.fromRGB(120, 200, 255),
 	},
 	{
-		id = "wins_600",
-		label = "+600 Wins",
+		id = "wins_400",
+		label = "+400 Wins",
 		kind = "wins",
-		-- Mở được Pad 5 (500). Cố ý: đây là ô 16%, phải đáng bấm nút chứ không chỉ đủ để
-		-- không-tay-trắng.
-		amount = 600,
+		amount = 400,
 		weight = 16,
 		rarity = "16%",
 		color = Color3.fromRGB(104, 234, 95),
@@ -169,8 +163,8 @@ Roulette.SLOTS = {
 		id = "boost_speed",
 		label = "x2 Speed 15m",
 		kind = "boostSpeed",
-		-- 10 → 15 phút: ô boost là thứ DUY NHẤT tự co giãn theo thu nhập hiện tại của người
-		-- chơi, nên khi kéo Wins xuống thì đây là chỗ bù lại giá trị mà không gây lạm phát.
+		-- Hai ô boost là thứ DUY NHẤT trên bánh xe tự co giãn theo thu nhập hiện tại của người
+		-- chơi, nên chúng là toàn bộ giá trị end-game của hệ thống này.
 		amount = 900,
 		weight = 15,
 		rarity = "15%",
@@ -186,39 +180,25 @@ Roulette.SLOTS = {
 		color = Color3.fromRGB(90, 130, 255),
 	},
 	{
-		id = "wins_5k",
-		label = "+5K Wins",
+		id = "wins_4k",
+		label = "+4K Wins",
 		kind = "wins",
-		--[[
-			JACKPOT WINS — đây là ô gánh phần lớn lý do mua gói vé Robux, nên nó phải TO.
-
-			5.000 mở được Pad 6 (2.500) và vẫn cách xa Pad 7 (15.000). Bản 2.000 của lần cân
-			trước quá nhỏ để gọi là jackpot: nó chỉ nhỉnh hơn ô 16% có ba lần.
-		]]
-		amount = 5_000,
+		-- 4.000 < 4.273 = tổng giá pad_2..pad_7. Một cú may mắn vẫn không mua đứt cả thang pad.
+		amount = 4_000,
 		weight = 6,
 		rarity = "6%",
 		color = Color3.fromRGB(186, 90, 255),
 	},
 	{
-		id = "speed_200k",
-		label = "+200K Speed",
+		id = "speed_400k",
+		label = "+400K Speed",
 		kind = "speed",
-		--[[
-			Con số TO NHẤT của vòng quay nằm ở Speed chứ không phải Wins — đây là chỗ đổ dopamine
-			mà không đụng tới tiền cứng.
-
-			⚠️ GIỮ NGUYÊN 200K. Bản nháp của lần cân 27/08 đẩy lên 500K để "bù phần Wins đã cắt",
-			và đó là một sai lầm đo được: tổng Speed cần để tới Level 50 — mốc REBIRTH ĐẦU TIÊN —
-			là 523.004. Một ô 5% cho 500K tức là **96% toàn bộ quãng đường tới rebirth trong đúng
-			một lần quay**. 200K = 38%, đủ để hò reo mà vẫn còn hơn nửa chặng phải tự đi.
-
-			Luật rút ra: mọi ô Speed phải soi vào `Formulas.GetRequiredXP` cộng dồn, không phải
-			chỉ soi vào các ô khác trên cùng bánh xe.
-		]]
-		amount = 200_000,
-		weight = 5,
-		rarity = "5%",
+		-- Con số to nhất bánh xe nằm ở Speed chứ không phải Wins: Speed là tiền MỀM (mất trắng
+		-- khi trùng sinh), Wins là tiền CỨNG. Đổ dopamine ở tiền mềm thì không gây lạm phát.
+		-- +400.000 → Level 49 (WS 110) cho người vừa reset.
+		amount = 400_000,
+		weight = 3,
+		rarity = "3%",
 		color = Color3.fromRGB(255, 110, 80),
 	},
 	{
@@ -226,13 +206,13 @@ Roulette.SLOTS = {
 		label = "FROZEN BLOOM",
 		kind = "aura",
 		auraId = "aura_frozen_bloom",
-		-- Đền bù khi ĐÃ sở hữu aura: 25K → 8K. Vẫn là giải an ủi lớn nhất bảng, và vẫn DƯỚI
-		-- mốc Pad 7 (15.000 Wins).
-		amount = 8_000,
+		-- Đền bù khi ĐÃ sở hữu aura. Đây là lý do bánh xe không bao giờ hết giá trị: một aura
+		-- x10 nằm trong xô Cosmetic vĩnh viễn, đáng giá y hệt với người Level 20 và người R15.
+		-- Ba gói vé Robux bán chính món này, không phải bán mấy ô Wins.
+		amount = 10_000,
 		weight = 1,
 		rarity = "1%",
 		color = Color3.fromRGB(255, 60, 180),
 	},
 } :: { RouletteSlot }
-
 return Roulette

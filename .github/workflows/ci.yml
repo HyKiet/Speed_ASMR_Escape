@@ -7,8 +7,9 @@ on:
   workflow_dispatch:
 
 env:
+  # Lune, Rojo, StyLua, Selene và Wally đều đến từ aftman.toml — đừng ghim phiên bản ở đây.
+  # luau-lsp là ngoại lệ: nó tải bằng tay vì cần đúng cặp binary + globalTypes cùng tag.
   LUAU_LSP_VERSION: "1.69.0"
-  LUNE_VERSION: "0.10.5"
 
 jobs:
   check:
@@ -29,9 +30,20 @@ jobs:
       - name: Rojo sourcemap
         run: rojo sourcemap default.project.json -o sourcemap.json
 
-      # 2. Cổng chặn cứng: selene error (warning thì cho qua — repo đang có ~52 cái).
+      # 2. Cổng chặn cứng: selene error (warning thì cho qua — repo đang có ~32 cái).
       - name: Selene (chặn khi có error)
         run: selene --allow-warnings src
+
+      # ⚠️ KHÔNG CÒN UNIT TEST (gỡ 2026-09-05 cùng thư mục `tests/`).
+      #
+      #    Trước đó có 21 test Lune nạp thẳng `src/shared/Config/*` và kiểm những bất biến mà
+      #    mắt người đọc bảng số không bắt được: đường cong XP đơn điệu tăng, gate stage nằm
+      #    trong trần WalkSpeed, giá pad kẹp giữa hai mốc Wins, `EARLY_REBIRTH_LEVELS` hội tụ
+      #    đúng tại R8. Chúng đỏ khi ai đó đổi một số cân bằng mà quên bạn-cùng-cặp của nó.
+      #
+      #    Giờ không còn gì canh việc đó ngoài con mắt người review — xem danh sách cặp hằng số
+      #    khoá nhau ở `docs/PLAYTIME.md` §5 và `AGENTS.md` §5 luật 9. Khôi phục được từ git
+      #    history nếu cần: `git log -- tests/`.
 
       # 3. Không chặn: 76 file chưa format, dọn dần chứ không dọn một lượt.
       - name: StyLua (chỉ báo cáo)
@@ -80,7 +92,7 @@ jobs:
           # thông điệp) — đúng một lỗi thật.
           COUNT=$(grep "TypeError\|SyntaxError\|UnknownSymbol" lsp-out.txt \
             | sed 's/^[^[]*//' | sort -u | wc -l | tr -d ' ')
-          BASELINE=$(cat tests/luau-lsp-baseline.txt)
+          BASELINE=$(cat .github/luau-lsp-baseline.txt)
           echo "Lỗi type duy nhất: $COUNT (baseline $BASELINE)"
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Thêm $((COUNT - BASELINE)) lỗi type mới so với baseline."
@@ -89,7 +101,7 @@ jobs:
             exit 1
           fi
           if [ "$COUNT" -lt "$BASELINE" ]; then
-            echo "::notice::Giảm được $((BASELINE - COUNT)) lỗi — hạ tests/luau-lsp-baseline.txt xuống $COUNT."
+            echo "::notice::Giảm được $((BASELINE - COUNT)) lỗi — hạ .github/luau-lsp-baseline.txt xuống $COUNT."
           fi
 
       # 5. Không chặn: canh chừng snapshot thế giới game.
@@ -112,16 +124,6 @@ jobs:
           if [ "$COUNT" -lt 10000 ]; then
             echo "::warning::SpeedEscape.rbxl chỉ có $COUNT instance — trông như bản build chỉ-có-code chứ không phải thế giới game (~68.000). Kiểm tra lại xem đã dùng File → Download a Copy chưa."
           fi
-
-      # 6. Cổng chặn cứng: unit test công thức thuần (XP curve, walkspeed cap,
-      #    roulette weight, giá kinh tế). Chạy ngoài Roblox nên nhanh và rẻ.
-      - name: Chạy unit test (Lune)
-        run: |
-          curl -sL -o lune.zip \
-            "https://github.com/lune-org/lune/releases/download/v${LUNE_VERSION}/lune-${LUNE_VERSION}-linux-x86_64.zip"
-          unzip -q -o lune.zip
-          chmod +x lune
-          ./lune run tests/run.luau
 
       - uses: actions/upload-artifact@v4
         if: always()

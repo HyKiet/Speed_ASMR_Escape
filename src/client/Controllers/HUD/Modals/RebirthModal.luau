@@ -220,9 +220,19 @@ local function buildContent(): { any }
 				Theme.MakeOutlineLabel({
 					Position = UDim2.fromScale(0, 0),
 					Size = UDim2.fromScale(1, 1),
+					--[[
+						Dòng này gánh HAI điều kiện từ 2026-09-06: đủ Level và đủ Wins trả phí
+						(GDD 3.0 §3.4). Người chơi phải đọc ra ngay mình còn thiếu vế nào — thiếu
+						hiển thị vế phí là họ thấy "Level 120/120" mà nút vẫn xám.
+					]]
 					Text = Computed(function()
 						local s = State.GetSnapshot()
-						return `Level {s.level} / {s.requiredRebirthLevel}`
+						local levelPart = `Level {s.level} / {s.requiredRebirthLevel}`
+						local cost = s.rebirthWinsCost or 0
+						if cost <= 0 then
+							return levelPart
+						end
+						return `{levelPart}  •  {Constants.FormatNumber(cost)} Wins`
 					end),
 					MaxTextSize = 44,
 					ZIndex = 46,

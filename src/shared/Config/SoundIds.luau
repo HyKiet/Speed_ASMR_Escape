@@ -19,12 +19,8 @@
 ]]
 
 local SoundIds = {
-	--[[
-		Bàn phím cơ. Dùng ở HAI nơi và BẮT BUỘC phải giống nhau:
-		  • `ASMR/Floors/Keyboard` — sàn phím Zone 15 (4.650 phím).
-		  • `Effects/KeyCapperSFXController` — tiếng gõ phím của HUD.
-		Hai nơi này người chơi nghe cách nhau vài giây, lệch tiếng là nghe ra ngay.
-	]]
+	-- Bàn phím cơ — dùng bởi `ASMR/Floors/Keyboard` (sàn phím Zone 15, 4.650 phím).
+	-- (2026-09-06: `Effects/KeyCapperSFXController` đã gỡ cùng plugin KeyCapper, xem README.)
 	KEYBOARD_TICK = 9113140795, -- ProSoundEffects Apple Keyboard 5, 0.20s
 	KEYBOARD_RELEASE = 9116157307, -- ProSoundEffects Keyboard Typing 34, 0.30s
 

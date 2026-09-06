@@ -26,20 +26,13 @@
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "$properties": {
-        "CharacterWalkSpeed": 6
+        "CharacterWalkSpeed": 14
       },
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
         "Client": {
           "$path": "src/client"
         }
-      }
-    },
-
-    "StarterGui": {
-      "$className": "StarterGui",
-      "UI": {
-        "$path": "src/ui"
       }
     },
 
