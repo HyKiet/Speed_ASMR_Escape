@@ -4,7 +4,7 @@ build-ci.rbxl
 *.rbxl
 # ⚠️ NGOẠI LỆ: snapshot THẾ GIỚI GAME (File → Download a Copy trong Studio).
 # Đây là bản sao lưu duy nhất của map nằm trong version control — mọi thứ .rbxl khác
-# đều là sản phẩm build nên vẫn bị loại ở dòng trên. Xem README → "Nguồn chân lý".
+# đều là sản phẩm build nên vẫn bị loại ở dòng trên. Chỉ file này được giữ lại.
 !SpeedEscape.rbxl
 sourcemap.json
 sourcemap-check.json
@@ -25,3 +25,8 @@ globalTypes.d.luau
 # Bí mật cục bộ — API key Open Cloud. KHÔNG BAO GIỜ commit.
 .env
 .env.local
+
+# Ghi chú công cụ nội bộ — giữ trên máy, không đẩy lên remote
+CLAUDE.md
+AGENTS.md
+.mcp.json
