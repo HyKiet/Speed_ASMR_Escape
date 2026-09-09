@@ -53,10 +53,14 @@ local function prefetchRunAnim(player: Player)
 	end
 	task.spawn(function()
 		local ok, description = pcall(function()
-			return Players:GetHumanoidDescriptionFromUserId(userId)
+			return Players:GetHumanoidDescriptionFromUserIdAsync(userId)
 		end)
-		if ok and description and description.RunAnimation > 0 then
-			runAnimByUserId[userId] = `rbxassetid://{description.RunAnimation}`
+		if ok and description then
+			-- API có yield; người chơi có thể đã rời server trong lúc chờ.
+			if entries[player] and description.RunAnimation > 0 then
+				runAnimByUserId[userId] = `rbxassetid://{description.RunAnimation}`
+			end
+			description:Destroy()
 		end
 	end)
 end
@@ -107,6 +111,7 @@ local function loadTrack(animator: Animator, animId: string): AnimationTrack?
 	local ok, track = pcall(function()
 		return animator:LoadAnimation(animation)
 	end)
+	animation:Destroy()
 	if ok and track then
 		return track
 	end
@@ -152,7 +157,9 @@ local function refresh(player: Player)
 	track:Play(0.15)
 	entry.track = track
 	if DEBUG then
-		Log.Boot(`[TreadmillAnim] play {player.Name} ({track.Animation and (track.Animation :: Animation).AnimationId})`)
+		Log.Boot(
+			`[TreadmillAnim] play {player.Name} ({track.Animation and (track.Animation :: Animation).AnimationId})`
+		)
 	end
 end
 
@@ -201,6 +208,7 @@ function TreadmillAnimController.Start()
 	end
 	Players.PlayerAdded:Connect(watchPlayer)
 	Players.PlayerRemoving:Connect(function(player)
+		runAnimByUserId[player.UserId] = nil
 		local entry = entries[player]
 		entries[player] = nil
 		emoteSuppressed[player] = nil
@@ -232,8 +240,7 @@ function TreadmillAnimController.Start()
 	end
 end
 
--- Emote owns the character animation while active. Suppression prevents the 1s
--- self-healing poll from immediately restarting the treadmill track underneath it.
+-- Emote đang chạy thì vòng tự hồi phục không được khởi động lại animation treadmill.
 function TreadmillAnimController.SetEmoteSuppressed(player: Player, suppressed: boolean)
 	if suppressed then
 		emoteSuppressed[player] = true

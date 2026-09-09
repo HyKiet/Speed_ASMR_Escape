@@ -14,6 +14,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Log = require(ReplicatedStorage.Shared.Util.Log)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 
 local RunService = game:GetService("RunService")
 
@@ -24,11 +25,14 @@ local CULL_DIST = 130
 local FALL_TIME = 0.55
 local RISE_TIME = 0.5
 
-local segs = {} -- { part, z, state, t, blocks = { {part, cf0, transp0, color0} } | nil }
+type Block = { part: BasePart, cf0: CFrame, size0: Vector3, transp0: number, color0: Color3 }
+type Segment = { part: BasePart, z: number, state: string, t: number, blocks: { Block }? }
+local segs: { Segment } = {}
 
-local function collectBlocks(segZ)
+local function collectBlocks(segZ: number): { Block }
 	-- lấy khối jelly hiện có trong dải Z của segment (lazy — an toàn với streaming)
-	local zone7 = workspace.Zones and workspace.Zones:FindFirstChild("Zone7")
+	local zones = workspace:FindFirstChild("Zones")
+	local zone7 = zones and zones:FindFirstChild("Zone7")
 	local asmr = zone7 and zone7:FindFirstChild("ASMR")
 	if not asmr then
 		return {}
@@ -55,7 +59,7 @@ local function collectBlocks(segZ)
 	return list
 end
 
-local function applyRest(e)
+local function applyRest(e: Block)
 	local b = e.part
 	b.CFrame = e.cf0
 	b.Size = e.size0
@@ -63,104 +67,136 @@ local function applyRest(e)
 	b.Color = e.color0
 end
 
-local function applyHidden(e)
+local function applyHidden(e: Block)
 	e.part.Transparency = 1
 end
 
 function Zone7JellyBridgeController.Init() end
 
+local started = false
+local folderJanitor = Janitor.new()
+local activeFolder: Instance? = nil
+
 function Zone7JellyBridgeController.Start()
-	task.spawn(function()
-		local zone7 = workspace:WaitForChild("Zones", 10) and workspace.Zones:WaitForChild("Zone7", 10)
-		local mech = zone7 and zone7:WaitForChild("Mechanics", 10)
-		local folder = mech and mech:WaitForChild("JellyBridge", 15)
-		if not folder then
-			return
-		end
-
-		local function register(p)
-			if not p:IsA("BasePart") then
-				return
-			end
-			local e = { part = p, z = p.Position.Z, state = "up", t = 0, blocks = nil }
-			table.insert(segs, e)
-			p:GetAttributeChangedSignal("State"):Connect(function()
-				local s = p:GetAttribute("State") or "up"
-				e.state = s
-				e.t = 0
-				-- CHỈ chụp trạng thái gốc lúc bắt đầu warn (chụp giữa chu kỳ sẽ
-				-- lưu nhầm màu hồng/độ mờ đang animate làm "gốc" — bug kẹt màu)
-				if s == "warn" and not e.blocks then
-					e.blocks = collectBlocks(e.z)
-				end
-			end)
-		end
-		for _, p in folder:GetChildren() do
-			register(p)
-		end
-		folder.ChildAdded:Connect(register)
-		Log.Boot(("[Zone7JellyBridge] visual sẵn sàng — %d segment"):format(#segs))
-
-		RunService.Heartbeat:Connect(function(dt)
-			local cam = workspace.CurrentCamera
-			local camPos = cam and cam.CFrame.Position
-			for _, e in segs do
-				if not e.blocks then
-					continue
-				end
-				local near = camPos and math.abs(camPos.Z - e.z) < CULL_DIST and math.abs(camPos.X + 4) < CULL_DIST
-				e.t += dt
-				if e.state == "warn" then
-					if near then
-						-- nhấp sáng trắng nóng (Lerp giữ tông màu gốc) + rùng nhẹ
-						local k = 0.5 + 0.5 * math.sin(e.t * 40)
-						local sq = 1 - 0.08 * k
-						for _, blk in e.blocks do
-							blk.part.Color = blk.color0:Lerp(WARN_COLOR, 0.35 + 0.4 * k)
-							blk.part.Size = Vector3.new(blk.size0.X, blk.size0.Y * sq, blk.size0.Z)
+	if started then
+		return
+	end
+	started = true
+	local elapsed = 0.5
+	local warned = false
+	RunService.Heartbeat:Connect(function(dt)
+		elapsed += dt
+		if elapsed >= 0.5 then
+			elapsed = 0
+			local zones = workspace:FindFirstChild("Zones")
+			local zone = zones and zones:FindFirstChild("Zone7")
+			local mechanics = zone and zone:FindFirstChild("Mechanics")
+			local folder = mechanics and mechanics:FindFirstChild("JellyBridge")
+			if folder ~= activeFolder then
+				folderJanitor:Sweep()
+				activeFolder = folder
+				if folder then
+					local function register(part: Instance)
+						if not part:IsA("BasePart") or folderJanitor[part] then
+							return
+						end
+						local e: Segment = { part = part, z = part.Position.Z, state = "up", t = 0, blocks = nil }
+						table.insert(segs, e)
+						local connection = part:GetAttributeChangedSignal("State"):Connect(function()
+							local state = part:GetAttribute("State")
+							e.state = if typeof(state) == "string" then state else "up"
+							e.t = 0
+							-- Chụp lúc warn để không lưu nhầm màu hoặc hình đang rơi làm gốc.
+							if e.state == "warn" and not e.blocks then
+								e.blocks = collectBlocks(e.z)
+							end
+						end)
+						folderJanitor[part] = function()
+							connection:Disconnect()
+							if e.blocks then
+								for _, block in e.blocks do
+									applyRest(block)
+								end
+							end
+							local index = table.find(segs, e)
+							if index then
+								table.remove(segs, index)
+							end
 						end
 					end
-				elseif e.state == "fall" then
-					local a = math.min(e.t / FALL_TIME, 1)
-					if near and a < 1 then
-						-- rơi giữ nguyên màu thạch, xoáy nhẹ so le, tan mờ dần
-						local drop = 26 * a * a
-						local spin = 0.45 * a
-						for i, blk in e.blocks do
-							local dir = (i % 2 == 0) and 1 or -1
-							blk.part.Color = blk.color0
-							blk.part.Size = blk.size0
-							blk.part.CFrame = blk.cf0
-								* CFrame.new(0, -drop, 0)
-								* CFrame.Angles(spin * 0.35 * dir, spin * 0.2, spin * dir)
-							blk.part.Transparency = blk.transp0 + (0.95 - blk.transp0) * (a * a)
-						end
-					elseif a >= 1 then
-						for _, blk in e.blocks do
-							applyHidden(blk)
-						end
+					folderJanitor:Add(folder.ChildAdded:Connect(register))
+					folderJanitor:Add(folder.ChildRemoved:Connect(function(part)
+						folderJanitor[part] = nil
+					end))
+					for _, part in folder:GetChildren() do
+						register(part)
 					end
-				elseif e.state == "up" then
-					local a = math.min(e.t / RISE_TIME, 1)
-					if a >= 1 then
-						for _, blk in e.blocks do
-							applyRest(blk)
-						end
-						e.blocks = nil -- xong chu kỳ — ngừng animate segment này
-					elseif near then
-						-- mọc từ dưới -6 với overshoot đàn hồi
-						local rise = 1 - math.exp(-8 * a)
-						local yOff = -6 * (1 - rise)
-						local wob = 1 + 0.3 * math.exp(-5 * a) * math.sin(14 * a)
-						for _, blk in e.blocks do
-							blk.part.CFrame = blk.cf0 * CFrame.new(0, yOff, 0)
-							blk.part.Size = Vector3.new(blk.size0.X, blk.size0.Y * wob, blk.size0.Z)
-							blk.part.Transparency = blk.transp0 + (1 - blk.transp0) * (1 - a)
-						end
-					end
+					Log.Boot(("[Zone7JellyBridge] visual sẵn sàng — %d segment"):format(#segs))
 				end
 			end
-		end)
+			if not folder and not warned then
+				warned = true
+				warn("[Zone7JellyBridge] Waiting for streamed JellyBridge; retrying")
+			end
+		end
+		local cam = workspace.CurrentCamera
+		local camPos = cam and cam.CFrame.Position
+		for _, e in segs do
+			if not e.blocks then
+				continue
+			end
+			local near = camPos and math.abs(camPos.Z - e.z) < CULL_DIST and math.abs(camPos.X + 4) < CULL_DIST
+			e.t += dt
+			if e.state == "warn" then
+				if near then
+					-- nhấp sáng trắng nóng (Lerp giữ tông màu gốc) + rùng nhẹ
+					local k = 0.5 + 0.5 * math.sin(e.t * 40)
+					local sq = 1 - 0.08 * k
+					for _, blk in e.blocks do
+						blk.part.Color = blk.color0:Lerp(WARN_COLOR, 0.35 + 0.4 * k)
+						blk.part.Size = Vector3.new(blk.size0.X, blk.size0.Y * sq, blk.size0.Z)
+					end
+				end
+			elseif e.state == "fall" then
+				local a = math.min(e.t / FALL_TIME, 1)
+				if near and a < 1 then
+					-- rơi giữ nguyên màu thạch, xoáy nhẹ so le, tan mờ dần
+					local drop = 26 * a * a
+					local spin = 0.45 * a
+					for i, blk in e.blocks do
+						local dir = (i % 2 == 0) and 1 or -1
+						blk.part.Color = blk.color0
+						blk.part.Size = blk.size0
+						blk.part.CFrame = blk.cf0
+							* CFrame.new(0, -drop, 0)
+							* CFrame.Angles(spin * 0.35 * dir, spin * 0.2, spin * dir)
+						blk.part.Transparency = blk.transp0 + (0.95 - blk.transp0) * (a * a)
+					end
+				elseif a >= 1 then
+					for _, blk in e.blocks do
+						applyHidden(blk)
+					end
+				end
+			elseif e.state == "up" then
+				local a = math.min(e.t / RISE_TIME, 1)
+				if a >= 1 then
+					for _, blk in e.blocks do
+						applyRest(blk)
+					end
+					e.blocks = nil -- xong chu kỳ — ngừng animate segment này
+				elseif near then
+					-- mọc từ dưới -6 với overshoot đàn hồi
+					local rise = 1 - math.exp(-8 * a)
+					local yOff = -6 * (1 - rise)
+					local wob = 1 + 0.3 * math.exp(-5 * a) * math.sin(14 * a)
+					for _, blk in e.blocks do
+						blk.part.CFrame = blk.cf0 * CFrame.new(0, yOff, 0)
+						blk.part.Size = Vector3.new(blk.size0.X, blk.size0.Y * wob, blk.size0.Z)
+						blk.part.Transparency = blk.transp0 + (1 - blk.transp0) * (1 - a)
+					end
+				end
+			end
+		end
 	end)
 end
 

@@ -37,8 +37,8 @@ function NetRateLimit.ShouldDrop(player: Player, key: string, minInterval: numbe
 		times[player] = perPlayer
 	end
 
-	local last = perPlayer[key] or 0
-	if now - last < interval then
+	local last = perPlayer[key]
+	if last and now - last < interval then
 		return true
 	end
 

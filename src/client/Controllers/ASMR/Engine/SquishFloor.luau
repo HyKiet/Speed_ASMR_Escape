@@ -80,7 +80,7 @@ function SquishFloor.make(cfg)
 		local HEIGHT_X = HEIGHT_AXIS == "X"
 		local radius = RADIUS
 
-		task.spawn(function()
+		self.initTask = task.spawn(function()
 			local folder = model:WaitForChild("Tiles", 10)
 			if not folder then
 				return
@@ -307,7 +307,12 @@ function SquishFloor.make(cfg)
 			anyActive = active
 		end
 
-		function self.destroy() end
+		function self.destroy()
+			self.ready = false
+			engine.Await.cancel(self.initTask)
+			resetAll()
+			table.clear(records)
+		end
 
 		return self
 	end

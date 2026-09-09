@@ -1,7 +1,6 @@
 --!strict
--- Quản lý dữ liệu profile của mỗi người chơi qua ProfileStore + leaderstats.
--- Khi CoreLoopVersion ở profile cũ hơn Constants.CORE_LOOP_VERSION,
--- chạy migration (hiện chỉ reset CustomSpeedLimit theo công thức mới).
+-- Server: nạp và migrate profile bằng ProfileStore, rồi cung cấp dữ liệu cho các service.
+-- Leaderstats phản ánh profile; lần lưu cuối đóng dấu offline trước khi phiên kết thúc.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,6 +10,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local Env = require(ReplicatedStorage.Shared.Util.Env)
 local ProfileStore = require(ServerScriptService.ServerPackages.ProfileStore)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 
 type PlayerData = typeof(Constants.DATA_TEMPLATE)
 type Profile = any
@@ -311,10 +311,23 @@ local function loadPlayer(player: Player)
 	profile:Reconcile()
 	normalizeData(profile.Data)
 
-	profile.OnSessionEnd:Connect(function()
-		profiles[player] = nil
-		player:Kick("Your data session ended. Please rejoin.")
-	end)
+	local profileJanitor = Janitor.new()
+	-- PlayerRemoving và BindToClose có thể chạy sau callback đóng phiên của ProfileStore.
+	-- OnLastSave chạy trước lần ghi cuối cho cả EndSession và shutdown; callback này không yield.
+	profileJanitor:Add(
+		profile.OnLastSave:Connect(function()
+			profile.Data.LastOnlineTime = os.time()
+		end),
+		"Disconnect"
+	)
+	profileJanitor:Add(
+		profile.OnSessionEnd:Connect(function()
+			profileJanitor:Sweep()
+			profiles[player] = nil
+			player:Kick("Your data session ended. Please rejoin.")
+		end),
+		"Disconnect"
+	)
 
 	if player.Parent ~= Players then
 		profile:EndSession()

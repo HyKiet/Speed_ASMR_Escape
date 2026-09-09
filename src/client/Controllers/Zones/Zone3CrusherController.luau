@@ -74,6 +74,7 @@ local centerX, centerZ = 0, 0
 local awake = false
 local nextFarStep = 0
 local connection: RBXScriptConnection? = nil
+local resolverThread: thread? = nil
 
 -- Pha chu kỳ của frame TRƯỚC, theo từng nhóm. nil = chưa có gì để so (vừa vào tầm).
 local lastPhase: { [number]: number? } = {}
@@ -264,9 +265,12 @@ end
 function Zone3CrusherController.Init() end
 
 function Zone3CrusherController.Start()
+	if connection then
+		return
+	end
 	connection = RunService.RenderStepped:Connect(step)
 
-	task.spawn(function()
+	resolverThread = task.spawn(function()
 		while true do
 			if not alive() then
 				resolve()
@@ -277,6 +281,13 @@ function Zone3CrusherController.Start()
 end
 
 function Zone3CrusherController.Stop()
+	-- Dừng cả vòng dò streaming; ngắt render thôi vẫn giữ controller sống ngầm.
+	if resolverThread then
+		if coroutine.status(resolverThread) == "suspended" then
+			task.cancel(resolverThread)
+		end
+		resolverThread = nil
+	end
 	if connection then
 		connection:Disconnect()
 		connection = nil

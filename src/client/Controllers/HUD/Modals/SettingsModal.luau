@@ -39,6 +39,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 local AudioMixController = require(script.Parent.Parent.Parent.Effects.AudioMixController)
 local BgmController = require(script.Parent.Parent.Parent.Effects.BgmController)
 local AutoPerformanceController = require(script.Parent.Parent.Parent.Effects.AutoPerformanceController)
@@ -283,6 +284,7 @@ local function makeSlider(props: {
 	onChanged: (number) -> (),
 })
 	local hovered = Value(false)
+	local janitor = Janitor.new()
 
 	local track = New("Frame")({
 		BackgroundColor3 = Color3.fromRGB(16, 30, 42),
@@ -348,6 +350,9 @@ local function makeSlider(props: {
 		return math.max(TRACK_H, TOUCH_MIN / math.max(0.01, State.viewportScale:get()))
 	end)
 	local hit = New("TextButton")({
+		[Fusion.Cleanup] = function()
+			janitor:Sweep()
+		end,
 		AutoButtonColor = false,
 		BackgroundTransparency = 1,
 		Text = "",
@@ -376,7 +381,7 @@ local function makeSlider(props: {
 		props.onChanged(math.clamp((x - track.AbsolutePosition.X) / width, 0, 1))
 	end
 
-	hit.InputBegan:Connect(function(input)
+	janitor:Add(hit.InputBegan:Connect(function(input)
 		if
 			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
@@ -384,10 +389,10 @@ local function makeSlider(props: {
 			dragging = true
 			setFromX(input.Position.X)
 		end
-	end)
+	end))
 	-- Nghe trên UserInputService chứ không phải trên track: kéo nhanh là con trỏ ra khỏi
 	-- thanh ngay, `track.InputChanged` sẽ ngừng bắn và slider kẹt giữa chừng.
-	UserInputService.InputChanged:Connect(function(input)
+	janitor:Add(UserInputService.InputChanged:Connect(function(input)
 		if not dragging then
 			return
 		end
@@ -397,15 +402,15 @@ local function makeSlider(props: {
 		then
 			setFromX(input.Position.X)
 		end
-	end)
-	UserInputService.InputEnded:Connect(function(input)
+	end))
+	janitor:Add(UserInputService.InputEnded:Connect(function(input)
 		if
 			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
 		then
 			dragging = false
 		end
-	end)
+	end))
 
 	local percent = Theme.MakeOutlineLabel({
 		Position = UDim2.fromOffset(TRACK_X + TRACK_W + 14, 28),

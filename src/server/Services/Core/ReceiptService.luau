@@ -1,5 +1,6 @@
 --!strict
--- Bộ định tuyến ProcessReceipt: thử lần lượt các Service đăng ký xử lý hóa đơn.
+-- Server: chờ profile rồi chuyển hóa đơn Roblox cho các service giao sản phẩm.
+-- Chỉ ghi donation sau khi service xác nhận đã giao; client không quyết định kết quả mua.
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -11,6 +12,7 @@ local ReceiptService = {}
 
 local processors: { (any) -> Enum.ProductPurchaseDecision } = {}
 local LeaderboardService
+local DataService: any
 
 --[[
 	GHI DONATE Ở ĐÂY, KHÔNG Ở TỪNG SERVICE (2026-08-26, user báo bảng Top Donate trống trên
@@ -63,6 +65,18 @@ end
 	Trả `NotProcessedYet` khi không ai nhận là ĐÚNG: Roblox sẽ gọi lại sau, tiền không mất.
 ]]
 local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurchaseDecision
+	local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+	if not player then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	-- Receipt có thể đến ngay lúc join. Roblox cho phép callback yield và không tự retry
+	-- theo đồng hồ, nên chờ profile ngay ở cửa chung để các processor không xác nhận nhầm.
+	while player.Parent == Players and not DataService.IsLoaded(player) do
+		task.wait()
+	end
+	if player.Parent ~= Players or not DataService.IsLoaded(player) then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
 	for _, processor in processors do
 		local ok, decision = pcall(processor, receiptInfo)
 		if not ok then
@@ -80,6 +94,7 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 end
 
 function ReceiptService.Init()
+	DataService = ServiceLocator.Get("DataService")
 	local teleport = ServiceLocator.Get("TeleportService")
 	local stage = ServiceLocator.Get("StageCheckpointService")
 	local serverBoost = ServiceLocator.Get("ServerBoostService")

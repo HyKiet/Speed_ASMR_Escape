@@ -11,6 +11,16 @@ local TweenService = game:GetService("TweenService")
 
 local BubbleWrap = {}
 
+type Bubble = {
+	part: BasePart,
+	mesh: SpecialMesh?,
+	restScale: Vector3?,
+	restPos: Vector3,
+	restColor: Color3,
+	restTransp: number,
+	popped: boolean,
+}
+
 local POP_SOUNDS = { 9117848644, 9119669295, 9117183955, 9117019901, 9117020299 }
 local CRINKLE = 9125723913
 BubbleWrap.soundIds = { 9117848644, 9119669295, 9117183955, 9117019901, 9117020299, CRINKLE }
@@ -29,23 +39,25 @@ local POP_SCALE_Y = 0.1
 local POP_TI = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local INFLATE_TI = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
-function BubbleWrap.attach(model, engine)
+function BubbleWrap.attach(model: Model, engine: any)
 	local FxBudget, SoundPool, ParticlePool, Bounds =
 		engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
 	local self = { ready = false }
 	-- Bản zone không có Base → box.topY = đỉnh bóng, cần tolerance rộng hơn (builder set YTol=4.2)
-	local Y_TOL = model:GetAttribute("YTol") or 2.6
+	local Y_TOL = (model:GetAttribute("YTol") or 2.6) :: number
 
-	local bubbles = {}
+	local bubbles: { Bubble } = {}
+	local tweens: { [Instance]: Tween } = {}
+	local resetTask: thread? = nil
 	local box
 	local popR2 = POP_R_MIN * POP_R_MIN
 	-- Bóng nổ tụt xuống bao nhiêu. Chốt lại theo mặt đất lúc attach (xem khối tính dưới).
 	local popDrop = POP_DROP
 	local poppedCount = 0
-	local firstPopAt = nil
+	local firstPopAt: number? = nil
 	local resetting = false
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Bubbles", 10)
 		if not folder then
 			return
@@ -53,9 +65,11 @@ function BubbleWrap.attach(model, engine)
 		engine.Await.childrenStable(folder)
 		for _, d in folder:GetChildren() do
 			if d:IsA("BasePart") then
+				local mesh = d:FindFirstChildOfClass("SpecialMesh")
 				table.insert(bubbles, {
 					part = d,
-					mesh = d:FindFirstChildOfClass("SpecialMesh"),
+					mesh = mesh,
+					restScale = mesh and mesh.Scale,
 					restPos = d.Position,
 					restColor = d.Color,
 					restTransp = d.Transparency,
@@ -96,44 +110,55 @@ function BubbleWrap.attach(model, engine)
 		Log.Floor("BubbleWrap", #bubbles, model)
 	end)
 
-	local function sound(parent, id, vol, spMin, spMax)
+	local function sound(parent: BasePart, id: number, vol: number, spMin: number, spMax: number)
 		if not FxBudget.fxOK(parent.Position) then
 			return
 		end
 		SoundPool.playStep(id, parent.Position, vol, spMin + math.random() * (spMax - spMin), 80)
 	end
 
-	local function popBubble(b)
+	local function playTween(target: Instance, info: TweenInfo, goal: { [string]: any })
+		local previous = tweens[target]
+		if previous then
+			previous:Cancel()
+			previous:Destroy()
+		end
+		local tween = TweenService:Create(target, info, goal)
+		tweens[target] = tween
+		tween:Play()
+	end
+
+	local function popBubble(b: Bubble)
 		b.popped = true
 		poppedCount += 1
 		firstPopAt = firstPopAt or os.clock()
 		local top = b.restPos + Vector3.new(0, b.part.Size.Y / 2, 0)
 		ParticlePool.emit("puff", top, 5)
 		ParticlePool.emit("sparks", top, 9)
-		TweenService:Create(b.part, POP_TI, {
+		playTween(b.part, POP_TI, {
 			Position = b.restPos - Vector3.new(0, popDrop, 0),
 			Transparency = 0.72,
 			Color = Color3.fromRGB(210, 214, 222),
-		}):Play()
+		})
 		if b.mesh then
-			TweenService:Create(b.mesh, POP_TI, { Scale = Vector3.new(1.06, POP_SCALE_Y, 1.06) }):Play()
+			playTween(b.mesh, POP_TI, { Scale = Vector3.new(1.06, POP_SCALE_Y, 1.06) })
 		end
 		sound(b.part, POP_SOUNDS[math.random(#POP_SOUNDS)], 0.42, 1.2, 1.6)
 	end
 
 	local function resetWave()
 		resetting = true
-		task.spawn(function()
+		resetTask = task.spawn(function()
 			for i, b in bubbles do
 				if b.popped then
 					b.popped = false
-					TweenService:Create(b.part, INFLATE_TI, {
+					playTween(b.part, INFLATE_TI, {
 						Position = b.restPos,
 						Transparency = b.restTransp,
 						Color = b.restColor,
-					}):Play()
+					})
 					if b.mesh then
-						TweenService:Create(b.mesh, INFLATE_TI, { Scale = Vector3.one }):Play()
+						playTween(b.mesh, INFLATE_TI, { Scale = Vector3.one })
 					end
 					ParticlePool.emit("puff", b.restPos, 2)
 					if i % 3 == 0 then
@@ -151,14 +176,14 @@ function BubbleWrap.attach(model, engine)
 	end
 
 	local stepDist = 0
-	local stepLast = nil
+	local stepLast: Vector3? = nil
 
-	function self.update(dt, now, foot)
+	function self.update(_dt, _now, foot)
 		if not self.ready then
 			return
 		end
 		if foot then
-			local pos = foot.pos
+			local pos: Vector3 = foot.pos
 			if engine.Bounds.contains(box, pos) and math.abs((pos.Y - FOOT_DROP) - box.topY) <= Y_TOL then
 				if not resetting then
 					for _, b in bubbles do
@@ -196,7 +221,26 @@ function BubbleWrap.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		engine.Await.cancel(resetTask)
+		for _, tween in tweens do
+			tween:Cancel()
+			tween:Destroy()
+		end
+		-- Cancel dừng chuyển động nhưng giữ pose hiện tại, nên phải hoàn tác riêng.
+		for _, b in bubbles do
+			b.part.Position = b.restPos
+			b.part.Color = b.restColor
+			b.part.Transparency = b.restTransp
+			if b.mesh and b.restScale then
+				b.mesh.Scale = b.restScale
+			end
+		end
+		table.clear(tweens)
+		table.clear(bubbles)
+	end
 
 	return self
 end

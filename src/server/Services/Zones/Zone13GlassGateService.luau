@@ -29,6 +29,7 @@ local Workspace = game:GetService("Workspace")
 
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 
 local Zone13GlassGateService = {}
 
@@ -111,6 +112,9 @@ function Zone13GlassGateService.Start()
 	end
 
 	GamePackets.requestGlassSmash.listen(function(data, player)
+		if not player or NetRateLimit.ShouldDrop(player, "glassSmash", SMASH_COOLDOWN) then
+			return
+		end
 		local groundFolder = ground
 		if not groundFolder then
 			return

@@ -1,4 +1,6 @@
 --!strict
+-- Server: xác minh group, trao quà một lần qua ProgressionService và gửi trạng thái cho modal.
+-- ProximityPrompt và ByteNet cùng đi qua kiểm tra phiên và giới hạn tần suất.
 --[[
 	Group Chest: quà tham gia group, cache trạng thái group và gắn ProximityPrompt cho rương lobby.
 
@@ -32,6 +34,7 @@ local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local GroupChestConfig = require(ReplicatedStorage.Shared.Config.GroupChest)
 local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 
 local CHEST_MODEL_NAME = "GroupChest"
 local PROMPT_NAME = "GroupChestPrompt"
@@ -47,7 +50,7 @@ local ProgressionService
 
 local isGroupMemberByPlayer: { [Player]: boolean } = {}
 local claimCooldownByPlayer: { [Player]: number } = {}
-local promptConnections: { RBXScriptConnection } = {}
+local promptJanitor = Janitor.new()
 
 local GroupChestService = {}
 
@@ -61,7 +64,7 @@ end
 
 local function computeGroupMembership(player: Player): boolean
 	local success, result = pcall(function()
-		return player:IsInGroup(GroupChestConfig.GROUP_ID)
+		return player:IsInGroupAsync(GroupChestConfig.GROUP_ID)
 	end)
 
 	if not success then
@@ -73,7 +76,14 @@ local function computeGroupMembership(player: Player): boolean
 end
 
 local function cachePlayer(player: Player)
+	if player.Parent ~= Players then
+		return
+	end
 	local isMember = computeGroupMembership(player)
+	-- Truy vấn Roblox có thể yield sau PlayerRemoving; không tạo lại cache của người đã rời.
+	if player.Parent ~= Players then
+		return
+	end
 	isGroupMemberByPlayer[player] = isMember
 	player:SetAttribute("IsGroupMember", isMember)
 end
@@ -137,12 +147,17 @@ function GroupChestService.RefreshGroupMembership(player: Player): boolean
 end
 
 function GroupChestService.OpenChest(player: Player)
+	if player.Parent ~= Players or NetRateLimit.ShouldDrop(player, "groupChestState") then
+		return
+	end
 	GroupChestService.RefreshGroupMembership(player)
-	sendState(player)
+	if player.Parent == Players then
+		sendState(player)
+	end
 end
 
 function GroupChestService.TryClaim(player: Player): boolean
-	if not canAttemptClaim(player) then
+	if player.Parent ~= Players or not canAttemptClaim(player) then
 		return false
 	end
 
@@ -158,6 +173,10 @@ function GroupChestService.TryClaim(player: Player): boolean
 		return false
 	end
 
+	-- Xác minh group có thể yield; chỉ sửa đúng profile vẫn thuộc phiên đang hoạt động.
+	if player.Parent ~= Players or DataService.GetData(player) ~= data then
+		return false
+	end
 	if data.hasClaimedGroupReward then
 		sendToast(player, "Group chest already claimed")
 		sendState(player)
@@ -193,6 +212,7 @@ function GroupChestService.TryClaim(player: Player): boolean
 end
 
 local function bindChestPrompt()
+	promptJanitor:Sweep()
 	local chest = Workspace:FindFirstChild(CHEST_MODEL_NAME, true)
 	if not chest then
 		warn(`[GroupChestService] Không tìm thấy Workspace.{CHEST_MODEL_NAME}.`)
@@ -204,12 +224,12 @@ local function bindChestPrompt()
 		return
 	end
 
-	table.insert(
-		promptConnections,
-		prompt.Triggered:Connect(function(player: Player)
-			GroupChestService.OpenChest(player)
-		end)
-	)
+	promptJanitor:Add(prompt.Triggered:Connect(function(player: Player)
+		GroupChestService.OpenChest(player)
+	end))
+	promptJanitor:Add(prompt.Destroying:Connect(function()
+		promptJanitor:Sweep()
+	end))
 end
 
 function GroupChestService.Init()
@@ -233,17 +253,18 @@ function GroupChestService.Start()
 
 	bindChestPrompt()
 
-	GamePackets.requestGroupChestState.listen(function(_request, player: Player)
-		if NetRateLimit.ShouldDrop(player, "groupChestState") then
-			return
+	GamePackets.requestGroupChestState.listen(function(_request, player)
+		if player then
+			GroupChestService.OpenChest(player)
 		end
-		GroupChestService.OpenChest(player)
 	end)
 
 	-- TryClaim đã tự có cooldown riêng (canAttemptClaim / CLAIM_COOLDOWN_SECONDS),
 	-- nên không cần khoác thêm rate-limit chung ở đây.
-	GamePackets.requestGroupChestClaim.listen(function(_request, player: Player)
-		GroupChestService.TryClaim(player)
+	GamePackets.requestGroupChestClaim.listen(function(_request, player)
+		if player then
+			GroupChestService.TryClaim(player)
+		end
 	end)
 end
 

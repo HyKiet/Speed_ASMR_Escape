@@ -1,20 +1,13 @@
 --!strict
---[[
-	CodeService.luau — Quản lý & Đổi mã quà tặng (Promo Codes).
+-- Server nhận mã qua ByteNet, đối chiếu Codes rồi khoá lượt nhận trong dữ liệu DataService.
+-- ProgressionService cấp Speed, RouletteService cấp vé; mã quà không cấp Wins.
 
-	Xử lý gói tin requestRedeemCode từ Client, kiểm tra mã hợp lệ,
-	chống nhận trùng (lưu vào data.RedeemedCodes) và phát thưởng Wins, Speed, Spin Tickets.
-]]
-
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Codes = require(ReplicatedStorage.Shared.Config.Economy.Codes)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
-
-local PROMO_CODES = Codes
 
 local DataService: any = nil
 local ProgressionService: any = nil
@@ -27,7 +20,7 @@ function CodeService.RedeemCode(player: Player, rawCode: string)
 		return
 	end
 
-	local cleanCode = string.upper(string.gsub(rawCode, "%s+", ""))
+	local cleanCode = string.gsub(rawCode, "%s+", ""):upper()
 	if #cleanCode == 0 then
 		GamePackets.toast.sendTo({
 			kind = "code",
@@ -37,7 +30,7 @@ function CodeService.RedeemCode(player: Player, rawCode: string)
 		return
 	end
 
-	local reward = PROMO_CODES[cleanCode]
+	local reward = Codes[cleanCode]
 	if not reward then
 		GamePackets.toast.sendTo({
 			kind = "code",
@@ -94,8 +87,8 @@ function CodeService.Init()
 end
 
 function CodeService.Start()
-	GamePackets.requestRedeemCode.listen(function(packet, player: Player)
-		if NetRateLimit.ShouldDrop(player, "redeemCode") then
+	GamePackets.requestRedeemCode.listen(function(packet, player)
+		if not player or NetRateLimit.ShouldDrop(player, "redeemCode") then
 			return
 		end
 		CodeService.RedeemCode(player, packet.code)

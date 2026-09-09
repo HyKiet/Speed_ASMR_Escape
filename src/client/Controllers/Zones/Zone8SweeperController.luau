@@ -27,6 +27,7 @@ local radPerSec = 0
 local ready = false
 local nextFarStep = 0
 local connection: RBXScriptConnection? = nil
+local resolverThread: thread? = nil
 
 local function resolve(): boolean
 	local zones = Workspace:FindFirstChild("Zones")
@@ -86,8 +87,11 @@ local function step()
 end
 
 function Zone8SweeperController.Start()
+	if connection then
+		return
+	end
 	connection = RunService.RenderStepped:Connect(step)
-	task.spawn(function()
+	resolverThread = task.spawn(function()
 		-- Zone/attribute do server inline script dựng lúc runtime, và streaming có thể
 		-- dỡ/nạp lại zone bất cứ lúc nào → poll nhẹ 0.5s để bám lại tham chiếu.
 		while true do
@@ -100,6 +104,13 @@ function Zone8SweeperController.Start()
 end
 
 function Zone8SweeperController.Stop()
+	-- Dừng cả vòng dò streaming; ngắt render thôi vẫn giữ controller sống ngầm.
+	if resolverThread then
+		if coroutine.status(resolverThread) == "suspended" then
+			task.cancel(resolverThread)
+		end
+		resolverThread = nil
+	end
 	if connection then
 		connection:Disconnect()
 		connection = nil

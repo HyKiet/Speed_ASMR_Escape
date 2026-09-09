@@ -54,7 +54,7 @@ function Clay.attach(model, engine)
 	local records = {}
 	local box, centerY
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Tiles", 10)
 		if not folder then
 			return
@@ -110,7 +110,7 @@ function Clay.attach(model, engine)
 	local onFloor = false
 	local stepLast, stepDist = nil, 0
 
-	function self.update(dt, now, foot)
+	function self.update(dt, _now, foot)
 		if not self.ready then
 			return
 		end
@@ -205,7 +205,16 @@ function Clay.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for _, rec in records do
+			rec.part.Size = rec.restSize
+			rec.part.Position = rec.restPos
+			rec.part.Color = rec.restColor
+		end
+		table.clear(records)
+	end
 
 	return self
 end

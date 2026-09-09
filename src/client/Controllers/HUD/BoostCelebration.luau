@@ -150,7 +150,6 @@ local bannerScale = Fusion.Tween(bannerScaleGoal, TweenInfo.new(0.35, Enum.Easin
 local bannerTitle = Value("")
 local bannerSubtitle = Value("")
 local bannerToken = 0
-local currentIsRebirth = Value(false)
 
 local confettiLayer: Frame? = nil
 local rng = Random.new()
@@ -410,7 +409,6 @@ end
 -- nhạc riêng. Mua hàng thường thì để nhỏ cho khỏi loãng.
 local function showBanner(title: string, subtitle: string, big: boolean?)
 	local isBig = big == true or string.find(string.upper(title), "REBIRTH") ~= nil
-	currentIsRebirth:set(isBig)
 
 	playVictorySound(isBig)
 	burstConfetti(isBig)

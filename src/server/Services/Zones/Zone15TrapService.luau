@@ -80,7 +80,7 @@ end
 local function setup(): boolean
 	local zones = Workspace:FindFirstChild("Zones")
 	local zone = zones and zones:FindFirstChild("Zone15")
-	if not zone then
+	if not zone or not zone:FindFirstChild("Mechanics") then
 		return false
 	end
 

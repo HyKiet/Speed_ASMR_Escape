@@ -26,7 +26,7 @@ function Soap.attach(model, engine)
 	local curlIdx, grooveIdx = 0, 0
 	local anyFxActive = false
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Bars", 10)
 		local curlTemplate = ReplicatedStorage:WaitForChild("RoundCubeMesh", 10)
 		if not (folder and curlTemplate) then
@@ -88,7 +88,7 @@ function Soap.attach(model, engine)
 		)
 	end
 
-	local function spawnCut(bar, z, ratio)
+	local function spawnCut(bar, z)
 		local topY = bar.part.Position.Y + bar.part.Size.Y / 2
 		-- rãnh cắt
 		grooveIdx = grooveIdx % GROOVE_POOL_N + 1
@@ -123,7 +123,7 @@ function Soap.attach(model, engine)
 
 	local onFloorState = nil
 
-	function self.update(dt, now, foot)
+	function self.update(dt, _now, foot)
 		if not self.ready then
 			return
 		end
@@ -152,7 +152,7 @@ function Soap.attach(model, engine)
 							math.abs(pos.X - bar.x) <= bar.halfX
 							and math.abs(pos.Z - bar.part.Position.Z) <= bar.part.Size.Z / 2
 						then
-							spawnCut(bar, pos.Z, ratio)
+							spawnCut(bar, pos.Z)
 							cutSound(foot.root, ratio)
 							break
 						end
@@ -199,7 +199,19 @@ function Soap.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for _, curl in curls do
+			curl.part:Destroy()
+		end
+		for _, groove in grooves do
+			groove.part:Destroy()
+		end
+		table.clear(curls)
+		table.clear(grooves)
+		table.clear(bars)
+	end
 
 	return self
 end

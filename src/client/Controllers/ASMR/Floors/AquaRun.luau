@@ -29,7 +29,7 @@ function AquaRun.attach(model, engine)
 	local rippleIdx = 0
 	local anyRippleActive = false
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local basin = model:WaitForChild("Basin", 10)
 		local surface = model:WaitForChild("WaterSurface", 10)
 		if not (basin and surface) then
@@ -94,7 +94,7 @@ function AquaRun.attach(model, engine)
 
 	local onFloorState = nil
 
-	function self.update(dt, now, foot)
+	function self.update(dt, _now, foot)
 		if not self.ready then
 			return
 		end
@@ -151,7 +151,14 @@ function AquaRun.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for _, ripple in ripples do
+			ripple.part:Destroy()
+		end
+		table.clear(ripples)
+	end
 
 	return self
 end

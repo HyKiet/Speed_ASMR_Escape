@@ -62,7 +62,7 @@ local winsContainer: Frame? = nil
 
 local lastWins = 0
 local function setupWinsObserver()
-	Fusion.Observer(Computed(function()
+	return Fusion.Observer(Computed(function()
 		return State.GetSnapshot().totalWins
 	end)):onChange(function()
 		local currentWins = State.GetSnapshot().totalWins
@@ -196,7 +196,13 @@ local function makeWinsDisplay()
 		},
 	})
 	winsContainer = frame
-	setupWinsObserver()
+	local disconnect = setupWinsObserver()
+	frame.Destroying:Connect(function()
+		disconnect()
+		if winsContainer == frame then
+			winsContainer = nil
+		end
+	end)
 	return frame
 end
 

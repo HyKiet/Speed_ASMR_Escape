@@ -1,10 +1,6 @@
 --!strict
---[[
-	KillBlockService.luau — Quản lý va chạm và tiêu diệt người chơi cho KillBlockGlobal:
-	  1. Quét toàn bộ BasePart trong Workspace.KillBlockGlobal.
-	  2. Lắng nghe sự kiện Touched: khi người chơi va chạm sẽ lập tức làm rỗng Health (chết).
-	  3. Có Cooldown chống spam log và hỗ trợ các Part được spawn sau (DescendantAdded).
-]]
+-- Server dùng CharacterUtil để xử lý người chạm KillBlockGlobal.
+-- Janitor dọn listener theo folder và từng part khi map thêm hoặc gỡ kill block.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 
 local KillBlockService = {}
 
@@ -19,7 +16,7 @@ local FOLDER_NAME = "KillBlockGlobal"
 local KILL_COOLDOWN = 0.8 -- GIây: Cooldown diệt người chơi chống spam
 
 local lastKillTime: { [Player]: number } = {}
-local connectedParts: { [BasePart]: RBXScriptConnection } = {}
+local folderJanitors: { [Folder]: any } = {}
 
 local function handleTouch(hit: BasePart)
 	local player, humanoid = CharacterUtil.GetPlayerFromHit(hit)
@@ -37,27 +34,27 @@ local function handleTouch(hit: BasePart)
 	humanoid.Health = 0
 end
 
-local function bindPart(part: Instance)
-	if part:IsA("BasePart") and not connectedParts[part] then
-		part.CanTouch = true
-		connectedParts[part] = part.Touched:Connect(handleTouch)
-	end
-end
-
-local function unbindPart(part: Instance)
-	if part:IsA("BasePart") and connectedParts[part] then
-		connectedParts[part]:Disconnect()
-		connectedParts[part] = nil
-	end
-end
-
 local function scanFolder(folder: Folder)
+	if folderJanitors[folder] then
+		return
+	end
+	local janitor: any = Janitor.new()
+	folderJanitors[folder] = janitor
+	local function bindPart(part: Instance)
+		if part:IsA("BasePart") and not janitor[part] then
+			part.CanTouch = true
+			janitor[part] = part.Touched:Connect(handleTouch)
+		end
+	end
+
+	janitor:Add(folder.DescendantAdded:Connect(bindPart))
+	janitor:Add(folder.DescendantRemoving:Connect(function(part)
+		-- Xoá key của Janitor đồng thời ngắt listener của part đó.
+		janitor[part] = nil
+	end))
 	for _, desc in folder:GetDescendants() do
 		bindPart(desc)
 	end
-
-	folder.DescendantAdded:Connect(bindPart)
-	folder.DescendantRemoving:Connect(unbindPart)
 end
 
 function KillBlockService.Init() end
@@ -73,6 +70,15 @@ function KillBlockService.Start()
 	Workspace.ChildAdded:Connect(function(child)
 		if child.Name == FOLDER_NAME and child:IsA("Folder") then
 			scanFolder(child)
+		end
+	end)
+	Workspace.ChildRemoved:Connect(function(child)
+		if child:IsA("Folder") then
+			local janitor = folderJanitors[child]
+			if janitor then
+				folderJanitors[child] = nil
+				janitor:Sweep()
+			end
 		end
 	end)
 

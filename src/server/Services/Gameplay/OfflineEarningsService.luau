@@ -1,4 +1,6 @@
 --!strict
+-- Server: quy đổi thời gian offline thành Speed chờ nhận trong profile.
+-- DataService đóng dấu lần rời; service này xác nhận Claim/Double rồi báo OfflineModal.
 --[[
 	OfflineEarningsService.luau — Treadmill vẫn chạy khi người chơi đã thoát game.
 
@@ -30,15 +32,11 @@
 	   nhau có thể lệch nhau vài giây ⇒ `elapsed` ÂM là chuyện bình thường, không phải gian lận.
 	   `math.max(0, …)` xử lý, và tuyệt đối KHÔNG được cảnh báo hay trừng phạt vì chuyện đó.
 
-	2. PHẢI đóng dấu ở CẢ `PlayerRemoving` LẪN `BindToClose`. Thiếu vế hai thì mỗi lần Roblox
-	   tắt server (update, restart, hết người) là dấu thời gian của mọi người đang chơi bị kẹt
-	   ở lần thoát TRƯỚC ĐÓ — họ vào lại và được trả công cho quãng thời gian họ đang… chơi.
+	2. PHẢI đóng dấu cả lúc rời và shutdown, nếu không lượt sau có thể tính cả thời gian online.
+	   DataService dùng `Profile.OnLastSave` để xử lý cả hai đường ngay trước lần lưu cuối.
 
-	3. Đóng dấu TRƯỚC khi `DataService` gọi `profile:EndSession()`. `PlayerRemoving` chạy các
-	   listener theo thứ tự đăng ký, mà DataService kết thúc phiên ngay trong listener của nó;
-	   ghi sau đó là ghi vào một profile đã đóng — mất trắng, không có lỗi nào được ném ra.
-	   Bootstrapper `Start()` các service song song bằng `task.spawn` nên thứ tự KHÔNG đảm bảo.
-	   Cách chắc chắn duy nhất không phụ thuộc thứ tự nằm ở khối `stampLeave` bên dưới.
+	3. Không ghi dấu bằng listener riêng ở đây: `GetData` đã trả nil sau khi DataService đóng
+	   phiên, còn các callback BindToClose chạy song song. Thứ tự đó từng làm mất dấu rời game.
 
 	4. Hoá đơn "Double It" mua khi không còn gì chờ nhận PHẢI trả `PurchaseGranted` kèm đền bù.
 	   Xem khối lý do trong `ProcessReceipt` — trả `NotProcessedYet` là tạo một vòng thử lại
@@ -54,6 +52,7 @@ local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local OfflineConfig = require(ReplicatedStorage.Shared.Config.OfflineEarnings)
 local Products = require(ReplicatedStorage.Shared.Config.Economy.Products)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
 
@@ -169,6 +168,9 @@ local function onJoin(player: Player)
 	end
 
 	local speed, credited = computeOffline(player, data)
+	if player.Parent ~= Players or DataService.GetData(player) ~= data then
+		return
+	end
 
 	--[[
 		Đóng dấu LẠI ngay lúc vào, dù có cộng thêm gì hay không.
@@ -194,23 +196,6 @@ local function onJoin(player: Player)
 		return
 	end
 	sendState(player, data, credited)
-end
-
---[[
-	Đóng dấu thời điểm rời game.
-
-	⚠️ Bẫy 3 ở đầu file: `DataService` gọi `profile:EndSession()` ngay trong listener
-	`PlayerRemoving` của nó, và bootstrapper `Start()` các service song song nên không có gì
-	đảm bảo listener nào chạy trước. Cách chắc chắn duy nhất không phụ thuộc thứ tự là ghi vào
-	bảng `data` — `DataService.GetData` trả về `profile.Data`, tức chính bảng ProfileStore đang
-	theo dõi; nếu phiên đã đóng thì `GetData` trả nil và ta lặng lẽ bỏ qua (giá trị cũ vẫn còn,
-	chỉ là mất chính xác vài giây — chấp nhận được, và không bao giờ trả công thừa).
-]]
-local function stampLeave(player: Player)
-	local data = DataService.GetData(player)
-	if data then
-		data.LastOnlineTime = os.time()
-	end
 end
 
 --[[
@@ -294,10 +279,10 @@ function OfflineEarningsService.Start()
 	end)
 
 	GamePackets.requestOfflineClaim.listen(function(_data, player)
-		payout(player, 1)
+		if player and not NetRateLimit.ShouldDrop(player, "offlineClaim") then
+			payout(player, 1)
+		end
 	end)
-
-	Players.PlayerRemoving:Connect(stampLeave)
 
 	if RunService:IsStudio() then
 		for _, player in Players:GetPlayers() do
@@ -305,17 +290,6 @@ function OfflineEarningsService.Start()
 		end
 		Players.PlayerAdded:Connect(watchStudioOfflineHook)
 	end
-
-	--[[
-		Bẫy 2: server tắt (update / restart / hết người) KHÔNG bắn `PlayerRemoving` cho mọi
-		người kịp thời. Thiếu nhánh này thì cả phòng bị kẹt dấu thời gian ở lần thoát trước và
-		được trả công cho quãng họ vừa ngồi chơi.
-	]]
-	game:BindToClose(function()
-		for _, player in Players:GetPlayers() do
-			stampLeave(player)
-		end
-	end)
 end
 
 return OfflineEarningsService

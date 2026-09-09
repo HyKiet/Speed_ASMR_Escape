@@ -1,5 +1,6 @@
 --!strict
--- Dịch chuyển nhanh đến Lobby/Stage/Training, thanh toán bằng Wins hoặc Robux.
+-- Server: xác minh điểm đến và khả năng dịch chuyển trước khi trừ Wins hoặc xử lý hóa đơn.
+-- StageLanding/StageFacing chọn vị trí; ByteNet báo HUD và camera sau khi server di chuyển nhân vật.
 -- Player được TỰ DO teleport: không còn chặn theo Level/WalkSpeed (Stage Gate đã gỡ bỏ).
 
 local Players = game:GetService("Players")
@@ -10,6 +11,7 @@ local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
 local PathResolver = require(ReplicatedStorage.Shared.Util.PathResolver)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local StageFacing = require(ReplicatedStorage.Shared.Util.StageFacing)
 local StageLanding = require(ReplicatedStorage.Shared.Util.StageLanding)
 
@@ -90,19 +92,20 @@ local function getDestinationCFrame(destination: DestinationConfig): CFrame?
 	return (CFrame.new(liftedPosition) * (baseCFrame - baseCFrame.Position)) * TELEPORT_FACING_CORRECTION
 end
 
-local function teleportPlayer(player: Player, destination: DestinationConfig)
-	local now = os.clock()
-	if now - (lastTeleportTimeByPlayer[player] or 0) < TELEPORT_COOLDOWN_SECONDS then
-		return
+local function resolveTeleport(player: Player, destination: DestinationConfig): (BasePart?, CFrame?)
+	if os.clock() - (lastTeleportTimeByPlayer[player] or 0) < TELEPORT_COOLDOWN_SECONDS then
+		return nil, nil
 	end
-	lastTeleportTimeByPlayer[player] = now
-
 	local root = CharacterUtil.GetAliveRoot(player)
 	local destinationCFrame = getDestinationCFrame(destination)
 	if not root or not destinationCFrame then
-		return
+		return nil, nil
 	end
+	return root, destinationCFrame
+end
 
+local function teleportPlayer(player: Player, destination: DestinationConfig, root: BasePart, destinationCFrame: CFrame)
+	lastTeleportTimeByPlayer[player] = os.clock()
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
 	root.CFrame = destinationCFrame
@@ -128,7 +131,12 @@ local function teleportPlayer(player: Player, destination: DestinationConfig)
 	}, player)
 end
 
-local function tryPayWins(player: Player, destination: DestinationConfig): boolean
+local function tryPayWins(
+	player: Player,
+	destination: DestinationConfig,
+	root: BasePart,
+	destinationCFrame: CFrame
+): boolean
 	local data = DataService.GetData(player)
 	if not data then
 		GamePackets.toast.sendTo({
@@ -173,6 +181,8 @@ local function tryPayWins(player: Player, destination: DestinationConfig): boole
 	end
 
 	data.TotalWins -= priceWins
+	-- Không yield giữa trừ tiền và di chuyển. Kiểm tra cooldown/root/đích đã xong ở caller.
+	teleportPlayer(player, destination, root, destinationCFrame)
 	-- Sửa 2026-08-28: sink duy nhất còn lại của Wins ngoài cosmetic. Xem giải thích ở
 	-- `ProgressionService` chỗ mua trail/aura.
 	if priceWins > 0 and TelemetryService then
@@ -205,13 +215,12 @@ function TeleportService.ProcessReceipt(
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
-	local root = CharacterUtil.GetAliveRoot(player)
-	local destinationCFrame = getDestinationCFrame(destination)
+	local root, destinationCFrame = resolveTeleport(player, destination)
 	if not root or not destinationCFrame then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
-	teleportPlayer(player, destination)
+	teleportPlayer(player, destination, root, destinationCFrame)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 
@@ -233,7 +242,10 @@ function TeleportService.Init()
 end
 
 function TeleportService.Start()
-	GamePackets.requestTeleport.listen(function(request, player: Player)
+	GamePackets.requestTeleport.listen(function(request, player)
+		if not player or NetRateLimit.ShouldDrop(player, "teleportRequest") then
+			return
+		end
 		if typeof(request.destinationId) ~= "string" then
 			return
 		end
@@ -257,11 +269,12 @@ function TeleportService.Start()
 			return
 		end
 
-		if not tryPayWins(player, destination) then
+		-- Trước đây trả tiền xong mới kiểm tra: spam lúc cooldown hoặc chết vẫn bị trừ Wins.
+		local root, destinationCFrame = resolveTeleport(player, destination)
+		if not root or not destinationCFrame then
 			return
 		end
-
-		teleportPlayer(player, destination)
+		tryPayWins(player, destination, root, destinationCFrame)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

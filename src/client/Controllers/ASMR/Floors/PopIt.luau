@@ -10,6 +10,16 @@ local TweenService = game:GetService("TweenService")
 
 local PopIt = {}
 
+type Bubble = {
+	part: BasePart,
+	mesh: SpecialMesh?,
+	restScale: Vector3?,
+	restPos: Vector3,
+	restColor: Color3,
+	popped: boolean,
+	unpopTask: thread?,
+}
+
 -- Mix ASMR: pop/suction/pacifier/click + 2 Mouth Pop PSE mới (đa chất liệu phê tai)
 local POP_SOUNDS = { 9117848644, 9119669295, 9117183955, 86707910685850, 9117019900, 9117020115 }
 PopIt.soundIds = POP_SOUNDS
@@ -29,18 +39,19 @@ local FOOT_DROP = 3.2
 local POP_TI = TweenInfo.new(0.11, Enum.EasingStyle.Back, Enum.EasingDirection.In)
 local UNPOP_TI = TweenInfo.new(0.26, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
-function PopIt.attach(model, engine)
+function PopIt.attach(model: Model, engine: any)
 	local FxBudget, SoundPool, Bounds = engine.FxBudget, engine.SoundPool, engine.Bounds
 	local self = { ready = false }
 	-- Bản zone không có Base → box.topY = ĐỈNH bubble (cao 2.6) chứ không phải mặt sàn
 	-- → builder set YTol=4.2. Bản test giữ mặc định 2.6 (mốc Base thấp).
-	local Y_TOL = model:GetAttribute("YTol") or 2.6
+	local Y_TOL = (model:GetAttribute("YTol") or 2.6) :: number
 
-	local bubbles = {}
+	local bubbles: { Bubble } = {}
+	local tweens: { [Instance]: Tween } = {}
 	local box
 	local popR2 = POP_R_MIN * POP_R_MIN
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Bubbles", 10)
 		if not folder then
 			return
@@ -48,9 +59,11 @@ function PopIt.attach(model, engine)
 		engine.Await.childrenStable(folder)
 		for _, d in folder:GetChildren() do
 			if d:IsA("BasePart") and d.Name == "Bubble" then
+				local mesh = d:FindFirstChildOfClass("SpecialMesh")
 				table.insert(bubbles, {
 					part = d,
-					mesh = d:FindFirstChildOfClass("SpecialMesh"),
+					mesh = mesh,
+					restScale = mesh and mesh.Scale,
 					restPos = d.Position,
 					restColor = d.Color,
 					popped = false,
@@ -67,7 +80,7 @@ function PopIt.attach(model, engine)
 		Log.Floor("PopIt", #bubbles, model)
 	end)
 
-	local function playPop(parent, speedMin, speedMax, volume)
+	local function playPop(parent: BasePart, speedMin: number, speedMax: number, volume: number)
 		if not FxBudget.fxOK(parent.Position) then
 			return
 		end
@@ -80,36 +93,48 @@ function PopIt.attach(model, engine)
 		)
 	end
 
-	local function pop(b)
+	local function playTween(target: Instance, info: TweenInfo, goal: { [string]: any })
+		local previous = tweens[target]
+		if previous then
+			previous:Cancel()
+			previous:Destroy()
+		end
+		local tween = TweenService:Create(target, info, goal)
+		tweens[target] = tween
+		tween:Play()
+	end
+
+	local function pop(b: Bubble)
 		b.popped = true
 		local c = b.restColor
-		TweenService:Create(b.part, POP_TI, {
+		playTween(b.part, POP_TI, {
 			Position = b.restPos - Vector3.new(0, POP_DEPTH, 0),
 			Color = Color3.new(c.R * 0.55, c.G * 0.55, c.B * 0.55),
-		}):Play()
+		})
 		if b.mesh then
-			TweenService:Create(b.mesh, POP_TI, { Scale = POP_SCALE }):Play()
+			playTween(b.mesh, POP_TI, { Scale = POP_SCALE })
 		end
 		playPop(b.part, 0.92, 1.35, 0.48)
 
-		task.delay(UNPOP_MIN + math.random() * (UNPOP_MAX - UNPOP_MIN), function()
-			if not b.popped then
+		b.unpopTask = task.delay(UNPOP_MIN + math.random() * (UNPOP_MAX - UNPOP_MIN), function()
+			b.unpopTask = nil
+			if not self.ready or not b.popped then
 				return
 			end
 			b.popped = false
-			TweenService:Create(b.part, UNPOP_TI, { Position = b.restPos, Color = b.restColor }):Play()
+			playTween(b.part, UNPOP_TI, { Position = b.restPos, Color = b.restColor })
 			if b.mesh then
-				TweenService:Create(b.mesh, UNPOP_TI, { Scale = Vector3.one }):Play()
+				playTween(b.mesh, UNPOP_TI, { Scale = Vector3.one })
 			end
 			playPop(b.part, 0.55, 0.72, 0.20) -- tiếng "phồng lại" trầm, nhỏ hơn
 		end)
 	end
 
-	function self.update(dt, now, foot)
+	function self.update(_dt, _now, foot)
 		if not (self.ready and foot) then
 			return
 		end
-		local pos = foot.pos
+		local pos: Vector3 = foot.pos
 		if not engine.Bounds.contains(box, pos) then
 			return
 		end
@@ -127,7 +152,25 @@ function PopIt.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for _, tween in tweens do
+			tween:Cancel()
+			tween:Destroy()
+		end
+		-- Cancel không hoàn tác property; phải trả pose trước khi adapter khác nạp lại.
+		for _, b in bubbles do
+			engine.Await.cancel(b.unpopTask)
+			b.part.Position = b.restPos
+			b.part.Color = b.restColor
+			if b.mesh and b.restScale then
+				b.mesh.Scale = b.restScale
+			end
+		end
+		table.clear(tweens)
+		table.clear(bubbles)
+	end
 
 	return self
 end

@@ -68,21 +68,23 @@ local IMAGE_SIZE = 120
 local PULSE_PERIOD = 1.25
 local PULSE_AMOUNT = 0.05 -- ±5%: đủ thấy ở đuôi mắt, chưa tới mức làm chữ khó đọc
 
-local pulseGoal = Value(0)
-local pulse = Tween(pulseGoal, TweenInfo.new(PULSE_PERIOD, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut))
-task.spawn(function()
-	while true do
-		pulseGoal:set(1)
-		task.wait(PULSE_PERIOD)
-		pulseGoal:set(0)
-		task.wait(PULSE_PERIOD)
-	end
-end)
-
 function StarterPackCard.Build()
 	local hovered = Value(false)
+	local pulseGoal = Value(0)
+	local pulse = Tween(pulseGoal, TweenInfo.new(PULSE_PERIOD, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut))
+	local pulseThread = task.spawn(function()
+		while true do
+			pulseGoal:set(1)
+			task.wait(PULSE_PERIOD)
+			pulseGoal:set(0)
+			task.wait(PULSE_PERIOD)
+		end
+	end)
 
 	return New("Frame")({
+		[Fusion.Cleanup] = function()
+			task.cancel(pulseThread)
+		end,
 		BackgroundTransparency = 1,
 		--[[
 			Ô ĐẦU TIÊN (trái nhất) của HÀNG NGANG góc phải-trên — xem `Theme.TOP_ROW`.

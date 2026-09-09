@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 local Responsive = require(script.Parent.Responsive)
 local State = require(script.Parent.State)
 local Tokens = require(script.Parent.Tokens)
@@ -885,6 +886,8 @@ end
 	trùng khít rãnh theo chiều dọc — nếu không, hàng ô sẽ lệch pha đúng bằng phần tràn.
 ]]
 function Theme.MakeBarFillStuds(transparency: number?, zIndex: number?, cornerRadius: number?): ImageLabel
+	local troughJanitor = Janitor.new()
+	local alive = true
 	local img: ImageLabel = New("ImageLabel")({
 		Name = "BarFillStuds",
 		BackgroundTransparency = 1,
@@ -897,12 +900,15 @@ function Theme.MakeBarFillStuds(transparency: number?, zIndex: number?, cornerRa
 		TileSize = UDim2.fromOffset(STUD_TARGET_SIZE, STUD_TARGET_SIZE),
 		ZIndex = zIndex or 11,
 		[Children] = { Theme.MakeCorner(cornerRadius or 18) },
+		[Fusion.Cleanup] = function()
+			alive = false
+			troughJanitor:Sweep()
+		end,
 	}) :: any
 
 	-- Lớp hoa văn của rãnh: ImageLabel lát gạch nằm cùng cấp với miếng chạy (do `MakeSurface`
 	-- dựng). `nil` khi miếng chạy chưa vào cây, hoặc khi rãnh được khai `Studs = false`.
 	local troughStuds: ImageLabel? = nil
-	local troughConns: { RBXScriptConnection } = {}
 
 	local function apply()
 		local own = img.AbsoluteSize
@@ -930,10 +936,10 @@ function Theme.MakeBarFillStuds(transparency: number?, zIndex: number?, cornerRa
 	end
 
 	local function rebind()
-		for _, conn in troughConns do
-			conn:Disconnect()
+		if not alive then
+			return
 		end
-		table.clear(troughConns)
+		troughJanitor:Sweep()
 
 		--[[
 			Trèo NGƯỢC lên tìm lớp hoa văn của rãnh, chứ không giả định "ông nội là rãnh": giữa
@@ -963,8 +969,8 @@ function Theme.MakeBarFillStuds(transparency: number?, zIndex: number?, cornerRa
 		if ref then
 			-- Lưới của rãnh chốt MUỘN hơn frame đầu (xem `MakeStudsPattern`), nên phải nghe
 			-- `TileSize` chứ không chỉ đo một lần — không thì ta mượn nhầm lưới tạm.
-			table.insert(troughConns, ref:GetPropertyChangedSignal("TileSize"):Connect(apply))
-			table.insert(troughConns, ref:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply))
+			troughJanitor:Add(ref:GetPropertyChangedSignal("TileSize"):Connect(apply))
+			troughJanitor:Add(ref:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply))
 		end
 		apply()
 	end
@@ -1004,6 +1010,7 @@ function Theme.MakeSunburst(props: SunburstProps?)
 		và mỗi chỗ gọi lại phải chép lại cả khối field.
 	]]
 	local p: SunburstProps = props or {}
+	local janitor = Janitor.new()
 	local sunburst = New("ImageLabel")({
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
@@ -1015,6 +1022,9 @@ function Theme.MakeSunburst(props: SunburstProps?)
 		Position = p.Position or UDim2.fromOffset(49, 51),
 		Size = p.Size or UDim2.fromOffset(148, 148),
 		ZIndex = p.ZIndex or 2,
+		[Fusion.Cleanup] = function()
+			janitor:Sweep()
+		end,
 	})
 	local tween = TweenService:Create(
 		sunburst,
@@ -1022,8 +1032,9 @@ function Theme.MakeSunburst(props: SunburstProps?)
 		{ Rotation = 360 }
 	)
 	tween:Play()
-	State.sweeper:Add(function()
+	janitor:Add(function()
 		tween:Cancel()
+		tween:Destroy()
 	end)
 
 	if p.Pulse then
@@ -1036,8 +1047,9 @@ function Theme.MakeSunburst(props: SunburstProps?)
 			{ Scale = 1.12 }
 		)
 		pulseTween:Play()
-		State.sweeper:Add(function()
+		janitor:Add(function()
 			pulseTween:Cancel()
+			pulseTween:Destroy()
 		end)
 	end
 
@@ -1126,7 +1138,7 @@ function Theme.MakeOutlineLabel(props: { [string]: any })
 		end
 	end
 
-	local childrenList = defaults[Children] or {}
+	local childrenList = table.clone(defaults[Children] or {})
 	-- `Zoom`: hệ số phóng của nút đang chứa nhãn, để CHỮ to lên cùng nhịp với khung.
 	-- `MakeSurface` truyền xuống qua `Content` dạng hàm — xem khối lý do ở `MakeTextSizeConstraint`.
 	table.insert(childrenList, Theme.MakeTextSizeConstraint(maxTextSize, minTextSize, props.Zoom))
@@ -1161,10 +1173,7 @@ end
 local PRICE_GREEN = Tokens.COLOR.PRICE
 
 function Theme.MakePriceLabel(props: { [string]: any })
-	local merged: { [string]: any } = {}
-	for key, value in props do
-		merged[key] = value
-	end
+	local merged = table.clone(props)
 	merged.TextColor3 = PRICE_GREEN
 	-- Trước đây nhãn giá cố tình dày hơn nhãn thường (4 so với 3). Bỏ: viền chữ giờ đồng bộ
 	-- tuyệt đối cả HUD ở `Theme.TEXT_STROKE` = 4, tức là nhãn giá vẫn đúng độ dày cũ mà không
@@ -1369,6 +1378,7 @@ end
 	vẫn ổn; nhưng không kẹp thì có khối viền nuốt sạch phần màu.
 ]]
 local function bindPixelBorder(host: GuiObject, fill: Frame, designBorder: number)
+	local janitor = Janitor.new()
 	local function refresh()
 		local w, h = host.AbsoluteSize.X, host.AbsoluteSize.Y
 		if w <= 2 or h <= 2 then
@@ -1382,8 +1392,12 @@ local function bindPixelBorder(host: GuiObject, fill: Frame, designBorder: numbe
 	end
 
 	refresh()
-	State.sweeper:Add(host:GetPropertyChangedSignal("AbsoluteSize"):Connect(refresh))
-	State.sweeper:Add(Fusion.Observer(State.viewportScale):onChange(refresh))
+	janitor:Add(host:GetPropertyChangedSignal("AbsoluteSize"):Connect(refresh))
+	janitor:Add(Fusion.Observer(State.viewportScale):onChange(refresh))
+	-- Observer giữ callback sống; huỷ khối phải ngắt ngay, không chờ toàn HUD đóng.
+	host.Destroying:Connect(function()
+		janitor:Sweep()
+	end)
 end
 
 function Theme.MakeSurface(props: SurfaceProps)
@@ -1439,14 +1453,8 @@ function Theme.MakeSurface(props: SurfaceProps)
 		BackgroundColor3 = props.Color or Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = props.FillTransparency,
 		ClipsDescendants = props.ClipContent ~= false,
-		Position = Computed(function()
-			local b = border:get()
-			return UDim2.fromOffset(b, b)
-		end),
-		Size = Computed(function()
-			local b = border:get()
-			return UDim2.new(1, -b * 2, 1, -b * 2)
-		end),
+		Position = UDim2.fromOffset(border:get(), border:get()),
+		Size = UDim2.new(1, -border:get() * 2, 1, -border:get() * 2),
 		ZIndex = zIndex + 1,
 		[Children] = fillChildren,
 	})
@@ -1774,6 +1782,14 @@ end
 local RED_DOT_SIZE = 40
 
 local function makeRedDot(badge: any): Instance
+	local janitor = Janitor.new()
+	local function play(tween: Tween)
+		janitor:Add(function()
+			tween:Cancel()
+			tween:Destroy()
+		end)
+		tween:Play()
+	end
 	-- Quầng sáng: nở + tan liên tục. Không đảo chiều (`reverses = false`) vì sóng radar phải
 	-- luôn đi RA — cho nó co ngược lại trông như đang thở, mất hẳn cảm giác "báo động".
 	local halo = New("Frame")({
@@ -1791,12 +1807,16 @@ local function makeRedDot(badge: any): Instance
 	local haloScale = Instance.new("UIScale")
 	haloScale.Scale = 1
 	haloScale.Parent = halo
-	TweenService
-		:Create(haloScale, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1), { Scale = 1.55 })
-		:Play()
-	TweenService:Create(halo, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1), {
+	play(
+		TweenService:Create(
+			haloScale,
+			TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1),
+			{ Scale = 1.55 }
+		)
+	)
+	play(TweenService:Create(halo, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1), {
 		BackgroundTransparency = 1,
-	}):Play()
+	}))
 
 	local body = New("Frame")({
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1840,18 +1860,21 @@ local function makeRedDot(badge: any): Instance
 		Visible = badge,
 		ZIndex = 20,
 		[Children] = { halo, body },
+		[Fusion.Cleanup] = function()
+			janitor:Sweep()
+		end,
 	}) :: Frame
 
 	local pulse = Instance.new("UIScale")
 	pulse.Scale = 1
 	pulse.Parent = wrapper
-	TweenService
-		:Create(
+	play(
+		TweenService:Create(
 			pulse,
 			TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
 			{ Scale = 1.12 }
 		)
-		:Play()
+	)
 
 	return wrapper
 end

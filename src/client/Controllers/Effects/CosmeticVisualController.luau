@@ -508,10 +508,6 @@ type LodEntry = {
 }
 local lodEntries: { [Player]: LodEntry } = {}
 
-local function invalidateLod(player: Player)
-	lodEntries[player] = nil
-end
-
 -- Duyệt character MỘT LẦN lúc vừa gắn cosmetic (hiếm) thay vì mỗi tick.
 local function buildLodEntry(player: Player): LodEntry?
 	local root = getRoot(player)
@@ -581,6 +577,15 @@ local function applyLodTier(entry: LodEntry, tier: number)
 			beam.Enabled = beamsOn
 		end
 	end
+end
+
+local function invalidateLod(player: Player)
+	local entry = lodEntries[player]
+	if entry then
+		-- Đổi trail vẫn giữ aura cũ: trả Rate gốc trước khi chụp lại, tránh lấy Rate đã cull làm gốc.
+		applyLodTier(entry, 0)
+	end
+	lodEntries[player] = nil
 end
 
 local function stepCosmeticLod()
@@ -1294,7 +1299,7 @@ local function setupCharacter(player: Player, character: Model)
 		task.wait(0.15)
 
 		-- 3. Tiến hành gắn Trail & Aura
-		if player.Character == character and humanoid.Health > 0 then
+		if player.Parent == Players and player.Character == character and humanoid.Health > 0 then
 			applyTrail(player)
 			applyAura(player)
 			invalidateLod(player)
@@ -1302,7 +1307,7 @@ local function setupCharacter(player: Player, character: Model)
 
 		-- 4. Double check kiểm tra phụ sau 0.5s để chống mất Trail/Aura khi vừa hồi sinh
 		task.wait(0.5)
-		if player.Character == character and humanoid.Health > 0 then
+		if player.Parent == Players and player.Character == character and humanoid.Health > 0 then
 			local currentRoot = getRoot(player)
 			if currentRoot then
 				local hasTrail = currentRoot:FindFirstChild(TRAIL_ATTACH_A) ~= nil
@@ -1319,6 +1324,7 @@ local function setupCharacter(player: Player, character: Model)
 				if typeof(auraId) == "string" and auraId ~= "none" and not hasAura then
 					applyAura(player)
 				end
+				invalidateLod(player)
 			end
 		end
 	end)
@@ -1339,7 +1345,7 @@ local function watchPlayer(player: Player)
 	local function bindWalkSpeed(character: Model)
 		task.spawn(function()
 			local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 8)
-			if humanoid and humanoid:IsA("Humanoid") then
+			if player.Parent == Players and player.Character == character and humanoid and humanoid:IsA("Humanoid") then
 				humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
 					syncTrailLifetime(player)
 				end)

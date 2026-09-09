@@ -1,4 +1,6 @@
 --!strict
+-- Server: nhận mốc từ gameplay, lưu bước tutorial và báo TutorialController vẽ hướng dẫn.
+-- Yêu cầu Skip chỉ kết thúc hướng dẫn; phần thưởng thuộc hệ thống khác.
 --[[
 	TutorialService.luau — dẫn đường 3 bước cho người chơi mới.
 
@@ -51,6 +53,7 @@ local RunService = game:GetService("RunService")
 
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local TutorialService = {}
@@ -145,7 +148,10 @@ function TutorialService.Init()
 end
 
 function TutorialService.Start()
-	GamePackets.requestTutorialSkip.listen(function(_payload, player: Player)
+	GamePackets.requestTutorialSkip.listen(function(_payload, player)
+		if not player or NetRateLimit.ShouldDrop(player, "tutorialSkip") then
+			return
+		end
 		local data = DataService.GetData(player)
 		if not data or not isActive(data) then
 			return
@@ -162,7 +168,7 @@ function TutorialService.Start()
 				task.wait(0.1)
 				tries += 1
 			end
-			if not DataService.IsLoaded(player) then
+			if player.Parent ~= Players or not DataService.IsLoaded(player) then
 				return
 			end
 

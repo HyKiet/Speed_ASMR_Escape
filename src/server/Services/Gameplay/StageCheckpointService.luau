@@ -1,8 +1,7 @@
 --!strict
 --[[
-	StageCheckpointService.luau
-	Server-side service managing Stage checkpoints (1-15).
-	Handles stage progression, Lobby teleports, Revives, Win/x2 Wins pads, and Skip Stage pads.
+	Server xác minh checkpoint/pad, gọi ProgressionService cấp thưởng và gửi trạng thái qua ByteNet.
+	Quản lý tiến trình stage, về Lobby, hồi sinh và các pad Win/x2 Win/Skip Stage.
 
 	Vạch Stage{N}Finish KHÔNG tự trao Wins — nhận thưởng CHỈ qua bộ 3 pad cuối zone
 	(WinCollectionPad / DoubleWinCollectionPad / SkipStagePad, xem setupSpecialPads).
@@ -19,6 +18,7 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local CharacterUtil = require(ReplicatedStorage.Shared.Util.CharacterUtil)
 local PathResolver = require(ReplicatedStorage.Shared.Util.PathResolver)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
 local StageFacing = require(ReplicatedStorage.Shared.Util.StageFacing)
 local StageLanding = require(ReplicatedStorage.Shared.Util.StageLanding)
@@ -38,7 +38,6 @@ local function ownsInfiniteRevives(player: Player): boolean
 	end
 	return GamepassService.OwnsPass(player, passId) == true
 end
-local zone5Event: RemoteEvent? = nil
 
 local REVIVE_ROOT_HEIGHT = 4
 local REVIVE_PENDING_GRACE_SECONDS = 120
@@ -85,22 +84,6 @@ end
 
 local function getStagePath(stage: number, childName: string): string
 	return `Workspace.Zones.Zone{stage}.Mechanics.Stage{stage}{childName}`
-end
-
-local function getTargetCFrame(path: string): CFrame?
-	local target = PathResolver.Resolve(path)
-	if not target then
-		return nil
-	end
-	if target:IsA("SpawnLocation") then
-		return target.CFrame + Vector3.new(0, 4, 0)
-	elseif target:IsA("BasePart") then
-		return target.CFrame + Vector3.new(0, (target.Size.Y * 0.5) + REVIVE_ROOT_HEIGHT, 0)
-	elseif target:IsA("Model") then
-		local _, size = target:GetBoundingBox()
-		return target:GetPivot() + Vector3.new(0, (size.Y * 0.5) + REVIVE_ROOT_HEIGHT, 0)
-	end
-	return nil
 end
 
 -- Đưa người chơi tới `cframe`, dập tắt vận tốc và báo AntiCheat để không bị giật ngược.
@@ -303,10 +286,10 @@ local function completeStage(player: Player, stage: number): (boolean, number)
 		end
 	end
 
-	if stage == 5 and zone5Event then
+	if stage == 5 then
 		local finishPart = PathResolver.Resolve(getStagePath(stage, "Finish"))
 		if finishPart and finishPart:IsA("BasePart") then
-			zone5Event:FireClient(player, "Victory", finishPart.Position)
+			GamePackets.zone5EffectState.sendTo({ action = "Victory", position = finishPart.Position }, player)
 		end
 	end
 
@@ -338,12 +321,6 @@ local function findStageParts(zone: Instance, stage: number, suffix: string): { 
 		end
 	end
 	return parts
-end
-
-local function connectTouched(part: BasePart, callback: (BasePart) -> ())
-	part.Touched:Connect(function(hit: BasePart)
-		callback(hit)
-	end)
 end
 
 local function onHumanoidDied(player: Player)
@@ -531,6 +508,46 @@ local function activatePad(player: Player, entry: PadEntry)
 	end
 end
 
+--[[
+	Ghi số Wins lên biển `PadLabel` của pad TỪ `Constants.STAGE_WINS`, mỗi lần server khởi động.
+
+	⚠️ BUG 2026-09-07 (user quay video, tưởng là lỗ hổng kinh tế): nhãn 30 pad này là chuỗi
+	TĨNH gõ tay trong map, và map không nằm trong git. Đợt GDD 3.0 (commit 586e1c4) viết lại
+	toàn bộ `STAGE_WINS` — Stage 14: 50.000 → 160.000, Stage 15: 150.000 → 400.000 — nhưng
+	không có gì đối chiếu bảng đó với map, nên cả 30 nhãn vẫn quảng cáo bảng CŨ. Người chơi
+	dậm pad ghi "50,000 Wins" rồi nhận 352.000 (= 160.000 × 1,1 buff group × 2 Wins Boost) và
+	kết luận game đang tự nhân Wins loạn xạ. Server tính ĐÚNG; cái nói dối là tấm biển.
+
+	Đây đúng là con bug mà `MultiplierPadService.writePadSign` đã dính trước đó với bảng giá
+	pad — cùng nguyên nhân, cùng cách chữa: đừng bao giờ để một con số kinh tế sống trong map.
+
+	Nhãn ghi số GỐC của stage, không nhân hệ số cá nhân (buff group / Wins Boost / VIP / pass):
+	biển là thứ CHUNG cho cả server, mà mỗi người một hệ số khác nhau. Ăn nhiều hơn con số trên
+	biển là món quà, không phải lời hứa bị phá.
+]]
+local function writePadLabel(pad: BasePart, kind: PadKind, stage: number)
+	if kind == "skip" then
+		return -- SkipStagePad không quảng cáo số Wins nào.
+	end
+	local baseWins = Constants.STAGE_WINS[stage]
+	if not baseWins or baseWins <= 0 then
+		return
+	end
+	local wins = if kind == "x2" then baseWins * 2 else baseWins
+	local text = `{Constants.FormatNumber(wins)} Win{if wins == 1 then "" else "s"}`
+
+	local written = 0
+	for _, descendant in pad:GetDescendants() do
+		if descendant:IsA("TextLabel") then
+			descendant.Text = text
+			written += 1
+		end
+	end
+	if written == 0 then
+		warn(`[StageCheckpointService] {pad:GetFullName()} không có TextLabel — biển giữ chữ cũ`)
+	end
+end
+
 -- Pad Handler: gắn Touched + ghi registry cho vòng dò vị trí (part đã dựng sẵn trong Studio).
 local function setupSpecialPads(stage: number)
 	local zonesFolder = Workspace:FindFirstChild("Zones")
@@ -559,6 +576,7 @@ local function setupSpecialPads(stage: number)
 				id = `{spec.kind}:{stage}`,
 			}
 			table.insert(padRegistry, entry)
+			writePadLabel(part, spec.kind, stage)
 			part.Touched:Connect(function(hit)
 				local player = CharacterUtil.GetPlayerFromHit(hit)
 				if player and isTouchNearPart(player, part) then
@@ -651,16 +669,6 @@ function StageCheckpointService.Init()
 	AntiCheatService = ServiceLocator.Find("AntiCheatService")
 	GamepassService = ServiceLocator.Find("GamepassService")
 	TelemetryService = ServiceLocator.Find("TelemetryService")
-
-	local existingEvent = ReplicatedStorage:FindFirstChild("Zone5Event")
-	if existingEvent and existingEvent:IsA("RemoteEvent") then
-		zone5Event = existingEvent
-	else
-		local event = Instance.new("RemoteEvent")
-		event.Name = "Zone5Event"
-		event.Parent = ReplicatedStorage
-		zone5Event = event
-	end
 end
 
 function StageCheckpointService.Start()
@@ -692,7 +700,7 @@ function StageCheckpointService.Start()
 		end
 		for _, startPart in startParts do
 			table.insert(startRegistry, { part = startPart, stage = stage })
-			connectTouched(startPart, function(hit: BasePart)
+			startPart.Touched:Connect(function(hit: BasePart)
 				onStageStartTouched(stage, startPart, hit)
 			end)
 		end
@@ -749,8 +757,12 @@ function StageCheckpointService.Start()
 		end
 	end)
 
-	GamePackets.requestRevive.listen(function(request, player: Player)
-		if typeof(request.method) ~= "string" then
+	GamePackets.requestRevive.listen(function(request, player)
+		if not player or (request.method ~= "decline" and request.method ~= "free") then
+			return
+		end
+		-- Tách hai thao tác để nút đóng không bị chặn sau một yêu cầu hồi sinh.
+		if NetRateLimit.ShouldDrop(player, `revive:{request.method}`) then
 			return
 		end
 

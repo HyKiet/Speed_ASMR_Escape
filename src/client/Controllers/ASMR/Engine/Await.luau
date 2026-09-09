@@ -2,8 +2,15 @@
 -- Đợi children của một folder replicate ổn định — model KHÔNG Atomic có thể stream con
 -- về sau khi script client đã chạy (bài học Keyboard v5). Model Atomic về đủ ngay,
 -- vòng lặp thoát sau đúng 2 lần đếm.
+-- Client: các adapter giữ initTask để engine đợi đúng vòng nạp và hủy khi sàn bị tháo.
 
 local Await = {}
+
+function Await.cancel(thread: thread?)
+	if thread and coroutine.status(thread) == "suspended" then
+		task.cancel(thread)
+	end
+end
 
 function Await.childrenStable(folder: Instance, timeout: number?)
 	local last = -1

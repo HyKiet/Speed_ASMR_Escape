@@ -47,6 +47,7 @@ local PANEL_HEIGHT = 610
 
 local wheelFrame: Frame? = nil
 local currentRotation = 0
+local spinRequestToken = 0
 
 local function formatClock(seconds: number): string
 	local total = math.max(0, math.floor(seconds))
@@ -292,12 +293,15 @@ local function requestSpin()
 		return
 	end
 	State.rouletteSpinning:set(true)
+	spinRequestToken += 1
+	local token = spinRequestToken
 	State.rouletteResultText:set("")
 	GamePackets.requestSpin.send({})
 
 	-- An toàn: nếu server không phản hồi (lag), mở khóa sau 8s.
 	task.delay(8, function()
-		if State.rouletteSpinning:get() then
+		-- Timeout lượt trước không được mở khoá lượt quay mới.
+		if token == spinRequestToken and State.rouletteSpinning:get() then
 			State.rouletteSpinning:set(false)
 		end
 	end)
@@ -412,50 +416,53 @@ local function buildRightColumn()
 			}),
 			-- Nút SPIN. Bọc `UIAnchors.Keep` để tutorial bước 5/5 chiếu spotlight vào đúng đây
 			-- sau khi người chơi mở modal (xem `TutorialController.runSpinFinale`).
-			UIAnchors.Keep("rouletteSpinButton", Theme.MakeSurface({
-				ClassName = "TextButton",
-				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.fromOffset(240, 200),
-				Size = UDim2.fromOffset(360, 84),
-				ZIndex = 45,
-				Radius = 18,
-				Border = Tokens.BORDER,
-				Color = Computed(function()
-					return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
-						then Color3.fromRGB(110, 80, 124)
-						else Color3.fromRGB(108, 240, 130)
-				end),
-				ColorB = Computed(function()
-					return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
-						then Color3.fromRGB(66, 44, 84)
-						else Color3.fromRGB(30, 150, 72)
-				end),
-				Zoom = { Hovered = spinHovered, Scale = 1.06 },
-				Activated = requestSpin,
-				MouseEnter = function()
-					spinHovered:set(true)
-				end,
-				MouseLeave = function()
-					spinHovered:set(false)
-				end,
-				Content = function(zoom)
-					return {
-						Theme.MakeOutlineLabel({
-							Position = UDim2.fromScale(0, 0),
-							Size = UDim2.fromScale(1, 1),
-							Text = Computed(function()
-								if State.rouletteSpinning:get() then
-									return "SPINNING..."
-								end
-								return "SPIN (1 🎟️)"
-							end),
-							Zoom = zoom,
-							MaxTextSize = 42,
-							ZIndex = 47,
-						}),
-					}
-				end,
-			})),
+			UIAnchors.Keep(
+				"rouletteSpinButton",
+				Theme.MakeSurface({
+					ClassName = "TextButton",
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.fromOffset(240, 200),
+					Size = UDim2.fromOffset(360, 84),
+					ZIndex = 45,
+					Radius = 18,
+					Border = Tokens.BORDER,
+					Color = Computed(function()
+						return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
+							then Color3.fromRGB(110, 80, 124)
+							else Color3.fromRGB(108, 240, 130)
+					end),
+					ColorB = Computed(function()
+						return if State.rouletteSpinning:get() or State.rouletteTickets:get() <= 0
+							then Color3.fromRGB(66, 44, 84)
+							else Color3.fromRGB(30, 150, 72)
+					end),
+					Zoom = { Hovered = spinHovered, Scale = 1.06 },
+					Activated = requestSpin,
+					MouseEnter = function()
+						spinHovered:set(true)
+					end,
+					MouseLeave = function()
+						spinHovered:set(false)
+					end,
+					Content = function(zoom)
+						return {
+							Theme.MakeOutlineLabel({
+								Position = UDim2.fromScale(0, 0),
+								Size = UDim2.fromScale(1, 1),
+								Text = Computed(function()
+									if State.rouletteSpinning:get() then
+										return "SPINNING..."
+									end
+									return "SPIN (1 🎟️)"
+								end),
+								Zoom = zoom,
+								MaxTextSize = 42,
+								ZIndex = 47,
+							}),
+						}
+					end,
+				})
+			),
 			-- Tiêu đề mua thêm
 			Theme.MakeOutlineLabel({
 				Position = UDim2.fromOffset(0, 310),

@@ -1,4 +1,4 @@
---!nonstrict
+--!strict
 --[[
 	TopBarController.luau — Nút ẨN GIAO DIỆN + CÀI ĐẶT trên topbar, dựng bằng **TopbarPlus
 	v3.4.0** (`Packages/TopbarPlus`, wally `1foreverhd/topbarplus@3.4.0`).
@@ -363,10 +363,11 @@ function TopBarController.Start()
 		if not isHidden or not child:IsA("LayerCollector") or isTopbarPlusGui(child) or isTouchControlGui(child) then
 			return
 		end
+		local collector = child :: LayerCollector
 		task.defer(function()
-			if isHidden and child.Parent and child.Enabled then
-				suppressed[child] = true
-				child.Enabled = false
+			if isHidden and collector.Parent and collector.Enabled then
+				suppressed[collector] = true
+				collector.Enabled = false
 			end
 		end)
 	end)

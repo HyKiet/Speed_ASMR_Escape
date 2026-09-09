@@ -875,11 +875,16 @@ local function flashStepDone(onFinished: () -> ())
 end
 
 local function renderStep(step: number, active: boolean)
+	-- Vô hiệu hoá nhịp chúc mừng cũ, kể cả khi server vừa tắt tutorial.
+	flashToken += 1
 	currentStep = step
 	isActive = active
 
 	buildUI()
 	buildWorldGuides()
+	if banner then
+		banner.BackgroundColor3 = BANNER_COLOR
+	end
 
 	local config = STEPS[step + 1]
 	if not active or not config then
@@ -908,10 +913,6 @@ local function renderStep(step: number, active: boolean)
 	end
 	lastRenderedStep = step
 	show()
-end
-
-local function applyState(step: number, active: boolean)
-	renderStep(step, active)
 end
 
 --[[
@@ -1188,7 +1189,7 @@ end
 
 function TutorialController.Start()
 	GamePackets.tutorialState.listen(function(payload)
-		applyState(payload.step, payload.active)
+		renderStep(payload.step, payload.active)
 	end)
 
 	GamePackets.tutorialComplete.listen(function(payload)
@@ -1232,7 +1233,7 @@ function TutorialController.Start()
 				return
 			end
 			LocalPlayer:SetAttribute("StudioTutorialStep", nil)
-			applyState(math.clamp(math.floor(step), 0, #STEPS - 1), true)
+			renderStep(math.clamp(math.floor(step), 0, #STEPS - 1), true)
 		end)
 	end
 

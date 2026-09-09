@@ -1,4 +1,6 @@
 --!strict
+-- Server: quản lý cửa sổ bán Starter Pack và trao quyền lợi qua các service gameplay.
+-- Hóa đơn mới và gamepass đời đầu cùng kiểm tra cờ nhận trong profile để tránh trao lặp.
 --[[
 	StarterPackService.luau — gói "Rookie Rocket" (xem Config/Economy/StarterPack.luau).
 
@@ -34,6 +36,7 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local StarterPackConfig = require(ReplicatedStorage.Shared.Config.Economy.StarterPack)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
 
 local StarterPackService = {}
@@ -163,6 +166,10 @@ function StarterPackService.GrantIfOwnedLegacyPass(player: Player, trusted: bool
 			return false
 		end
 	end
+	-- Tra quyền sở hữu có thể yield; hóa đơn khác hoặc phiên đóng có thể đã đổi dữ liệu.
+	if player.Parent ~= Players or DataService.GetData(player) ~= data or data.StarterPackBought then
+		return false
+	end
 
 	Log.Info(`[StarterPackService] {player.Name} sở hữu gamepass Rookie Rocket đời đầu — phát bù gói.`)
 	grantPack(player, data)
@@ -234,7 +241,7 @@ function StarterPackService.Start()
 				task.wait(0.1)
 				tries += 1
 			end
-			if not DataService.IsLoaded(player) then
+			if player.Parent ~= Players or not DataService.IsLoaded(player) then
 				return
 			end
 			StarterPackService.GrantIfOwnedLegacyPass(player)
@@ -247,13 +254,18 @@ function StarterPackService.Start()
 	end
 	Players.PlayerAdded:Connect(pushWhenReady)
 
-	GamePackets.requestStarterPackPurchase.listen(function(_payload, player: Player)
+	GamePackets.requestStarterPackPurchase.listen(function(_payload, player)
+		if not player or NetRateLimit.ShouldDrop(player, "starterPackPurchase") then
+			return
+		end
 		local data = DataService.GetData(player)
 		if not data or not isAvailable(data) then
 			-- Thẻ xem trước trong Studio: nút mua là thứ DUY NHẤT không chạy được, nói thẳng
 			-- ra console để khỏi tưởng nút hỏng.
 			if data and StarterPackConfig.ShowsCard() and not StarterPackConfig.IsConfigured() then
-				warn("[StarterPackService] Thẻ đang ở chế độ XEM TRƯỚC (PRODUCT_ID = 0) — không mở prompt mua.")
+				warn(
+					"[StarterPackService] Thẻ đang ở chế độ XEM TRƯỚC (PRODUCT_ID = 0) — không mở prompt mua."
+				)
 			end
 			sendState(player) -- client đang giữ trạng thái cũ → sửa lại cho nó
 			return
@@ -264,7 +276,9 @@ function StarterPackService.Start()
 			if StarterPackService.GrantIfOwnedLegacyPass(player) then
 				return
 			end
-			MarketplaceService:PromptProductPurchase(player, StarterPackConfig.PRODUCT_ID)
+			if player.Parent == Players and StarterPackService.IsAvailable(player) then
+				MarketplaceService:PromptProductPurchase(player, StarterPackConfig.PRODUCT_ID)
+			end
 		end)
 	end)
 

@@ -57,6 +57,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 local State = require(script.Parent.State)
 local Tokens = require(script.Parent.Tokens)
 
@@ -324,6 +325,7 @@ function Responsive.AttachHitArea(host: GuiObject, activated: () -> (), options:
 	]]
 	local opts: HitAreaOptions = options or {}
 	local maxGrowth = opts.MaxGrowth or Tokens.TOUCH.MAX_GROWTH
+	local janitor = Janitor.new()
 
 	local hit = New("TextButton")({
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -335,6 +337,9 @@ function Responsive.AttachHitArea(host: GuiObject, activated: () -> (), options:
 		Text = "",
 		ZIndex = opts.ZIndex or 200,
 		[OnEvent("Activated")] = activated,
+		[Fusion.Cleanup] = function()
+			janitor:Sweep()
+		end,
 	}) :: TextButton
 	-- ⚠️ Ép kiểu BẮT BUỘC: `Fusion.New` khai báo trả về `Instance`, nên nếu không ép thì mọi
 	-- lần đọc `hit.Size` / `hit.InputBegan` / `hit.InputEnded` bên dưới đều là lỗi
@@ -363,8 +368,8 @@ function Responsive.AttachHitArea(host: GuiObject, activated: () -> (), options:
 
 	hit.Parent = host
 	refresh()
-	State.sweeper:Add(host:GetPropertyChangedSignal("AbsoluteSize"):Connect(refresh))
-	State.sweeper:Add(Fusion.Observer(State.viewportScale):onChange(refresh))
+	janitor:Add(host:GetPropertyChangedSignal("AbsoluteSize"):Connect(refresh))
+	janitor:Add(Fusion.Observer(State.viewportScale):onChange(refresh))
 
 	-- Trả lại phản hồi bấm mà chính lớp chạm này vừa nuốt mất (xem `HitAreaOptions.Pressed`).
 	if opts.Pressed or opts.Hovered then
@@ -376,12 +381,12 @@ function Responsive.AttachHitArea(host: GuiObject, activated: () -> (), options:
 				opts.Hovered:set(down)
 			end
 		end
-		State.sweeper:Add(hit.InputBegan:Connect(function(input: InputObject)
+		janitor:Add(hit.InputBegan:Connect(function(input: InputObject)
 			if input.UserInputType == Enum.UserInputType.Touch then
 				setFeedback(true)
 			end
 		end))
-		State.sweeper:Add(hit.InputEnded:Connect(function(input: InputObject)
+		janitor:Add(hit.InputEnded:Connect(function(input: InputObject)
 			if input.UserInputType == Enum.UserInputType.Touch then
 				setFeedback(false)
 			end
@@ -403,11 +408,16 @@ end
 ]]
 function Responsive.Connect()
 	Responsive.Recompute()
+	local cameraJanitor = Janitor.new()
+	State.sweeper:Add(function()
+		cameraJanitor:Sweep()
+	end)
 
 	local function bindCamera()
+		cameraJanitor:Sweep()
 		local camera = Workspace.CurrentCamera
 		if camera then
-			State.sweeper:Add(camera:GetPropertyChangedSignal("ViewportSize"):Connect(Responsive.Recompute))
+			cameraJanitor:Add(camera:GetPropertyChangedSignal("ViewportSize"):Connect(Responsive.Recompute))
 		end
 		Responsive.Recompute()
 	end

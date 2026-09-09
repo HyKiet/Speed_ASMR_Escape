@@ -71,7 +71,7 @@ selene --allow-warnings src
 
 ---
 
-## B. Trong QA — phần máy kiểm được (🤖 qua MCP, ⏱ ~10 phút)
+## B. Trong QA — phần máy kiểm được (🤖 chạy script trong Command Bar, ⏱ ~10 phút)
 
 - [ ] 🤖 Console sạch khi khởi động: có `--- [SERVER READY] ---` và khối `[CLIENT LOADING]`
       báo **đủ 59 controller**. Thiếu số = có controller chết câm.
@@ -168,4 +168,26 @@ Checklist chỉ có giá trị khi nó dài ra theo từng bug đã từng xảy
 
 | Ngày | Bug lọt lưới | Mục đã thêm |
 |---|---|---|
-| | | |
+| 2026-09-08 | Timeout của lượt Roulette trước mở khoá lượt kế tiếp | Quay tiếp trước khi timeout 8s cũ hết; lượt mới phải giữ khoá cho tới kết quả hoặc timeout riêng. |
+| 2026-09-08 | Stop controller bẫy vẫn để vòng dò streaming chạy | Start hai lần, Stop hai lần, rồi Start lại: chỉ một renderer và một vòng dò; Stop phải dọn cả hai. |
+| 2026-09-08 | Cầu Jelly không nối lại sau khi map stream tới muộn | Để JellyBridge vắng hơn 20s, nạp lại rồi gỡ/nạp segment; animation trở lại, listener cũ được dọn và khối được trả hình gốc. |
+| 2026-09-08 | WindShake mất cờ Initialized và bỏ sót listener từng lá | Lặp Init/Cleanup; kiểm connection, Settings, octree và CFrame về trạng thái ban đầu. |
+| 2026-09-08 | Màn hình tải vượt trần khi CharacterAdded hoặc preload bị treo | Mô phỏng từng bước chờ không trả về; màn hình vẫn hết chờ sau trần hiện có và huỷ worker. |
+| 2026-09-08 | Widget bị giữ trong sweeper/Observer sau khi Destroy | Dựng/huỷ 100 surface và sunburst; số owner và viewport listener phải trở về mốc đầu. |
+| 2026-09-08 | SpeedWind dùng thuộc tính PitchRatio không tồn tại và nuốt lỗi init | Kiểm đủ audio node/Wire, dùng AudioPitchShifter.Pitch; Master phải điều khiển cả AudioPlayer của gió và sonic boom. |
+
+### Các rủi ro còn mở sau audit source 2026-09-08
+
+Các mục dưới đây chưa được nghiệm thu; build và lint xanh không xác nhận được chúng.
+
+- [ ] `ReceiptService` chưa có lịch sử `PurchaseId` bền vững: kiểm receipt lặp và xử lý đồng thời
+      giữa server, kể cả donation. Thiết kế lưu dấu giao hàng phải đi cùng giao thưởng; nếu thêm
+      trường profile thì bump schema và có migration trước khi triển khai.
+- [ ] Roulette đã trừ vé trước khoảng chờ animation nhưng chỉ giao thưởng nếu người chơi còn
+      trong server. Kiểm rời game giữa hai bước và cơ chế khôi phục thưởng khi vào lại.
+- [ ] Starter Pack đánh dấu đã mua trước chuỗi cấp thưởng có thể yield: kiểm lỗi giữa chuỗi,
+      tránh vừa mất quyền nhận phần còn lại vừa cấp trùng phần đã nhận.
+- [ ] Zone 5/6 còn có kiểm tra chết ở client. Đối chiếu hình học map thật và luồng server trước
+      khi bổ sung kiểm chứng phía server; cần kiểm cả bỏ qua sát thương lẫn chết oan ở tốc độ cao.
+- [ ] Chạy phần người thật ở C1–C8 trên bản QA đã publish; các fixture Studio/Lune của audit
+      không thay thế kiểm mua Robux, rejoin, hai thiết bị, mobile và tải 25 người.

@@ -1,5 +1,6 @@
 --!strict
--- 3 bảng xếp hạng SurfaceGui (TopSpeed / TopWins / TopDonate) trong Workspace.LeaderBoard.
+-- Server đọc điểm từ DataService, ghi bảng xếp hạng rồi cập nhật SurfaceGui trong map.
+-- OrderedDataStore chỉ là chỉ mục xếp hạng; dữ liệu người chơi vẫn do ProfileStore giữ.
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
@@ -655,8 +656,14 @@ local function publishPlayer(player: Player)
 						tostring(player.UserId),
 						safeValue
 					)
-					if not success and not RunService:IsStudio() then
-						warn(`[LeaderboardService] Failed to publish {config.modelName}: {err}`)
+					if not success then
+						-- Lần ghi lỗi phải được thử lại, kể cả khi điểm không đổi.
+						if published[player.UserId] == safeValue then
+							published[player.UserId] = nil
+						end
+						if not RunService:IsStudio() then
+							warn(`[LeaderboardService] Failed to publish {config.modelName}: {err}`)
+						end
 					end
 				end)
 			end
@@ -734,6 +741,9 @@ function LeaderboardService.Start()
 
 	Players.PlayerRemoving:Connect(function(player)
 		publishPlayer(player)
+		for _, published in lastPublishedValues do
+			published[player.UserId] = nil
+		end
 	end)
 end
 

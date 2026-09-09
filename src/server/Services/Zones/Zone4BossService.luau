@@ -244,11 +244,15 @@ local function configureBoss(model: Model)
 	end
 end
 
-local function stopRunAnimation()
+local function stopRunAnimation(release: boolean?)
 	if runTrack then
 		runTrack:Stop(0.18)
-		runTrack = nil
-		runTrackBoss = nil
+		-- Boss nghỉ vẫn dùng lại track; chỉ hủy khi chuyển sang model khác.
+		if release then
+			runTrack:Destroy()
+			runTrack = nil
+			runTrackBoss = nil
+		end
 	end
 end
 
@@ -256,7 +260,7 @@ local function loadRunTrack(model: Model): AnimationTrack?
 	if runTrack and runTrackBoss == model then
 		return runTrack
 	end
-	stopRunAnimation()
+	stopRunAnimation(true)
 
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
@@ -330,7 +334,7 @@ local function ensureBoss(): Model?
 		return model
 	end
 
-	stopRunAnimation()
+	stopRunAnimation(true)
 	model = findBossModel()
 	if not model then
 		return nil
@@ -603,14 +607,13 @@ function Zone4BossService.Init()
 	if foundKillFloor and foundKillFloor:IsA("BasePart") then
 		killFloor = foundKillFloor
 	end
-
-	connectStageGates()
 end
 
 function Zone4BossService.Start()
 	if not zone or not mechanics or not startGate or not finishGate then
 		return
 	end
+	connectStageGates()
 
 	local model = ensureBoss()
 	if not model then
@@ -640,7 +643,7 @@ function Zone4BossService.Start()
 	end)
 
 	print(
-		"[Zone4BossService] MonkeyBoss sẵn sàng — server dí người gần nhất, 30Hz, ngủ khi sân trống"
+		"[Zone4BossService] MonkeyBoss sẵn sàng — server dí người dẫn đầu, 30Hz, ngủ khi sân trống"
 	)
 
 	local accumulator = 0

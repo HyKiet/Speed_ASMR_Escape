@@ -392,6 +392,7 @@ local function sendSnapshot(player: Player)
 			xp = 0,
 			requiredXP = Constants.GetRequiredXP(1),
 			rebirths = 0,
+			rebirthWinsCost = math.max(0, math.floor(Constants.GetRebirthWinsCost(1))),
 			maxWalkSpeed = Constants.GetMaxWalkSpeed(1),
 			customSpeedLimit = Constants.GetMaxWalkSpeed(1),
 			gainMultiplier = 1,

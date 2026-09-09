@@ -39,6 +39,7 @@ type Laser = {
 
 local lasers: { Laser } = {}
 local connection: RBXScriptConnection? = nil
+local resolverThread: thread? = nil
 
 local function resolve()
 	table.clear(lasers)
@@ -148,9 +149,12 @@ end
 function Zone2LaserController.Init() end
 
 function Zone2LaserController.Start()
+	if connection then
+		return
+	end
 	connection = RunService.RenderStepped:Connect(step)
 
-	task.spawn(function()
+	resolverThread = task.spawn(function()
 		while true do
 			-- Re-resolve khi mất tham chiếu HOẶC khi streaming vừa nạp thêm laser.
 			if not alive() or #lasers ~= streamedCount() then
@@ -162,6 +166,13 @@ function Zone2LaserController.Start()
 end
 
 function Zone2LaserController.Stop()
+	-- Dừng cả vòng dò streaming; ngắt render thôi vẫn giữ controller sống ngầm.
+	if resolverThread then
+		if coroutine.status(resolverThread) == "suspended" then
+			task.cancel(resolverThread)
+		end
+		resolverThread = nil
+	end
 	if connection then
 		connection:Disconnect()
 		connection = nil

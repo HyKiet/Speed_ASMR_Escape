@@ -17,7 +17,6 @@ local Manager = require(script.Parent.Manager)
 local Children = Fusion.Children
 local Computed = Fusion.Computed
 local New = Fusion.New
-local OnEvent = Fusion.OnEvent
 local Value = Fusion.Value
 
 local localPlayer = Players.LocalPlayer

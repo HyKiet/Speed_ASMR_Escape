@@ -1,14 +1,24 @@
 --!strict
+-- Server: đếm bạn bè đang trong phiên để ProgressionService tính bonus và gửi HUD.
+-- Gộp các lượt vào/ra thành một lần tra; kết quả của danh sách cũ không ghi đè danh sách mới.
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
 
 local FriendService = {}
 
 local friendsInServer: { [Player]: number } = {}
+local members: { [Player]: boolean } = {}
+local refreshPending = false
+local refreshing = false
+local ProgressionService: any
 
 local function updateFriendsCount()
-	local players = Players:GetPlayers()
-	local counts = {}
-	for _, p in players do
+	local players: { Player } = {}
+	local counts: { [Player]: number } = {}
+	for p in members do
+		table.insert(players, p)
 		counts[p] = 0
 	end
 
@@ -20,11 +30,11 @@ local function updateFriendsCount()
 	end
 
 	for _, pair in pairsToCheck do
-		if not pair.p1.Parent or not pair.p2.Parent then
+		if not members[pair.p1] or not members[pair.p2] then
 			continue
 		end
 		local ok, isFriends = pcall(function()
-			return pair.p1:IsFriendsWith(pair.p2.UserId)
+			return pair.p1:IsFriendsWithAsync(pair.p2.UserId)
 		end)
 		if ok and isFriends then
 			if counts[pair.p1] then
@@ -36,19 +46,42 @@ local function updateFriendsCount()
 		end
 	end
 
+	-- API có thể yield; một người vào/ra trong lúc tra làm toàn bộ snapshot này cũ đi.
+	if refreshPending then
+		return
+	end
 	for p, count in counts do
-		if not p.Parent then
+		if not members[p] then
 			continue
 		end
 		if friendsInServer[p] ~= count then
 			friendsInServer[p] = count
-			local ServiceLocator = require(game:GetService("ReplicatedStorage").Shared.Util.ServiceLocator)
-			local ProgressionService = ServiceLocator.Get("ProgressionService")
 			if ProgressionService then
 				ProgressionService.SendSnapshot(p)
 			end
 		end
 	end
+end
+
+local function requestRefresh()
+	refreshPending = true
+	if refreshing then
+		return
+	end
+	refreshing = true
+	task.defer(function()
+		repeat
+			refreshPending = false
+			local ok, err = pcall(function()
+				updateFriendsCount()
+				return true
+			end)
+			if not ok then
+				warn("[FriendService] Không cập nhật được danh sách bạn bè:", err)
+			end
+		until not refreshPending
+		refreshing = false
+	end)
 end
 
 function FriendService.GetFriendsInServer(player: Player): number
@@ -116,18 +149,28 @@ function FriendService.GetFriendsWinsMultiplier(player: Player): number
 	return bonusFor(WINS_BONUS, player)
 end
 
-function FriendService.Init() end
+function FriendService.Init()
+	ProgressionService = ServiceLocator.Get("ProgressionService")
+end
 
 function FriendService.Start()
 	Players.PlayerAdded:Connect(function(player)
+		members[player] = true
 		friendsInServer[player] = 0
-		task.spawn(updateFriendsCount)
+		requestRefresh()
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
+		-- PlayerRemoving chạy trước khi Parent đổi; loại khỏi tập phiên ngay tại đây.
+		members[player] = nil
 		friendsInServer[player] = nil
-		task.spawn(updateFriendsCount)
+		requestRefresh()
 	end)
+	for _, player in Players:GetPlayers() do
+		members[player] = true
+		friendsInServer[player] = 0
+	end
+	requestRefresh()
 end
 
 return FriendService

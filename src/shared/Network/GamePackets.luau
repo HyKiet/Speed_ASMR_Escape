@@ -1,10 +1,19 @@
 --!strict
+-- Hợp đồng ByteNet dùng chung cho Server/Client: khai kiểu dữ liệu trước khi gắn listener.
+-- Client gửi yêu cầu; service xác minh rồi gửi trạng thái hoặc hiệu ứng về đúng người nhận.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ByteNet = require(ReplicatedStorage.Packages.ByteNet)
 
 return ByteNet.defineNamespace("speedEscape", function()
 	return {
+		-- StageCheckpointService xác nhận thắng; Zone5FxController chỉ dựng hiệu ứng cục bộ.
+		zone5EffectState = ByteNet.definePacket({
+			value = ByteNet.struct({
+				action = ByteNet.string,
+				position = ByteNet.vec3,
+			}),
+		}),
 		profileSnapshot = ByteNet.definePacket({
 			value = ByteNet.struct({
 				isLoaded = ByteNet.bool,

@@ -1,12 +1,10 @@
 --!strict
--- Tô màu PadPart của 8 MultiplierPad theo trạng thái của localPlayer:
+-- Client tô màu pad và phát hiệu ứng theo quyền sở hữu do MultiplierPadService công bố.
 --   - ACTIVE  (đang ở pad này)         → vàng `Color3.fromRGB(255, 220, 0)`
 --   - UNLOCKED (đã đạt/mở khóa, chưa ở) → xanh lá `Color3.fromRGB(80, 220, 80)`
 --   - LOCKED   (chưa đạt)               → xám `Color3.fromRGB(110, 110, 110)`
 --
--- Theo attribute `HighestPadIndex` do server phát. ⚠️ Từ 2026-08-10 attribute đó KHÔNG còn là
--- cột mốc vĩnh viễn nữa mà là mức Wins HIỆN TẠI với tới (xem MultiplierPadService): Wins tụt
--- xuống dưới ngưỡng thì pad tương ứng xám lại và server tự hạ người chơi về pad còn đủ.
+-- HighestPadIndex là pad đã mua vĩnh viễn; tiêu Wins không làm pad bị khóa lại.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -223,6 +221,11 @@ end
 function MultiplierPadVisualController.Init() end
 
 function MultiplierPadVisualController.Start()
+	Workspace.DescendantRemoving:Connect(function(part)
+		if part:IsA("BasePart") then
+			lastColor[part] = nil
+		end
+	end)
 	bootstrap()
 
 	local lastHighest = getHighestPadIndex()

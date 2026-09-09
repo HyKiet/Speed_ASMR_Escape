@@ -64,14 +64,16 @@ local waveHidden: { boolean } = {}
 
 local ready = false
 local connection: RBXScriptConnection? = nil
+local resolverThread: thread? = nil
 local descAddedConn: RBXScriptConnection? = nil
+local descRemovingConn: RBXScriptConnection? = nil
 
 --[[
 	Đăng ký một part của sóng: chốt offset so với homeCF, rồi dựng bản sao cho các sóng phía
 	sau. Bản sao là VẬT TRANG TRÍ thuần tuý — server phán xử theo đồng hồ, không theo part —
 	nên phải tắt hết va chạm/truy vấn để không ai vấp vào một cái bóng.
 ]]
-function registerPart(d: BasePart)
+local function registerPart(d: BasePart)
 	if partRecords[d] ~= nil then
 		return
 	end
@@ -111,6 +113,20 @@ function registerPart(d: BasePart)
 			e.Transparency = 1
 		end
 	end
+end
+
+local function unregisterPart(part: BasePart)
+	local record = partRecords[part]
+	if not record then
+		return
+	end
+	-- Streaming có thể đưa chính instance này trở lại; trả home trước khi quên offset.
+	part.CFrame = homeCF * record.rel
+	part.Transparency = record.transparency
+	for _, echo in record.echoes do
+		echo:Destroy()
+	end
+	partRecords[part] = nil
 end
 
 local function resolve(): boolean
@@ -162,6 +178,14 @@ local function resolve(): boolean
 	descAddedConn = found.DescendantAdded:Connect(function(d)
 		if d:IsA("BasePart") then
 			registerPart(d)
+		end
+	end)
+	if descRemovingConn then
+		descRemovingConn:Disconnect()
+	end
+	descRemovingConn = found.DescendantRemoving:Connect(function(d)
+		if d:IsA("BasePart") then
+			unregisterPart(d)
 		end
 	end)
 	return true
@@ -288,8 +312,11 @@ end
 function Zone9TsunamiController.Init() end
 
 function Zone9TsunamiController.Start()
+	if connection then
+		return
+	end
 	connection = RunService.RenderStepped:Connect(step)
-	task.spawn(function()
+	resolverThread = task.spawn(function()
 		while true do
 			if not ready then
 				ready = resolve()
@@ -303,10 +330,35 @@ function Zone9TsunamiController.Start()
 end
 
 function Zone9TsunamiController.Stop()
+	-- Dừng cả vòng dò streaming; ngắt render thôi vẫn giữ controller sống ngầm.
+	if resolverThread then
+		if coroutine.status(resolverThread) == "suspended" then
+			task.cancel(resolverThread)
+		end
+		resolverThread = nil
+	end
 	if connection then
 		connection:Disconnect()
 		connection = nil
 	end
+	if descAddedConn then
+		descAddedConn:Disconnect()
+		descAddedConn = nil
+	end
+	if descRemovingConn then
+		descRemovingConn:Disconnect()
+		descRemovingConn = nil
+	end
+	for part in partRecords do
+		unregisterPart(part)
+	end
+	if echoFolder then
+		echoFolder:Destroy()
+		echoFolder = nil
+	end
+	table.clear(waveHidden)
+	model = nil
+	ready, hidden = false, false
 end
 
 return Zone9TsunamiController

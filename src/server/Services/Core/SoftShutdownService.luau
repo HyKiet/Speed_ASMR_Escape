@@ -1,4 +1,6 @@
 --!strict
+-- Server: nhận lệnh quản trị qua chat/MessagingService rồi chuyển phiên bằng TeleportService.
+-- Shutdown của nền tảng chỉ gửi thông báo; server trung chuyển đưa người chơi về matchmaking.
 --[[
 	SoftShutdownService.luau — chuyển người chơi sang server MỚI mà không đá họ ra ngoài.
 
@@ -63,6 +65,7 @@ local TextChatService = game:GetService("TextChatService")
 
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local GroupChestConfig = require(ReplicatedStorage.Shared.Config.GroupChest)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 
 local SoftShutdownService = {}
 
@@ -74,8 +77,6 @@ local RETURN_FLAG = "softShutdownReturn"
 -- Bao lâu cho người chơi đọc thông báo trước khi bị dời. Đủ để hiểu chuyện gì đang xảy ra,
 -- đủ ngắn để `BindToClose` (ngân sách ~30s của Roblox) vẫn kịp làm nốt phần teleport.
 local WARN_SECONDS = 6
--- Trần thời gian chờ người chơi rời khỏi server trong `BindToClose`. Phải nhỏ hơn hẳn 30s.
-local DRAIN_TIMEOUT = 20
 -- Rank tối thiểu trong group để gọi lệnh `/update`. 250+ = nhóm quản trị của group.
 local ADMIN_MIN_RANK = 250
 
@@ -93,7 +94,7 @@ end
 
 local function notify(message: string)
 	for _, player in Players:GetPlayers() do
-		GamePackets.toast.sendTo({ kind = "teleport", message = message, amount = 0 }, player)
+		pcall(GamePackets.toast.sendTo, { kind = "teleport", message = message, amount = 0 }, player)
 	end
 end
 
@@ -107,7 +108,7 @@ local function migrate(players: { Player }): boolean
 	end
 
 	local ok, accessCode = pcall(function()
-		return TeleportService:ReserveServer(game.PlaceId)
+		return TeleportService:ReserveServerAsync(game.PlaceId)
 	end)
 	if not ok or type(accessCode) ~= "string" then
 		warn(`[SoftShutdownService] ReserveServer hỏng: {tostring(accessCode)}`)
@@ -128,22 +129,15 @@ local function migrate(players: { Player }): boolean
 	return true
 end
 
---[[
-	Bắt đầu soft shutdown trên CHÍNH server này. An toàn khi gọi nhiều lần.
-
-	`blocking = true` (từ `BindToClose`): chặn cho tới khi server rỗng hoặc hết giờ. Roblox
-	chỉ giữ server sống chừng nào callback `BindToClose` chưa trả về, nên không chặn ở đó là
-	người chơi bị cắt giữa chừng lúc teleport.
-]]
-local function beginSoftShutdown(blocking: boolean)
+-- Chỉ chạy từ lệnh quản trị; BindToClose đã giao việc chuyển server cho Roblox.
+local function beginSoftShutdown()
 	if shuttingDown then
 		return
 	end
 	shuttingDown = true
 
 	notify("Server is updating — moving you to a fresh one")
-	-- Trong BindToClose ta không có đủ 30s để vừa cảnh báo dài vừa teleport; rút ngắn lại.
-	task.wait(if blocking then math.min(WARN_SECONDS, 4) else WARN_SECONDS)
+	task.wait(WARN_SECONDS)
 
 	if not migrate(Players:GetPlayers()) then
 		-- Không dời được thì THÔI, không đá ai cả. Server sống tiếp; lần publish sau hoặc
@@ -161,15 +155,6 @@ local function beginSoftShutdown(blocking: boolean)
 			migrate({ player })
 		end
 	end)
-
-	if not blocking then
-		return
-	end
-
-	local deadline = os.clock() + DRAIN_TIMEOUT
-	while #Players:GetPlayers() > 0 and os.clock() < deadline do
-		task.wait(0.5)
-	end
 end
 
 --[[
@@ -215,7 +200,7 @@ local function registerAdminCommand()
 
 	command.Triggered:Connect(function(source: TextSource)
 		local player = Players:GetPlayerByUserId(source.UserId)
-		if not player then
+		if not player or NetRateLimit.ShouldDrop(player, "softShutdownCommand") then
 			return
 		end
 		local ok, rank = pcall(function()
@@ -259,7 +244,7 @@ function SoftShutdownService.Start()
 
 	local ok, err = pcall(function()
 		MessagingService:SubscribeAsync(TOPIC, function()
-			task.spawn(beginSoftShutdown, false)
+			task.spawn(beginSoftShutdown)
 		end)
 	end)
 	if not ok then

@@ -2,7 +2,6 @@
 -- Modal Daily Login: điểm danh 7 ngày (hardcore streak). Theme hồng/magenta riêng biệt.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
@@ -50,16 +49,6 @@ local PANEL_HEIGHT = 584
 	nhận — nhận xong là mất ngay, không chỉ vào một cái nút xám.
 ]]
 local HINT_ARROW = "rbxassetid://10051771444"
-local hintBobGoal = Value(0)
-local hintBob = Tween(hintBobGoal, TweenInfo.new(0.45, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut))
-task.spawn(function()
-	while true do
-		hintBobGoal:set(1)
-		task.wait(0.45)
-		hintBobGoal:set(0)
-		task.wait(0.45)
-	end
-end)
 
 --[[
 	Bảng hiển thị 7 ngày — MỖI PHẦN THƯỞNG MỘT ICON (2026-08-08, yêu cầu user).
@@ -210,22 +199,14 @@ local function makeDayCard(day: number)
 
 	-- Nếu là Day 7: Thêm tia hào quang Sunburst xoay rực rỡ
 	if isDay7 then
-		local sunburst = New("ImageLabel")({
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundTransparency = 1,
-			Image = Theme.UI_ASSETS.Sunburst,
+		local sunburst = Theme.MakeSunburst({
 			ImageColor3 = Color3.fromRGB(255, 235, 110),
 			ImageTransparency = 0.25,
 			Position = UDim2.fromOffset(w / 2, h / 2 - 25),
 			Size = UDim2.fromOffset(270, 270),
 			ZIndex = 45,
+			SpinSeconds = 10,
 		})
-		local tween = TweenService:Create(
-			sunburst,
-			TweenInfo.new(10, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1),
-			{ Rotation = 360 }
-		)
-		tween:Play()
 		table.insert(cardChildren, sunburst)
 	end
 
@@ -386,7 +367,7 @@ local function buildGrid()
 	})
 end
 
-local function buildContent(): { any }
+local function buildContent(hintBob: any): { any }
 	local claimHovered = State.dailyClaimHovered
 
 	return {
@@ -488,7 +469,17 @@ local function buildContent(): { any }
 end
 
 function DailyModal.Build()
-	return ModalShell.Build({
+	local hintBobGoal = Value(0)
+	local hintBob = Tween(hintBobGoal, TweenInfo.new(0.45, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut))
+	local hintThread = task.spawn(function()
+		while true do
+			hintBobGoal:set(1)
+			task.wait(0.45)
+			hintBobGoal:set(0)
+			task.wait(0.45)
+		end
+	end)
+	local modal = ModalShell.Build({
 		Id = "daily",
 		Width = PANEL_WIDTH,
 		Height = PANEL_HEIGHT,
@@ -499,8 +490,12 @@ function DailyModal.Build()
 		Title = "Daily Rewards",
 		TitleMaxTextSize = 50,
 		OnClose = Manager.CloseDaily,
-		Content = buildContent(),
+		Content = buildContent(hintBob),
 	})
+	modal.Destroying:Connect(function()
+		task.cancel(hintThread)
+	end)
+	return modal
 end
 
 return DailyModal

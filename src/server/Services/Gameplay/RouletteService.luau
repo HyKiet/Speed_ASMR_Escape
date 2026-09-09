@@ -1,4 +1,6 @@
 --!strict
+-- Server: quản lý vé, tự chọn kết quả theo Config/Roulette và giao thưởng qua các service.
+-- Client chỉ yêu cầu quay rồi dùng spinResult để vẽ bánh xe; không gửi kết quả hay số thưởng.
 --[[
 	RouletteService.luau — Vòng quay May mắn (Speed Roulette).
 
@@ -297,17 +299,21 @@ function RouletteService.Init()
 end
 
 function RouletteService.Start()
-	GamePackets.requestSpin.listen(function(_data, player: Player)
-		onSpinRequest(player)
+	GamePackets.requestSpin.listen(function(_data, player)
+		if player then
+			onSpinRequest(player)
+		end
 	end)
 
 	--[[
 		Người chơi đã mở tab Auras ⇒ tắt chấm đỏ.
 
-		Không cần chống spam: gói này chỉ ghi `false` lên một cờ boolean, gọi bao nhiêu lần cũng
-		ra cùng kết quả và không đụng tới kinh tế.
+		Thao tác lặp không đổi kết quả; vẫn giới hạn tần suất để client không ép server xử lý vô hạn.
 	]]
-	GamePackets.requestClearAuraDot.listen(function(_data, player: Player)
+	GamePackets.requestClearAuraDot.listen(function(_data, player)
+		if not player or NetRateLimit.ShouldDrop(player, "clearAuraDot") then
+			return
+		end
 		local data = DataService.GetData(player)
 		if data then
 			data.UnseenAuraUnlock = false
@@ -315,8 +321,8 @@ function RouletteService.Start()
 		player:SetAttribute("UnseenAuraUnlock", false)
 	end)
 
-	GamePackets.requestRouletteState.listen(function(_data, player: Player)
-		if NetRateLimit.ShouldDrop(player, "rouletteState") then
+	GamePackets.requestRouletteState.listen(function(_data, player)
+		if not player or NetRateLimit.ShouldDrop(player, "rouletteState") then
 			return
 		end
 		sendState(player)

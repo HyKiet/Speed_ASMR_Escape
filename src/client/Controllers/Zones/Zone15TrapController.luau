@@ -66,6 +66,7 @@ local padCenter = Vector3.zero
 local doorCenter = Vector3.zero
 
 local connection: RBXScriptConnection? = nil
+local resolverThread: thread? = nil
 
 --=====================================================================================
 -- RESOLVE — chạy ở vòng poll chậm, KHÔNG chạy trong RenderStepped.
@@ -388,9 +389,12 @@ end
 function Zone15TrapController.Init() end
 
 function Zone15TrapController.Start()
+	if connection then
+		return
+	end
 	connection = RunService.RenderStepped:Connect(step)
 
-	task.spawn(function()
+	resolverThread = task.spawn(function()
 		while true do
 			poll()
 			task.wait(RESOLVE_INTERVAL)
@@ -399,6 +403,13 @@ function Zone15TrapController.Start()
 end
 
 function Zone15TrapController.Stop()
+	-- Dừng cả vòng dò streaming; ngắt render thôi vẫn giữ controller sống ngầm.
+	if resolverThread then
+		if coroutine.status(resolverThread) == "suspended" then
+			task.cancel(resolverThread)
+		end
+		resolverThread = nil
+	end
 	if connection then
 		connection:Disconnect()
 		connection = nil

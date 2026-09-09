@@ -420,6 +420,9 @@ function ClientSettingsController.Start()
 				return
 			end
 			task.wait(0.5)
+			if not performanceOn or player.Parent ~= Players or player.Character ~= character then
+				return
+			end
 			for _, part in character:GetDescendants() do
 				if part:IsA("BasePart") then
 					part.CastShadow = false

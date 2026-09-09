@@ -160,8 +160,8 @@ function TreadmillService.Start()
 	end
 
 	-- Trigger từ client (đã rate-limit); server validate lại toàn bộ.
-	GamePackets.treadmillContact.listen(function(data, player: Player)
-		if typeof(data.isOn) ~= "boolean" then
+	GamePackets.treadmillContact.listen(function(data, player)
+		if not player or typeof(data.isOn) ~= "boolean" then
 			return
 		end
 

@@ -246,50 +246,72 @@ local function timedOut(): boolean
 	return os.clock() - startedAt > MAX_WAIT_SECONDS
 end
 
--- 1) Đợi nhân vật — không có nó thì không biết nạp quanh ĐÂU.
-setProgress(0.08, "Waiting for character")
-local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-local root = character:FindFirstChild("HumanoidRootPart")
-while not root and not timedOut() do
-	task.wait(0.1)
-	root = character:FindFirstChild("HumanoidRootPart")
-end
+local function loadContent()
+	-- 1) Đợi nhân vật — không có nó thì không biết nạp quanh ĐÂU.
+	setProgress(0.08, "Waiting for character")
+	local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+	local root = character:FindFirstChild("HumanoidRootPart")
+	while not root and not timedOut() do
+		task.wait(0.1)
+		root = character:FindFirstChild("HumanoidRootPart")
+	end
 
--- 2) Bước quan trọng nhất: bảo Roblox ưu tiên đẩy content quanh chỗ người chơi sắp đứng,
---    rồi CHỜ tới khi xong.
-setProgress(0.25, "Streaming the world")
-if root then
-	pcall(function()
-		localPlayer:RequestStreamAroundAsync((root :: BasePart).Position, MAX_WAIT_SECONDS)
-	end)
-end
+	-- 2) Bước quan trọng nhất: bảo Roblox ưu tiên đẩy content quanh chỗ người chơi sắp đứng,
+	--    rồi CHỜ tới khi xong.
+	setProgress(0.25, "Streaming the world")
+	if root then
+		pcall(function()
+			localPlayer:RequestStreamAroundAsync((root :: BasePart).Position, MAX_WAIT_SECONDS)
+		end)
+	end
 
--- 3) Preload asset của UI đang có. KHÔNG preload cả Workspace: với 73.809 instance thì chờ
---    hàng phút, mà phần lớn nằm ngoài tầm nhìn.
-setProgress(0.6, "Preparing interface")
-do
-	local toPreload: { Instance } = {}
-	local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui")
-	if playerGui then
-		for _, d in playerGui:GetDescendants() do
-			-- ⚠️ LOẠI TRỪ `photo` — nó nằm TRONG PlayerGui nên vòng quét này gom trúng nó.
-			-- Chờ ảnh nền của chính màn hình chờ là tự mâu thuẫn: `PreloadAsync` chặn, nên
-			-- màn hình chờ sẽ đứng thêm đúng bằng thời gian tải tấm ảnh mà nó đang hiển thị.
-			-- Ảnh tự stream về rồi mờ dần hiện ra qua `IsLoaded` (xem chỗ dựng `photo`).
-			if (d:IsA("ImageLabel") or d:IsA("ImageButton")) and d ~= photo then
-				table.insert(toPreload, d)
+	-- 3) Preload asset của UI đang có. KHÔNG preload cả Workspace: với 73.809 instance thì chờ
+	--    hàng phút, mà phần lớn nằm ngoài tầm nhìn.
+	setProgress(0.6, "Preparing interface")
+	do
+		local toPreload: { Instance } = {}
+		local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui")
+		if playerGui then
+			for _, d in playerGui:GetDescendants() do
+				-- ⚠️ LOẠI TRỪ `photo` — nó nằm TRONG PlayerGui nên vòng quét này gom trúng nó.
+				-- Chờ ảnh nền của chính màn hình chờ là tự mâu thuẫn: `PreloadAsync` chặn, nên
+				-- màn hình chờ sẽ đứng thêm đúng bằng thời gian tải tấm ảnh mà nó đang hiển thị.
+				-- Ảnh tự tải và hiển thị khi sẵn sàng, không chờ tín hiệu IsLoaded.
+				if (d:IsA("ImageLabel") or d:IsA("ImageButton")) and d ~= photo then
+					table.insert(toPreload, d)
+				end
 			end
 		end
+		pcall(function()
+			ContentProvider:PreloadAsync(toPreload)
+		end)
 	end
-	pcall(function()
-		ContentProvider:PreloadAsync(toPreload)
-	end)
+
+	-- 4) Vài khung hình để thứ vừa stream về kịp dựng — tránh "vào là thấy giật".
+	setProgress(0.88, "Almost ready")
+	for _ = 1, 6 do
+		RunService.RenderStepped:Wait()
+	end
 end
 
--- 4) Vài khung hình để thứ vừa stream về kịp dựng — tránh "vào là thấy giật".
-setProgress(0.88, "Almost ready")
-for _ = 1, 6 do
-	RunService.RenderStepped:Wait()
+-- Trần chờ phải bao cả CharacterAdded và PreloadAsync, vì hai lời gọi này có thể yield lâu.
+local loadingDone = false
+local loadingThread = task.spawn(function()
+	local ok, err = pcall(function()
+		loadContent()
+		return true
+	end)
+	if not ok then
+		warn(`[LoadingScreen] {lastStep}: {err}`)
+	end
+	loadingDone = true
+end)
+while not loadingDone and not timedOut() do
+	task.wait(0.05)
+end
+local timedOutAt = if not loadingDone then lastStep else nil
+if timedOutAt and coroutine.status(loadingThread) == "suspended" then
+	task.cancel(loadingThread)
 end
 
 while os.clock() - startedAt < MIN_SHOW_SECONDS do
@@ -326,7 +348,7 @@ do
 		print(("[LoadingScreen] done in %.1fs (last step: %s)"):format(elapsed, lastStep))
 	end
 	-- Chạm trần chờ nghĩa là có bước không bao giờ xong — `lastStep` chỉ đúng chỗ đó.
-	if elapsed >= MAX_WAIT_SECONDS then
-		warn(("[LoadingScreen] HIT %ds CAP — stuck at step %q"):format(MAX_WAIT_SECONDS, lastStep))
+	if timedOutAt then
+		warn(("[LoadingScreen] HIT %ds CAP — stuck at step %q"):format(MAX_WAIT_SECONDS, timedOutAt))
 	end
 end

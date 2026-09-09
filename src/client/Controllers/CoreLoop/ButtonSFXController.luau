@@ -5,7 +5,6 @@
 --   • Click  → phát tiếng "click" + nhún nhẹ (press dip) bằng UIScale riêng (nhân với HoverZoom).
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local ContentProvider = game:GetService("ContentProvider")

@@ -1,13 +1,6 @@
 --!strict
--- ASMR Floor Engine — bộ điều khiển DUY NHẤT cho toàn bộ sàn ASMR trên map.
--- Kiến trúc: docs/asmr-engine-architecture.md. Thay thế 9 script inline cũ trong ASMR_Test.
---
---  • 1 Heartbeat cho mọi sàn (trước đây 9 vòng lặp song song)
---  • Local Player Isolation: chỉ tính hiệu ứng cho CHÍNH LocalPlayer — chi phí client
---    không phụ thuộc số người chơi trong server; server/network = 0%
---  • Sàn được đăng ký qua CollectionService tag "ASMRFloor" + attribute FloorType
---    → tương thích StreamingEnabled (sàn stream vào/ra tự attach/detach)
---  • SoundPool 32 + ParticlePool 12 + FxBudget dùng chung — không Instance churn
+-- Client: gắn/tháo adapter theo tag ASMRFloor và cập nhật tất cả sàn bằng một Heartbeat.
+-- Chỉ phản hồi bước chân LocalPlayer; các adapter dùng chung pool âm thanh, hạt và FxBudget.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -80,6 +73,7 @@ ParticlePool.init(runtime)
 -- ===== registry: tag -> adapter instance =====
 local instances = {} -- [Model] = floorInstance
 local instanceList = {} -- mảng để loop nhanh trong Heartbeat
+local reattachCount: { [Instance]: number } = {}
 
 local function rebuildList()
 	table.clear(instanceList)
@@ -89,7 +83,7 @@ local function rebuildList()
 end
 
 local function attach(model)
-	if instances[model] then
+	if instances[model] or not model:IsDescendantOf(workspace) or not CollectionService:HasTag(model, FLOOR_TAG) then
 		return
 	end
 	local floorType = model:GetAttribute("FloorType")
@@ -113,11 +107,14 @@ local function detach(model)
 	end
 end
 
+CollectionService:GetInstanceAddedSignal(FLOOR_TAG):Connect(attach)
+CollectionService:GetInstanceRemovedSignal(FLOOR_TAG):Connect(function(model)
+	reattachCount[model] = nil
+	detach(model)
+end)
 for _, m in CollectionService:GetTagged(FLOOR_TAG) do
 	task.spawn(attach, m)
 end
-CollectionService:GetInstanceAddedSignal(FLOOR_TAG):Connect(attach)
-CollectionService:GetInstanceRemovedSignal(FLOOR_TAG):Connect(detach)
 
 -- WATCHDOG: attach() ghi instances[model] NGAY, còn adapter mới init bất đồng bộ bên trong
 -- (WaitForChild "Tiles"/"Blocks" rồi dựng hình). Dưới StreamingEnabled, Model có thể tới
@@ -126,16 +123,18 @@ CollectionService:GetInstanceRemovedSignal(FLOOR_TAG):Connect(detach)
 -- (Zone 14 slime đã dính: phải gỡ/gắn lại tag bằng tay mới hiện).
 -- Ở đây thử lại các sàn chưa `ready`, có giới hạn để sàn rỗng hợp lệ không quay vô hạn.
 local MAX_REATTACH = 3
-local reattachCount: { [Instance]: number } = {}
 
 task.spawn(function()
 	while true do
 		task.wait(3)
 		for model, inst in instances do
-			if not inst.ready and model:IsDescendantOf(workspace) then
+			-- Không tháo adapter đang WaitForChild: instance con có thể chưa stream về sau 3 giây.
+			local initializing = inst.initTask and coroutine.status(inst.initTask) ~= "dead"
+			if not inst.ready and not initializing and model:IsDescendantOf(workspace) then
 				local tries = reattachCount[model] or 0
 				if tries < MAX_REATTACH then
 					reattachCount[model] = tries + 1
+					warn("[ASMR Engine] Nạp sàn chưa thành công, thử lại:", model:GetFullName(), tries + 1)
 					detach(model)
 					task.spawn(attach, model)
 				end
@@ -156,7 +155,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local char = player.Character
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if root and hum and hum.Health > 0 then
+	if root and root:IsA("BasePart") and hum and hum.Health > 0 then
 		local pos = root.Position
 		local vel = root.AssemblyLinearVelocity
 		foot = {

@@ -13,6 +13,8 @@
 ]]
 
 local ContentProvider = game:GetService("ContentProvider")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 
 local MovementConfig = require(script.Parent.MovementConfig)
 local MovementTypes = require(script.Parent.MovementTypes)
@@ -38,7 +40,7 @@ local function collectAnimateAssetIds(character: Model): { string }
 	return ids
 end
 
-local function warmAnimations(session: Session)
+local function warmAnimations(session: Session, janitor: any)
 	local assetIds: { string } = {}
 	for _, assetId in MovementConfig.Animations do
 		table.insert(assetIds, assetId)
@@ -52,34 +54,32 @@ local function warmAnimations(session: Session)
 		local anim = Instance.new("Animation")
 		anim.AnimationId = assetId
 		table.insert(anims, anim)
+		janitor:Add(anim, "Destroy")
 	end
 	pcall(function()
 		ContentProvider:PreloadAsync(anims)
 	end)
 
-	local warmed: { { track: AnimationTrack, anim: Animation } } = {}
 	for _, anim in anims do
 		local ok, track = pcall(function()
 			return session.animator:LoadAnimation(anim)
 		end)
 		if ok and track then
+			janitor:Add(function()
+				pcall(function()
+					track:Stop(0)
+					track:Destroy()
+				end)
+			end)
 			track.Priority = Enum.AnimationPriority.Core -- thấp nhất, không đè anim thật
 			track:Play(0, 0, 1) -- fade 0, WEIGHT 0 → vô hình nhưng vẫn dựng track + pose
-			table.insert(warmed, { track = track, anim = anim })
 		else
 			anim:Destroy()
 		end
 	end
 
-	task.delay(0.5, function()
-		for _, w in warmed do
-			pcall(function()
-				w.track:Stop(0)
-				w.track:Destroy()
-			end)
-			w.anim:Destroy()
-		end
-	end)
+	task.wait(0.5)
+	janitor:Sweep()
 end
 
 function MovementAnimator.Setup(session: Session)
@@ -103,7 +103,16 @@ function MovementAnimator.Setup(session: Session)
 
 	-- Chạy nền: collectAnimateAssetIds có thể chờ script Animate replicate tới 3s,
 	-- không được chặn việc dựng session.
-	task.spawn(warmAnimations, session)
+	local warmJanitor = Janitor.new()
+	local warmThread: thread? = nil
+	session.sweeper:Add(function()
+		-- PreloadAsync có thể còn chờ mạng khi nhân vật bị gỡ.
+		if warmThread and coroutine.status(warmThread) == "suspended" then
+			task.cancel(warmThread)
+		end
+		warmJanitor:Sweep()
+	end)
+	warmThread = task.spawn(warmAnimations, session, warmJanitor)
 end
 
 function MovementAnimator.PlayAction(session: Session, name: string)

@@ -1,4 +1,5 @@
 --!strict
+-- Server kiểm tra vị trí trên pad, mua quyền vĩnh viễn qua DataService rồi áp vào ProgressionService.
 --[[
 	Khi player đặt chân lên PadPart trong Workspace.MultiplierPads.Pad_{N} (nhận diện bằng
 	quét hình học mỗi frame — xem khối `ENTER_MARGIN_STUDS` bên dưới, KHÔNG dùng `Touched`):
@@ -34,6 +35,7 @@ local Workspace = game:GetService("Workspace")
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
 
 type PadConfig = Constants.MultiplierPadConfig
 
@@ -101,6 +103,7 @@ type PendingSelect = {
 local HINT_COOLDOWN_SECONDS = 20
 
 local padEntries: { PadEntry } = {}
+local padJanitors: { [BasePart]: any } = {}
 local clusterCenter: Vector3? = nil
 local clusterRadius = 0
 -- Khai báo trước: `connectPad` móc vào tín hiệu đổi vị trí pad và gọi ngược lên hàm này.
@@ -193,11 +196,8 @@ local function activeIndex(player: Player): number
 	return 0 -- chưa có pad nào ⇒ luôn cần áp pad mặc định
 end
 
---[[
-	Bắt trạng thái pad khớp với số Wins hiện tại. Gọi được liên tục: chỉ ĐỘNG VÀO khi người
-	chơi đang đứng ở pad cao hơn mức họ còn đủ Wins.
-]]
-local function enforcePad(player: Player, announce: boolean)
+-- Áp quyền pad đã lưu khi vào game; tiêu Wins không làm mất quyền này.
+local function enforcePad(player: Player)
 	local data = DataService.GetData(player)
 	if not data then
 		return
@@ -208,20 +208,7 @@ local function enforcePad(player: Player, announce: boolean)
 
 	local current = activeIndex(player)
 
-	--[[
-		Chưa chọn pad nào (vừa vào game) → phát THẲNG pad cao nhất đang đủ Wins.
-
-		⚠️ Đảo luật 2026-08-22 (user). Trước đây chỗ này áp cứng pad_1 với lý do "người chơi
-		phải tự đi tới pad mà đứng lên mới là nghi thức của khu Multiplier Pads". Nghi thức đó
-		chỉ đúng LẦN ĐẦU: `ActivePadId` là attribute (không nằm trong ProfileStore) nên thoát
-		game vào lại là mất sạch, và người chơi 200k Wins bị ném về +1/step mà không có một
-		dòng nào báo — họ tưởng game hỏng hoặc mất tiến trình.
-
-		Đây KHÔNG phải "tặng": `eligible` được tính lại từ Wins HIỆN TẠI mỗi lần gọi, đúng cái
-		mức mà chính họ đi lên pad kia cũng sẽ nhận được. Wins tụt là vòng canh bên dưới vẫn hạ
-		xuống như cũ. Người chơi mới có 0 Wins ⇒ eligible = 1 ⇒ vẫn là pad_1, tutorial bước 2
-		("đi tới Pad 2") không đổi một chút nào.
-	]]
+	-- ActivePadId không được lưu: vào lại phải khôi phục pad đã mua, tránh rơi về +1/step.
 	if current == 0 then
 		applyPad(player, Constants.MULTIPLIER_PADS[eligible])
 		ProgressionService.SendSnapshot(player)
@@ -235,13 +222,6 @@ local function enforcePad(player: Player, announce: boolean)
 	local config = Constants.MULTIPLIER_PADS[eligible]
 	applyPad(player, config)
 
-	if announce then
-		GamePackets.toast.sendTo({
-			kind = "pad",
-			message = `Not enough Wins — Pad +{config.speedPerStep}/step active`,
-			amount = 0,
-		}, player)
-	end
 	ProgressionService.SendSnapshot(player)
 end
 
@@ -254,7 +234,7 @@ local function ensureDefaultPad(player: Player)
 		end
 	end
 	-- Không báo toast lúc vào game: người chơi chưa làm gì để mà bị "hạ cấp" trước mắt họ.
-	enforcePad(player, false)
+	enforcePad(player)
 end
 
 --[[
@@ -376,7 +356,7 @@ local function tickPendingSelect(player: Player)
 
 	pendingSelect[player] = nil
 
-	-- Wins có thể đã tụt trong lúc đứng ⇒ kiểm lại quyền dùng pad trước khi áp.
+	-- Kiểm lại profile và quyền sở hữu trước khi hoàn tất lựa chọn đang chờ.
 	local data = DataService.GetData(player)
 	if not data or pending.entry.index > eligibleIndex(data) then
 		return
@@ -471,7 +451,6 @@ local function onPadEntered(player: Player, entry: PadEntry)
 		local pending = pendingSelect[player]
 		if not pending or pending.entry.padPart ~= entry.padPart then
 			pendingSelect[player] = {
-				config = config,
 				entry = entry,
 				since = now,
 			}
@@ -557,6 +536,30 @@ local function writePadSign(padModel: Instance, config: PadConfig)
 	end
 end
 
+local function removePad(part: Instance)
+	if not part:IsA("BasePart") then
+		return
+	end
+	local janitor = padJanitors[part]
+	if not janitor then
+		return
+	end
+	padJanitors[part] = nil
+	janitor:Sweep()
+	for index, entry in padEntries do
+		if entry.padPart == part then
+			table.remove(padEntries, index)
+			break
+		end
+	end
+	for player, pending in pendingSelect do
+		if pending.entry.padPart == part then
+			pendingSelect[player] = nil
+		end
+	end
+	recomputeCluster()
+end
+
 local function connectPad(padModel: Instance)
 	if padModel.Name == "BasePads" then
 		return
@@ -596,13 +599,15 @@ local function connectPad(padModel: Instance)
 		halfZ = padPart.Size.Z / 2,
 	}
 	-- Pad dời/đổi cỡ lúc runtime thì vùng nhận diện phải đi theo, nếu không nó nằm lại chỗ cũ.
-	padPart:GetPropertyChangedSignal("CFrame"):Connect(function()
+	local janitor = Janitor.new()
+	padJanitors[padPart] = janitor
+	janitor:Add(padPart:GetPropertyChangedSignal("CFrame"):Connect(function()
 		refreshPadGeometry(entry)
 		recomputeCluster()
-	end)
-	padPart:GetPropertyChangedSignal("Size"):Connect(function()
+	end))
+	janitor:Add(padPart:GetPropertyChangedSignal("Size"):Connect(function()
 		refreshPadGeometry(entry)
-	end)
+	end))
 	table.insert(padEntries, entry)
 end
 
@@ -646,14 +651,19 @@ local function bootstrapPads()
 	end
 	recomputeCluster()
 
-	folder.ChildAdded:Connect(function(child)
+	folder.ChildAdded:Connect(function(child: Instance)
 		if child:IsA("Model") then
 			task.defer(function()
+				if child.Parent ~= folder then
+					return
+				end
 				connectPad(child)
 				recomputeCluster()
 			end)
 		end
 	end)
+	-- Gỡ cả tham chiếu và listener khi một model hoặc PadPart rời cụm.
+	folder.DescendantRemoving:Connect(removePad)
 end
 
 --[[

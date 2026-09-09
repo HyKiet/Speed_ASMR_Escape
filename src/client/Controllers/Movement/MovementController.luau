@@ -53,6 +53,7 @@ local localPlayer = Players.LocalPlayer
 local MovementController = {}
 
 local currentSession: Session? = nil
+local sessionBuildThread: thread? = nil
 
 -- ─────────────────────────────────────────────────────────────────────
 -- CHỐNG NGÃ
@@ -189,6 +190,11 @@ local function buildSession(character: Model): Session
 end
 
 local function disposeSession()
+	local pending = sessionBuildThread
+	sessionBuildThread = nil
+	if pending and pending ~= coroutine.running() and coroutine.status(pending) == "suspended" then
+		task.cancel(pending)
+	end
 	if currentSession then
 		currentSession.sweeper:Sweep()
 		currentSession = nil
@@ -196,8 +202,20 @@ local function disposeSession()
 end
 
 local function onCharacterAdded(character: Model)
+	if localPlayer.Character ~= character then
+		return
+	end
 	disposeSession()
-	currentSession = buildSession(character)
+	local pending = coroutine.running()
+	sessionBuildThread = pending
+	local session = buildSession(character)
+	-- WaitForChild có thể kéo dài qua một lần respawn; session cũ không được thay session mới.
+	if sessionBuildThread == pending and localPlayer.Character == character then
+		sessionBuildThread = nil
+		currentSession = session
+	else
+		session.sweeper:Sweep()
+	end
 end
 
 -- Nhân vật còn sống và còn trong Workspace?

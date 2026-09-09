@@ -85,7 +85,7 @@ local function shape(d: number): (number, number)
 	return RIM - (RIM + DEPTH) * s, s
 end
 
-function KineticSandLive.attach(model, engine)
+function KineticSandLive.attach(model: Model, engine: any)
 	local FxBudget, SoundPool, ParticlePool, Bounds =
 		engine.FxBudget, engine.SoundPool, engine.ParticlePool, engine.Bounds
 	local self = { ready = false }
@@ -95,7 +95,7 @@ function KineticSandLive.attach(model, engine)
 	local active = {}
 	local numActive = 0
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Tiles", 10)
 		if not folder then
 			return
@@ -171,11 +171,12 @@ function KineticSandLive.attach(model, engine)
 		end)
 	end
 
-	local st = nil -- trạng thái bước chân: { dist, last, cd, side, idle }
-	local lastPos = nil
+	type StepState = { dist: number, last: Vector3, lastStepT: number, side: number, idle: number }
+	local st: StepState? = nil
+	local lastPos: Vector3? = nil
 	local animAcc = 0
 
-	function self.update(dt, now, foot)
+	function self.update(dt: number, now: number, foot)
 		if not self.ready then
 			return
 		end
@@ -183,8 +184,8 @@ function KineticSandLive.attach(model, engine)
 		-- ===== stamp theo chân người chơi =====
 		local onFloor = false
 		if foot then
-			local root = foot.root
-			local pos = foot.pos
+			local root: BasePart = foot.root
+			local pos: Vector3 = foot.pos
 			-- Cao độ CHÂN theo avatar thật (HipHeight); R6 HipHeight=0 → fallback 3.0.
 			local hum = root.Parent and root.Parent:FindFirstChildOfClass("Humanoid")
 			local hip = hum and hum.HipHeight or 0
@@ -197,8 +198,9 @@ function KineticSandLive.attach(model, engine)
 				local vel = foot.vel
 				local speed = Vector3.new(vel.X, 0, vel.Z).Magnitude
 
+				local stepState: StepState = st or { dist = 0, last = pos, lastStepT = now, side = 1, idle = 0 }
 				if not st then
-					st = { dist = 0, last = pos, lastStepT = now, side = 1, idle = 0 }
+					st = stepState
 					stampCrater(pos.X, pos.Z, now, ratio)
 					crunch(root, math.max(ratio, 0.3))
 				end
@@ -218,27 +220,27 @@ function KineticSandLive.attach(model, engine)
 				lastPos = pos
 
 				-- đứng yên vẫn để lại dấu chân
-				st.idle -= dt
-				if speed <= 0.5 and st.idle <= 0 then
-					st.idle = 0.8
+				stepState.idle -= dt
+				if speed <= 0.5 and stepState.idle <= 0 then
+					stepState.idle = 0.8
 					stampCrater(pos.X, pos.Z, now, 0)
 				end
 
-				local d = pos - st.last
-				st.last = pos
-				st.dist += Vector3.new(d.X, 0, d.Z).Magnitude
+				local d = pos - stepState.last
+				stepState.last = pos
+				stepState.dist += Vector3.new(d.X, 0, d.Z).Magnitude
 				-- Xem khối STRIDE_* ở đầu file: sải chân dài ra theo tốc độ, KHÔNG cooldown
 				-- cố định (cooldown chính là thứ biến nhịp bước thành metronome đảo tai).
 				local stride = math.max(STRIDE_MIN, speed / STRIDE_DIV)
-				if st.dist >= stride and (now - st.lastStepT) >= 1 / MAX_STEP_RATE then
-					st.dist = 0
-					st.lastStepT = now
+				if stepState.dist >= stride and (now - stepState.lastStepT) >= 1 / MAX_STEP_RATE then
+					stepState.dist = 0
+					stepState.lastStepT = now
 					if speed > 0.5 and speed <= 26 then
 						-- đi bộ: đặt vết so le sang trái/phải theo hướng đi
-						st.side = -st.side
+						stepState.side = -stepState.side
 						local dir = Vector3.new(vel.X, 0, vel.Z)
 						local rightV = dir.Unit:Cross(Vector3.yAxis)
-						local fp = pos + rightV * (0.8 * st.side)
+						local fp = pos + rightV * (0.8 * stepState.side)
 						stampCrater(fp.X, fp.Z, now, 0)
 					else
 						stampCrater(pos.X, pos.Z, now, ratio)
@@ -285,7 +287,18 @@ function KineticSandLive.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for rec in active do
+			rec.part.Position = rec.restPos
+			rec.part.Color = rec.dry
+		end
+		table.clear(active)
+		if grid then
+			table.clear(grid.map)
+		end
+	end
 
 	return self
 end

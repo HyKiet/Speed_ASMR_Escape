@@ -1,13 +1,12 @@
 --!strict
---[[
-	SpeedWindAudioController.luau
-	Client controller that manages dynamic speed-based ambient wind sounds and sonic booms
-	using Roblox's new node-based Audio API.
-]]
+-- Client: tăng tiếng gió theo WalkSpeed và phát sonic boom khi vượt ngưỡng tốc độ.
+-- Nối các audio node trong SoundService; camera hiện tại nhận rung ngắn lúc sonic boom.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Log = require(ReplicatedStorage.Shared.Util.Log)
+local Janitor = require(ReplicatedStorage.Packages.Janitor)
+local ServiceLocator = require(ReplicatedStorage.Shared.Util.ServiceLocator)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -20,7 +19,9 @@ local localPlayer = Players.LocalPlayer
 local windPlayer: AudioPlayer? = nil
 local windFader: AudioFader? = nil
 local windPitchShifter: AudioPitchShifter? = nil
-local deviceOutput: AudioDeviceOutput? = nil
+local audioJanitor = Janitor.new()
+local started = false
+local AudioMixController: any
 
 local sonicBoomPlayer: AudioPlayer? = nil
 
@@ -32,43 +33,49 @@ local SONIC_BOOM_COOLDOWN = 10 -- 10 seconds between booms
 local function initAudioAPI()
 	-- 1. Create Nodes
 	local playerNode = Instance.new("AudioPlayer")
+	audioJanitor:Add(playerNode, "Destroy")
 	playerNode.Name = "WindLoopPlayer"
-	playerNode.AssetId = "rbxassetid://687874741"
+	playerNode.Asset = "rbxassetid://687874741"
 	playerNode.Looping = true
 	playerNode.Parent = SoundService
 	windPlayer = playerNode
 
 	local faderNode = Instance.new("AudioFader")
+	audioJanitor:Add(faderNode, "Destroy")
 	faderNode.Name = "WindFader"
 	faderNode.Volume = 0 -- Start at 0 volume
 	faderNode.Parent = SoundService
 	windFader = faderNode
 
 	local pitchNode = Instance.new("AudioPitchShifter")
+	audioJanitor:Add(pitchNode, "Destroy")
 	pitchNode.Name = "WindPitchShifter"
-	pitchNode.PitchRatio = 1.0
+	pitchNode.Pitch = 1.0
 	pitchNode.Parent = SoundService
 	windPitchShifter = pitchNode
 
 	local outputNode = Instance.new("AudioDeviceOutput")
+	audioJanitor:Add(outputNode, "Destroy")
 	outputNode.Name = "WindDeviceOutput"
 	outputNode.Parent = SoundService
-	deviceOutput = outputNode
 
 	-- 2. Wire nodes: Player -> Fader -> PitchShifter -> DeviceOutput
 	local wire1 = Instance.new("Wire")
+	audioJanitor:Add(wire1, "Destroy")
 	wire1.Name = "WirePlayerToFader"
 	wire1.SourceInstance = playerNode
 	wire1.TargetInstance = faderNode
 	wire1.Parent = SoundService
 
 	local wire2 = Instance.new("Wire")
+	audioJanitor:Add(wire2, "Destroy")
 	wire2.Name = "WireFaderToPitch"
 	wire2.SourceInstance = faderNode
 	wire2.TargetInstance = pitchNode
 	wire2.Parent = SoundService
 
 	local wire3 = Instance.new("Wire")
+	audioJanitor:Add(wire3, "Destroy")
 	wire3.Name = "WirePitchToOutput"
 	wire3.SourceInstance = pitchNode
 	wire3.TargetInstance = outputNode
@@ -76,13 +83,15 @@ local function initAudioAPI()
 
 	-- One-shot Sonic Boom AudioPlayer
 	local boomPlayer = Instance.new("AudioPlayer")
+	audioJanitor:Add(boomPlayer, "Destroy")
 	boomPlayer.Name = "SonicBoomPlayer"
-	boomPlayer.AssetId = "rbxassetid://9120769331"
+	boomPlayer.Asset = "rbxassetid://9120769331"
 	boomPlayer.Looping = false
 	boomPlayer.Parent = SoundService
 	sonicBoomPlayer = boomPlayer
 
 	local boomWire = Instance.new("Wire")
+	audioJanitor:Add(boomWire, "Destroy")
 	boomWire.Name = "WireBoomToOutput"
 	boomWire.SourceInstance = boomPlayer
 	boomWire.TargetInstance = outputNode
@@ -90,6 +99,7 @@ local function initAudioAPI()
 
 	-- Start playing the loop
 	playerNode:Play()
+	return true
 end
 
 local function triggerSonicBoom(camera: Camera)
@@ -105,8 +115,10 @@ local function triggerSonicBoom(camera: Camera)
 
 	-- Simple camera shake effect
 	task.spawn(function()
-		local originalCFrame = camera.CFrame
-		for i = 1, 15 do
+		for _ = 1, 15 do
+			if Workspace.CurrentCamera ~= camera then
+				return
+			end
 			local offset =
 				Vector3.new(math.random(-50, 50) / 100, math.random(-50, 50) / 100, math.random(-50, 50) / 100)
 			camera.CFrame = camera.CFrame * CFrame.new(offset)
@@ -116,14 +128,35 @@ local function triggerSonicBoom(camera: Camera)
 end
 
 function SpeedWindAudioController.Init()
-	-- Initialize new Audio API nodes
-	pcall(initAudioAPI)
+	AudioMixController = ServiceLocator.Get("AudioMixController")
+	audioJanitor:Sweep()
+	windPlayer = nil
+	windFader, windPitchShifter, sonicBoomPlayer = nil, nil, nil
+	local ok, err = pcall(initAudioAPI)
+	if not ok then
+		-- Lỗi giữa chừng không được để lại nửa chuỗi audio trong SoundService.
+		audioJanitor:Sweep()
+		windPlayer = nil
+		windFader, windPitchShifter, sonicBoomPlayer = nil, nil, nil
+		warn("[SpeedWindAudioController] Audio initialization failed:", err)
+	end
 end
 
 function SpeedWindAudioController.Start()
-	local camera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera") :: Camera
+	if started then
+		return
+	end
+	started = true
 
 	RunService.RenderStepped:Connect(function()
+		-- AudioPlayer không đi qua SoundGroup của mixer; áp cùng Master/SFX tại nguồn.
+		local gain = AudioMixController.GetVolume("master") * AudioMixController.GetVolume("sfx")
+		if windPlayer then
+			windPlayer.Volume = gain
+		end
+		if sonicBoomPlayer then
+			sonicBoomPlayer.Volume = gain
+		end
 		local char = localPlayer.Character
 		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 		local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -151,13 +184,13 @@ function SpeedWindAudioController.Start()
 
 			-- Smooth interpolation
 			windFader.Volume = windFader.Volume + (targetVolume - windFader.Volume) * 0.1
-			windPitchShifter.PitchRatio = windPitchShifter.PitchRatio
-				+ (targetPitch - windPitchShifter.PitchRatio) * 0.1
+			windPitchShifter.Pitch = windPitchShifter.Pitch + (targetPitch - windPitchShifter.Pitch) * 0.1
 		end
 
 		-- Sonic Boom trigger: speed exceeds 200 studs/s
 		if speed >= 200 then
-			if not hasSonicBoomed then
+			local camera = Workspace.CurrentCamera
+			if not hasSonicBoomed and camera then
 				hasSonicBoomed = true
 				triggerSonicBoom(camera)
 			end

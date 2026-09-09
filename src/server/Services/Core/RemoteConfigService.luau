@@ -1,4 +1,6 @@
 --!strict
+-- Server: đọc ConfigService theo chu kỳ, kiểm tra giá trị rồi cung cấp hệ số cho ProgressionService.
+-- Khi tên hoặc hệ số event đổi, gửi trạng thái mới để HUD cập nhật.
 --[[
 	RemoteConfigService.luau — Hệ số event thời vụ chỉnh được TỪ XA, không cần publish game.
 
@@ -287,11 +289,16 @@ function RemoteConfigService.Start()
 
 			local previousSpeed = RemoteConfigService.GetEventSpeedMultiplier()
 			local previousWins = RemoteConfigService.GetEventWinsMultiplier()
+			local previousName = RemoteConfigService.GetEventName()
 			lastFetchOk = refresh()
 
 			local newSpeed = RemoteConfigService.GetEventSpeedMultiplier()
 			local newWins = RemoteConfigService.GetEventWinsMultiplier()
-			if newSpeed ~= previousSpeed or newWins ~= previousWins then
+			if
+				newSpeed ~= previousSpeed
+				or newWins ~= previousWins
+				or RemoteConfigService.GetEventName() ~= previousName
+			then
 				RemoteConfigService.PushEventState()
 				print(
 					`[RemoteConfigService] Hệ số event đổi: speed x{previousSpeed}→x{newSpeed} `

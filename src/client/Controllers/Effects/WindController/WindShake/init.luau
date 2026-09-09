@@ -126,10 +126,14 @@ function WindShake:Update()
 
 	self.LastUpdate = now
 
-	debug.profilebegin("WindShake")
-
 	local camera = workspace.CurrentCamera
-	local cameraCF = camera and camera.CFrame
+	if not camera then
+		self.Active = 0
+		return
+	end
+	local cameraCF = camera.CFrame
+
+	debug.profilebegin("WindShake")
 
 	debug.profilebegin("Octree Search")
 	local updateObjects = self.Octree:RadiusSearch(cameraCF.Position + (cameraCF.LookVector * 115), 120)
@@ -140,6 +144,7 @@ function WindShake:Update()
 	self.Active = activeCount
 
 	if activeCount < 1 then
+		debug.profileend()
 		return
 	end
 
@@ -214,8 +219,6 @@ end
 function WindShake:Init()
 	if self.Initialized then
 		return
-	else
-		self.Initialized = true
 	end
 
 	-- Define attributes if they're undefined.
@@ -237,6 +240,7 @@ function WindShake:Init()
 
 	-- Clear any old stuff.
 	self:Cleanup()
+	self.Initialized = true
 
 	-- Wire up tag listeners.
 	local windShakeAdded = CollectionService:GetInstanceAddedSignal(COLLECTION_TAG)
@@ -254,10 +258,6 @@ function WindShake:Init()
 end
 
 function WindShake:Cleanup()
-	if not self.Initialized then
-		return
-	end
-
 	self:Pause()
 
 	if self.AddedConnection then
@@ -270,7 +270,10 @@ function WindShake:Cleanup()
 		self.RemovedConnection = nil
 	end
 
-	table.clear(self.ObjectMetadata)
+	-- Clear per-object listeners and restore foliage before dropping the index.
+	for object in pairs(self.ObjectMetadata) do
+		self:RemoveObjectShake(object)
+	end
 	self.Octree:ClearNodes()
 
 	self.Handled = 0

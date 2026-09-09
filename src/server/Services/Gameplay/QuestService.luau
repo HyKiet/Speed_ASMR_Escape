@@ -1,5 +1,6 @@
 --!strict
--- One quest backbone: onboarding Chain first, then three server-owned Daily Quests forever.
+-- Server: đọc tiến trình từ DataService để chạy chuỗi nhiệm vụ rồi chuyển sang nhiệm vụ ngày.
+-- Sự kiện gameplay cập nhật mục tiêu; ByteNet chỉ nhận yêu cầu lĩnh thưởng đã được server xác nhận.
 
 local BadgeService = game:GetService("BadgeService")
 local Players = game:GetService("Players")
@@ -332,8 +333,8 @@ function QuestService.Init()
 end
 
 function QuestService.Start()
-	GamePackets.requestDailyQuestClaim.listen(function(payload, player: Player)
-		if not NetRateLimit.ShouldDrop(player, "dailyQuestClaim", 0.3) then
+	GamePackets.requestDailyQuestClaim.listen(function(payload, player)
+		if player and not NetRateLimit.ShouldDrop(player, "dailyQuestClaim", 0.3) then
 			claimDaily(player, payload.index)
 		end
 	end)

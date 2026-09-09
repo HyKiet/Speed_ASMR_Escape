@@ -132,7 +132,7 @@ function Butter.attach(model, engine)
 	local cullCenter, cullReach
 	local anyActive = false
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Blocks", 10)
 		if not folder then
 			return
@@ -375,7 +375,15 @@ function Butter.attach(model, engine)
 	end
 
 	function self.destroy()
-		resetAll()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		-- Trả đúng pose gốc; ngưỡng WRITE_EPS chỉ dành cho animation đang chạy.
+		for _, block in blocks do
+			for i, bone in block.bones do
+				bone.Position = block.rest[i]
+			end
+		end
+		table.clear(blocks)
 	end
 
 	return self

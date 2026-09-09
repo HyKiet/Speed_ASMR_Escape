@@ -1,6 +1,6 @@
 --!strict
--- Hệ thống Điểm danh 7 ngày (Hardcore Streak).
--- Bỏ lỡ 1 ngày → reset chuỗi về Ngày 1. Phần thưởng tăng dần, Ngày 7 tặng 1 lượt quay Roulette.
+-- Server dùng ngày UTC trong DataService để chốt mỗi lượt điểm danh, rồi gọi các service cấp quà.
+-- ByteNet gửi trạng thái về DailyModal; bỏ lỡ một ngày thì bắt đầu lại chuỗi bảy ngày.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,7 +45,17 @@ local DailyService = {}
 	⚠️ Sửa bảng này thì PHẢI sửa `REWARD_CONFIGS` trong `client/.../Modals/DailyModal.luau`
 	— lệch nhau là người chơi thấy một đằng nhận một nẻo.
 ]]
-local DAILY_REWARDS = {
+type DailyReward = {
+	wins: number?,
+	speed: number?,
+	spin: number?,
+	boostSpeed: number?,
+	boostWins: number?,
+	megaServerBoost: boolean?,
+	trail: string?,
+}
+
+local DAILY_REWARDS: { DailyReward } = {
 	-- Ngày 1 cố tình NGHÈO Wins: người chơi mới không được nhảy cóc qua đoạn đầu game. Toàn bộ
 	-- Wins đáng kể của chuỗi nằm ở Ngày 5 và Ngày 7, tức phải đi gần trọn chuỗi mới chạm tới.
 	{ wins = 5, speed = 2_000 },
@@ -234,8 +244,8 @@ function DailyService.Init()
 end
 
 function DailyService.Start()
-	GamePackets.requestDailyClaim.listen(function(_data, player: Player)
-		if NetRateLimit.ShouldDrop(player, "dailyClaim") then
+	GamePackets.requestDailyClaim.listen(function(_data, player)
+		if not player or NetRateLimit.ShouldDrop(player, "dailyClaim") then
 			return
 		end
 		onClaim(player)

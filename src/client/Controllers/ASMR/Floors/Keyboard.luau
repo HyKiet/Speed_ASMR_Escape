@@ -218,7 +218,7 @@ local RELEASE_K, RELEASE_D = 330, 30
 local HOLD_SLACK_XZ = 0.55
 local HOLD_SLACK_Y = 0.8
 
-function Keyboard.attach(model, engine)
+function Keyboard.attach(model: Model, engine: any)
 	local FxBudget, SoundPool, ParticlePool = engine.FxBudget, engine.SoundPool, engine.ParticlePool
 	local self = { ready = false }
 
@@ -233,7 +233,7 @@ function Keyboard.attach(model, engine)
 	-- bé hơn nên vẫn giữ 2 như cũ.
 	local fxCount = if fx == DEFAULT_FX then 2 else 1
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local wrap = model:WaitForChild("Clicky Keyboard Asmr", 10)
 		local themes = wrap and wrap:WaitForChild("Themes", 10)
 		if not themes then
@@ -310,7 +310,7 @@ function Keyboard.attach(model, engine)
 			pressDepth = engine.GroundLimit.maxSink(mid.topY, groundTop) or PRESS_DEPTH
 		end
 
-		self.ready = true
+		self.ready = #keys > 0
 		Log.Floor("Keyboard", #keys, model)
 	end)
 
@@ -528,7 +528,20 @@ function Keyboard.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for rec in activeKeys do
+			rec.part.CFrame = rec.rest
+		end
+		table.clear(activeKeys)
+		if keys then
+			table.clear(keys)
+		end
+		if grid then
+			table.clear(grid.map)
+		end
+	end
 
 	return self
 end

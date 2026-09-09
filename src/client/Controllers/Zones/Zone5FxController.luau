@@ -1,5 +1,6 @@
 --!strict
--- Hiệu ứng client cho Stage 5 (nổ banh + pháo hoa khi Victory).
+-- Client nhận kết quả Stage 5 từ StageCheckpointService qua ByteNet rồi phát SFX/pháo hoa.
+-- Mỗi hiệu ứng tự huỷ sau khi phát xong; quyền cấp Wins vẫn thuộc server.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,7 +8,7 @@ local Workspace = game:GetService("Workspace")
 
 local Zone5FxController = {}
 
-local zone5Event = ReplicatedStorage:WaitForChild("Zone5Event", 5) :: RemoteEvent?
+local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local localPlayer = Players.LocalPlayer
 
 --[[
@@ -26,7 +27,7 @@ local function spawnBallExplode(position: Vector3)
 	local sound = Instance.new("Sound")
 	sound.SoundId = POP_SOUND
 	sound.Volume = 0.5
-	sound.Pitch = 1.2 + (math.random(-15, 15) / 100)
+	sound.PlaybackSpeed = 1.2 + (math.random(-15, 15) / 100)
 
 	local soundPart = Instance.new("Part")
 	soundPart.Size = Vector3.new(1, 1, 1)
@@ -143,16 +144,11 @@ end
 function Zone5FxController.Init() end
 
 function Zone5FxController.Start()
-	if not zone5Event then
-		warn("[Zone5FxController] Zone5Event không tìm thấy")
-		return
-	end
-
-	zone5Event.OnClientEvent:Connect(function(action: string, data: any)
-		if action == "BallExplode" then
-			spawnBallExplode(data :: Vector3)
-		elseif action == "Victory" then
-			spawnVictoryFireworks(data :: Vector3)
+	GamePackets.zone5EffectState.listen(function(data)
+		if data.action == "BallExplode" then
+			spawnBallExplode(data.position)
+		elseif data.action == "Victory" then
+			spawnVictoryFireworks(data.position)
 		end
 	end)
 end

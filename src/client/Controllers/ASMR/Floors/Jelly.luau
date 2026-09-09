@@ -14,17 +14,17 @@ Jelly.soundIds = WOBBLE_SOUNDS
 
 local FOOT_DROP = 3.2
 
-function Jelly.attach(model, engine)
+function Jelly.attach(model: Model, engine: any)
 	local FxBudget, SoundPool, Bounds = engine.FxBudget, engine.SoundPool, engine.Bounds
 	local self = { ready = false }
 	-- bản zone không có Collider, box tính từ ĐỈNH block (cao 3.6) → cần tolerance rộng hơn.
 	-- Builder set attribute YTol=5.5 (bài học zone v2: patch 3→5.5)
-	local Y_TOL = model:GetAttribute("YTol") or 3
+	local Y_TOL = (model:GetAttribute("YTol") or 3) :: number
 
 	local blocks = {}
 	local box
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Blocks", 10)
 		if not folder then
 			return
@@ -35,6 +35,7 @@ function Jelly.attach(model, engine)
 				table.insert(blocks, {
 					part = b,
 					restPos = b.Position,
+					restCFrame = b.CFrame,
 					restSize = b.Size,
 					bottomY = b.Position.Y - b.Size.Y / 2,
 					amp = 0,
@@ -97,14 +98,14 @@ function Jelly.attach(model, engine)
 	local contact = nil
 	local stepLast, stepDist = nil, 0
 
-	function self.update(dt, now, foot)
+	function self.update(dt, _now, foot)
 		if not self.ready then
 			return
 		end
 
 		local rec = nil
 		if foot then
-			local pos = foot.pos
+			local pos: Vector3 = foot.pos
 			if engine.Bounds.contains(box, pos) and math.abs((pos.Y - FOOT_DROP) - box.topY) < Y_TOL then
 				rec = nearestBlock(pos)
 			end
@@ -149,7 +150,15 @@ function Jelly.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for _, rec in blocks do
+			rec.part.Size = rec.restSize
+			rec.part.CFrame = rec.restCFrame
+		end
+		table.clear(blocks)
+	end
 
 	return self
 end

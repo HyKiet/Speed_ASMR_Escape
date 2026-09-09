@@ -75,6 +75,8 @@ type Cluster = {
 local clusters: { Cluster } = {}
 local ready = false
 local lastFingerprint = -1
+local connection: RBXScriptConnection? = nil
+local resolverThread: thread? = nil
 
 local force: VectorForce? = nil
 local attachment: Attachment? = nil
@@ -339,7 +341,10 @@ local function spinBlades()
 end
 
 function Zone14FanController.Start()
-	task.spawn(function()
+	if connection then
+		return
+	end
+	resolverThread = task.spawn(function()
 		local lastPrint = -1
 		while true do
 			local fp = fanFingerprint()
@@ -368,8 +373,9 @@ function Zone14FanController.Start()
 		end
 	end)
 
-	RunService.Heartbeat:Connect(function(dt)
+	connection = RunService.Heartbeat:Connect(function(dt)
 		if not ready then
+			clearRig()
 			return
 		end
 
@@ -432,6 +438,16 @@ function Zone14FanController.Start()
 end
 
 function Zone14FanController.Stop()
+	if resolverThread then
+		if coroutine.status(resolverThread) == "suspended" then
+			task.cancel(resolverThread)
+		end
+		resolverThread = nil
+	end
+	if connection then
+		connection:Disconnect()
+		connection = nil
+	end
 	clearRig()
 end
 

@@ -1,4 +1,6 @@
 --!strict
+-- Server: xác minh quyền sở hữu với Roblox, cache theo phiên rồi mở khóa bằng ProgressionService.
+-- Khi mua thành công, cập nhật quyền lợi ngay và gửi hiệu ứng chúc mừng qua ByteNet.
 --[[
 	GamepassService.luau — Xử lý sở hữu & mua gamepass NGAY TRONG GAME.
 
@@ -54,7 +56,7 @@ local function recordGamepassDonation(player: Player, passId: number)
 		local price = passPriceCache[passId]
 		if not price then
 			local ok, info = pcall(function()
-				return MarketplaceService:GetProductInfo(passId, Enum.InfoType.GamePass)
+				return MarketplaceService:GetProductInfoAsync(passId, Enum.InfoType.GamePass)
 			end)
 			if not ok or typeof(info) ~= "table" then
 				warn(`[GamepassService] không đọc được giá pass {passId} để ghi Top Donate`)
@@ -155,7 +157,7 @@ end
 -- ("You already own this item", purchased=false) → không bao giờ unlock = kẹt vĩnh viễn.
 -- Tài khoản chưa sở hữu vẫn test được luồng mua bình thường (Studio test purchase).
 function GamepassService.OwnsPass(player: Player, passId: number): boolean
-	if passId <= 0 then
+	if passId <= 0 or player.Parent ~= Players then
 		return false
 	end
 
@@ -185,21 +187,33 @@ function GamepassService.OwnsPass(player: Player, passId: number): boolean
 	local ok, owns = pcall(function()
 		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, passId)
 	end)
+	if player.Parent ~= Players then
+		return false
+	end
+	-- Người chơi có thể vừa mua trong lúc truy vấn cũ đang chờ; quyền đã xác nhận luôn thắng.
+	owned = sessionOwned[player]
+	if owned and owned[passId] then
+		return true
+	end
 	if ok and owns == true then
+		local confirmed = owned or {}
+		sessionOwned[player] = confirmed
+		confirmed[passId] = true
 		return true
 	end
 
 	-- Cả "API trả false" lẫn "API lỗi" đều ghi nhận là chưa sở hữu trong 60s. Ghi cả ca
 	-- lỗi là CỐ Ý: lúc Roblox đang bóp request, hỏi lại dồn dập chỉ làm bị bóp lâu hơn.
-	if not misses then
-		misses = {}
-		negativeCache[player] = misses
-	end
-	misses[passId] = os.clock()
+	local cachedMisses = misses or {}
+	negativeCache[player] = cachedMisses
+	cachedMisses[passId] = os.clock()
 	return false
 end
 
 local function markSessionOwned(player: Player, passId: number)
+	if player.Parent ~= Players then
+		return
+	end
 	local owned = sessionOwned[player]
 	if not owned then
 		owned = {}
@@ -209,7 +223,10 @@ local function markSessionOwned(player: Player, passId: number)
 end
 
 local function syncVipAttribute(player: Player)
-	player:SetAttribute("IsVIP", GamepassService.OwnsPass(player, VIP_PASS_ID))
+	local owns = GamepassService.OwnsPass(player, VIP_PASS_ID)
+	if player.Parent == Players then
+		player:SetAttribute("IsVIP", owns)
+	end
 end
 
 -- Unlock treadmill (persist) + trang bị nếu multiplier cao hơn treadmill đang dùng.
@@ -341,7 +358,9 @@ function GamepassService.PromptTreadmillPurchase(player: Player, treadmillId: st
 			unlockTreadmill(player, treadmillId, true)
 			return
 		end
-		MarketplaceService:PromptGamePassPurchase(player, passId)
+		if player.Parent == Players then
+			MarketplaceService:PromptGamePassPurchase(player, passId)
+		end
 	end)
 end
 
@@ -363,7 +382,9 @@ function GamepassService.PromptCosmeticPurchase(player: Player, category: string
 			unlockCosmetic(player, pass, true)
 			return
 		end
-		MarketplaceService:PromptGamePassPurchase(player, passId)
+		if player.Parent == Players then
+			MarketplaceService:PromptGamePassPurchase(player, passId)
+		end
 	end)
 end
 
@@ -386,6 +407,9 @@ end
 function GamepassService.Start()
 	-- Áp quyền lợi của 1 pass (sau khi mua xong hoặc phát hiện đã sở hữu sẵn).
 	local function applyPass(player: Player, passId: number)
+		if player.Parent ~= Players then
+			return
+		end
 		markSessionOwned(player, passId)
 
 		local speedName = SPEED_PASS_NAMES[passId]

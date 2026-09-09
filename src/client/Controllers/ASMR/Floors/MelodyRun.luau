@@ -39,11 +39,22 @@ local FOOT_DROP = 3.2
 local Y_TOL = 2.8
 local MAX_NOTES_PER_FRAME = 8
 
-function MelodyRun.attach(model, engine)
+type Tile = {
+	part: BasePart,
+	dim: Color3,
+	restMaterial: Enum.Material,
+	bright: Color3,
+	semi: number,
+	glow: number,
+	light: PointLight?,
+	noteTask: thread?,
+}
+
+function MelodyRun.attach(model: Model, engine: any)
 	local FxBudget, SoundPool, Bounds = engine.FxBudget, engine.SoundPool, engine.Bounds
 	local self = { ready = false }
 
-	local records = {}
+	local records: { Tile } = {}
 	local grid
 	local box, topY
 	-- Vùng bắt tính RIÊNG THEO TỪNG TRỤC: ô Zone 13 là 50×24 (chữ nhật), dùng chung nửa
@@ -51,9 +62,9 @@ function MelodyRun.attach(model, engine)
 	-- ô hàng trên/dưới tranh nhau bàn chân vô cớ.
 	local reachX, reachZ = 2.3, 2.3 -- đo lại lúc attach
 	local lightRange = 9 -- theo cỡ ô, đo lại lúc attach
-	local glowing = {} -- set các rec đang sáng
+	local glowing: { [Tile]: boolean } = {} -- set các rec đang sáng
 
-	task.spawn(function()
+	self.initTask = task.spawn(function()
 		local folder = model:WaitForChild("Tiles", 10)
 		if not folder then
 			return
@@ -73,16 +84,18 @@ function MelodyRun.attach(model, engine)
 		grid = engine.SpatialGrid.new(math.max(CELL_MIN, math.max(reachX, reachZ) * 2))
 		for _, t in folder:GetChildren() do
 			if t:IsA("BasePart") then
-				local col = t:GetAttribute("Col") or 1
-				local hue = t:GetAttribute("Hue") or 0
+				local col = (t:GetAttribute("Col") or 1) :: number
+				local hue = (t:GetAttribute("Hue") or 0) :: number
 				local semi = PENTA[(col - 1) % 5 + 1] + 12 * math.floor((col - 1) / 5) + OCTAVE_DOWN
-				local rec = {
+				local rec: Tile = {
 					part = t,
 					dim = t.Color,
+					restMaterial = t.Material,
 					bright = Color3.fromHSV(hue, 0.6, 1),
 					semi = semi,
 					glow = 0,
-					light = nil,
+					light = nil :: PointLight?,
+					noteTask = nil :: thread?,
 				}
 				table.insert(records, rec)
 				grid:insert(t.Position.X, t.Position.Z, rec)
@@ -98,9 +111,10 @@ function MelodyRun.attach(model, engine)
 	-- Quét 3×3 cell chứ KHÔNG `bucketAt` (1 cell): ô không bao giờ căn khớp biên cell, nên
 	-- đứng gần mép ô là rơi sang cell bên cạnh và tra 1 cell sẽ trả về nil — mặt sàn thủng
 	-- lỗ chỗ. 9 bucket vẫn là O(1), chi phí không đáng kể.
-	local function tileAt(px, pz)
-		local best, bd
-		grid:query(px, pz, 1, function(rec)
+	local function tileAt(px: number, pz: number): Tile?
+		local best: Tile? = nil
+		local bd: number? = nil
+		grid:query(px, pz, 1, function(rec: Tile)
 			local dx = math.abs(px - rec.part.Position.X)
 			local dz = math.abs(pz - rec.part.Position.Z)
 			if dx <= reachX and dz <= reachZ then
@@ -128,7 +142,7 @@ function MelodyRun.attach(model, engine)
 	local RETRIGGER_LOCK = 0.35
 	local lastSemiAt = {}
 
-	local function playNote(rec, ratio, delaySec)
+	local function playNote(rec: Tile, ratio: number, delaySec: number?)
 		local now = os.clock()
 		local at = math.max(now + (delaySec or 0), nextNoteAt)
 		if at - now > LATE_DROP then
@@ -139,8 +153,9 @@ function MelodyRun.attach(model, engine)
 		end
 		lastSemiAt[rec.semi] = at
 		nextNoteAt = at + MIN_NOTE_GAP
-		task.delay(at - now, function()
-			if not FxBudget.fxOK(rec.part.Position, 150) then
+		rec.noteTask = task.delay(at - now, function()
+			rec.noteTask = nil
+			if not self.ready or not FxBudget.fxOK(rec.part.Position, 150) then
 				return
 			end
 			-- sáng đèn
@@ -148,15 +163,17 @@ function MelodyRun.attach(model, engine)
 			glowing[rec] = true
 			rec.part.Material = Enum.Material.Neon
 			rec.part.Color = rec.bright
-			if not rec.light then
+			local light = rec.light
+			if not light then
 				local l = Instance.new("PointLight")
 				l.Color = rec.bright
 				l.Range = lightRange
 				l.Brightness = 0
 				l.Parent = rec.part
 				rec.light = l
+				light = l
 			end
-			rec.light.Brightness = 3.5
+			(light :: PointLight).Brightness = 3.5
 			-- note pitch ngũ cung
 			SoundPool.playStep(
 				NOTE_ID,
@@ -171,19 +188,19 @@ function MelodyRun.attach(model, engine)
 		end)
 	end
 
-	local currentTile = nil
-	local lastPos = nil
+	local currentTile: Tile? = nil
+	local lastPos: Vector3? = nil
 
-	function self.update(dt, now, foot)
+	function self.update(dt: number, _now, foot)
 		if not self.ready then
 			return
 		end
 
-		local rec = nil
+		local rec: Tile? = nil
 		local onFloor = false
 		local ratio = 0
 		if foot then
-			local pos = foot.pos
+			local pos: Vector3 = foot.pos
 			if engine.Bounds.contains(box, pos) and math.abs((pos.Y - FOOT_DROP) - topY) < Y_TOL then
 				onFloor = true
 				ratio = foot.ratio
@@ -253,7 +270,23 @@ function MelodyRun.attach(model, engine)
 		end
 	end
 
-	function self.destroy() end
+	function self.destroy()
+		self.ready = false
+		engine.Await.cancel(self.initTask)
+		for _, rec in records do
+			engine.Await.cancel(rec.noteTask)
+			rec.part.Color = rec.dim
+			rec.part.Material = rec.restMaterial
+			if rec.light then
+				rec.light:Destroy()
+			end
+		end
+		table.clear(glowing)
+		table.clear(records)
+		if grid then
+			table.clear(grid.map)
+		end
+	end
 
 	return self
 end

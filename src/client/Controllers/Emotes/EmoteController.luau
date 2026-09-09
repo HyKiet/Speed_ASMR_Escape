@@ -179,6 +179,9 @@ end
 function EmoteController.Init() end
 
 function EmoteController.Start()
+	sweeper:Add(Players.PlayerRemoving:Connect(function(player)
+		stopTrack(player.UserId)
+	end))
 	sweeper:Add(UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		if not processed and input.KeyCode == Enum.KeyCode.G then
 			Manager.ToggleEmote()

@@ -11,7 +11,7 @@
 	Đó là nguyên nhân gốc của Sinks/Sources = 2,3% đo được trên Live: người chơi không keo, họ
 	học được rằng tiêu tiền thì bị phạt.
 
-	Giờ: trừ Wins một lần, ghi vào `data.OwnedPadIndex`, giữ mãi mãi.
+	Giờ: trừ Wins một lần, ghi vào `data.HighestPadIndex`, giữ mãi mãi.
 
 	⚠️ MIGRATION BẮT BUỘC (DataService, CORE_LOOP_VERSION 5): mọi tài khoản được cấp MIỄN PHÍ
 	tất cả pad mà `TotalWins` hiện tại của họ đủ theo bảng NGƯỠNG CŨ (0 / 1 / 15 / 100 / 500 /

@@ -1,5 +1,5 @@
 --!strict
--- Đo đạc bằng số liệu, thay cho việc ngồi đoán vì sao người chơi rời game.
+-- Server ghi funnel, kinh tế và lỗi từ các service; nhận cờ chẩn đoán giới hạn từ client.
 --
 -- Ba thứ được ghi:
 --   1. Onboarding funnel — người chơi MỚI đi được tới đâu trong 4 bước đầu.
@@ -23,6 +23,7 @@ local ScriptContext = game:GetService("ScriptContext")
 local Env = require(ReplicatedStorage.Shared.Util.Env)
 local GamePackets = require(ReplicatedStorage.Shared.Network.GamePackets)
 local Log = require(ReplicatedStorage.Shared.Util.Log)
+local NetRateLimit = require(ReplicatedStorage.Shared.Util.NetRateLimit)
 
 -- 4 bước đầu của người chơi mới. Đổi thứ tự = làm gãy dữ liệu lịch sử, chỉ
 -- được THÊM bước vào cuối.
@@ -326,7 +327,6 @@ local function finishSession(player: Player)
 	end
 end
 
-
 -- ============================================================================
 
 function TelemetryService.Start()
@@ -362,9 +362,17 @@ function TelemetryService.Start()
 		finishSession(player)
 	end)
 
-	GamePackets.earlySessionState.listen(function(payload, player: Player)
+	GamePackets.earlySessionState.listen(function(payload, player: Player?)
+		if not player then
+			return
+		end
 		local session = sessions[player]
 		if not session or os.clock() - session.joinedAt > 30 then
+			return
+		end
+		-- Hai cờ có thể đến cùng lúc từ hai controller; mỗi tổ hợp có hạn mức riêng.
+		local key = `earlySession:{payload.assetsLoaded}:{payload.controlsTouched}`
+		if NetRateLimit.ShouldDrop(player, key) then
 			return
 		end
 		-- Cờ chỉ được tiến từ false → true; spam packet sau lần đầu không tạo thêm việc.

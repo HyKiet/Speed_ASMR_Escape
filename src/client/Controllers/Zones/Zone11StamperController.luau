@@ -58,6 +58,7 @@ local impactSound: Sound? = nil
 local lastCyclePhase = -1
 local ready = false
 local connection: RBXScriptConnection? = nil
+local resolverThread: thread? = nil
 
 local function resolve(): boolean
 	local zones = Workspace:FindFirstChild("Zones")
@@ -252,8 +253,11 @@ local function step()
 end
 
 function Zone11StamperController.Start()
+	if connection then
+		return
+	end
 	connection = RunService.RenderStepped:Connect(step)
-	task.spawn(function()
+	resolverThread = task.spawn(function()
 		while true do
 			if not ready then
 				ready = resolve()
@@ -267,6 +271,13 @@ function Zone11StamperController.Start()
 end
 
 function Zone11StamperController.Stop()
+	-- Dừng cả vòng dò streaming; ngắt render thôi vẫn giữ controller sống ngầm.
+	if resolverThread then
+		if coroutine.status(resolverThread) == "suspended" then
+			task.cancel(resolverThread)
+		end
+		resolverThread = nil
+	end
 	if connection then
 		connection:Disconnect()
 		connection = nil
@@ -277,6 +288,8 @@ function Zone11StamperController.Stop()
 		end
 	end
 	laserLeft, laserRight, impactRig = nil, nil, nil
+	sparkEmitter, impactSound = nil, nil
+	ready = false
 end
 
 return Zone11StamperController

@@ -1,5 +1,5 @@
 --!strict
--- Modal Code: players enter promo codes to receive rewards.
+-- Dựng ô nhập mã trên client bằng ModalShell; gửi mã qua ByteNet để server kiểm tra và cấp quà.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -23,7 +23,7 @@ local PANEL_WIDTH = 740
 local PANEL_HEIGHT = 380
 
 local function submitCode()
-	local code = string.upper(string.gsub(State.codeInput:get(), "%s+", ""))
+	local code = State.codeInput:get():gsub("%s+", ""):upper()
 	if #code == 0 then
 		Toast.Show("Enter a code first!")
 		return
@@ -35,7 +35,6 @@ end
 
 local function buildContent(): { any }
 	return {
-		-- Instruction label
 		Theme.MakeOutlineLabel({
 			Position = UDim2.fromOffset(40, 106),
 			Size = UDim2.fromOffset(660, 34),
@@ -137,7 +136,6 @@ local function buildContent(): { any }
 			end,
 		}),
 
-		-- Social hint
 		Theme.MakeOutlineLabel({
 			Position = UDim2.fromOffset(40, 234),
 			Size = UDim2.fromOffset(660, 40),
@@ -147,7 +145,6 @@ local function buildContent(): { any }
 			ZIndex = 43,
 		}),
 
-		-- Divider line
 		New("Frame")({
 			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 			BackgroundTransparency = 0.7,
@@ -159,7 +156,6 @@ local function buildContent(): { any }
 			},
 		}),
 
-		-- Bottom hint
 		Theme.MakeOutlineLabel({
 			Position = UDim2.fromOffset(40, 296),
 			Size = UDim2.fromOffset(660, 72),

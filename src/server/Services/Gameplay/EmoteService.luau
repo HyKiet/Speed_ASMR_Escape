@@ -150,8 +150,8 @@ function EmoteService.Init()
 end
 
 function EmoteService.Start()
-	GamePackets.requestEmoteAction.listen(function(payload, player: Player)
-		if NetRateLimit.ShouldDrop(player, "emoteAction", 0.2) then
+	GamePackets.requestEmoteAction.listen(function(payload, player)
+		if not player or NetRateLimit.ShouldDrop(player, "emoteAction", 0.2) then
 			return
 		end
 		if payload.action == "buy" then

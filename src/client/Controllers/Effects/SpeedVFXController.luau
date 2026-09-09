@@ -1,4 +1,6 @@
 --!strict
+-- Client giữ FOV ổn định, cộng bù từ Modal Manager và phát vạch gió theo vận tốc nhân vật.
+-- Dựng lại hiệu ứng khi Roblox thay camera để không giữ Attachment đã bị huỷ.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Log = require(ReplicatedStorage.Shared.Util.Log)
@@ -10,25 +12,32 @@ local Workspace = game:GetService("Workspace")
 local SpeedVFXController = {}
 
 -- Các thông số tinh chỉnh
-local MIN_SPEED = 25 -- Tốc độ bắt đầu zoom FOV
-local MAX_SPEED = 120 -- Tốc độ đạt mốc FOV cao nhất
+local MAX_SPEED = 120 -- Tốc độ đạt mật độ vạch gió cao nhất
 local MIN_FOV = 70 -- FOV mặc định
-local MAX_FOV = 110 -- FOV tối đa (Zoom góc rộng ra)
 
 -- Vạch tốc độ bay ở đâu so với camera (60 studs phía trước) — cố định, xem vòng RenderStepped.
 local ATTACH_OFFSET = Vector3.new(0, 0, -60)
 
-local speedAttachment = nil
-local speedParticles = nil
+local speedAttachment: Attachment? = nil
+local speedParticles: ParticleEmitter? = nil
 
 function SpeedVFXController.SetupVFX()
+	if speedAttachment then
+		speedAttachment:Destroy()
+		speedAttachment = nil
+		speedParticles = nil
+	end
 	local camera = Workspace.CurrentCamera
+	if not camera then
+		return
+	end
 
 	-- 1. Tạo Attachment đặt xa 60 stud ở phía trước Camera
-	speedAttachment = Instance.new("Attachment")
-	speedAttachment.Name = "SpeedVFXAttachment"
-	speedAttachment.CFrame = CFrame.new(ATTACH_OFFSET)
-	speedAttachment.Parent = camera
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "SpeedVFXAttachment"
+	attachment.CFrame = CFrame.new(ATTACH_OFFSET)
+	attachment.Parent = camera
+	speedAttachment = attachment
 
 	-- 2. Cấu hình ParticleEmitter (Hạt Gió / Speed Lines)
 	local particle = Instance.new("ParticleEmitter")
@@ -65,7 +74,7 @@ function SpeedVFXController.SetupVFX()
 	particle.LightEmission = 0.8
 	particle.ZOffset = -1 -- Tránh che lấp UI
 
-	particle.Parent = speedAttachment
+	particle.Parent = attachment
 	speedParticles = particle
 end
 
@@ -80,13 +89,16 @@ function SpeedVFXController.Start()
 	-- để 0.5 sẵn, nên sửa ở StarterPlayer thôi là vô ích, controller sẽ đè lại lúc Start().
 	player.CameraMinZoomDistance = 0.5
 
-	RunService.RenderStepped:Connect(function(dt)
+	RunService.RenderStepped:Connect(function()
 		local camera = Workspace.CurrentCamera
 		local character = player.Character
+		if not camera then
+			return
+		end
 
-		-- Gắn chặt Attachment vào Camera (phòng khi Camera bị thay đổi)
-		if speedAttachment and speedAttachment.Parent ~= camera then
-			speedAttachment.Parent = camera
+		-- Camera cũ bị huỷ cùng con cháu; không thể reparent Attachment của nó.
+		if not speedAttachment or speedAttachment.Parent ~= camera then
+			SpeedVFXController.SetupVFX()
 		end
 		-- GHI KHI KHÁC, không ghi mù mỗi frame: Attachment này không bao giờ đổi chỗ (offset
 		-- cố định trong không gian camera), nên 60 lượt ghi/giây chỉ để đặt lại đúng giá trị
@@ -112,11 +124,11 @@ function SpeedVFXController.Start()
 			camera.FieldOfView = wantFov
 		end
 
-		if not character then
-			return
-		end
-		local root = character:FindFirstChild("HumanoidRootPart") :: BasePart
-		if not root then
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root or not root:IsA("BasePart") then
+			if speedParticles then
+				speedParticles.Rate = 0
+			end
 			return
 		end
 
